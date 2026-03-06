@@ -1,8 +1,12 @@
+
+
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
-!**/src/test/**/target/
+!**/src/test/**/target
+
+application-local.yaml
 
 ### STS ###
 .apt_generated
