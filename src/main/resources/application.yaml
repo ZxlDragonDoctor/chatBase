@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: chatBase
+
+# Dify密钥
+difyApp:
+  url: "https://api.dify.ai/v1"
+  apiKey: "app-x4pDm1oSxDVu9fRLChTGdoFi"
+  timeOut: 30
