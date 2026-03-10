@@ -1,71 +1,69 @@
 package com.zxl.chatbase.dify.model.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.util.List;
 
+/**
+ * ChatCompletionResponse - 完整的App结果响应
+ * 当 response_mode 为 blocking 时返回
+ */
 @Data
 public class DifyChatResponse {
     
-    @JsonProperty("event")
-    private String event;                           // 事件类型，一般为 message
+    /**
+     * 事件类型，固定为 message
+     */
+    private String event;
     
-    @JsonProperty("task_id")
+    /**
+     * 任务 ID，用于请求跟踪和停止响应接口
+     */
     private String taskId;
     
-    @JsonProperty("message_id")
+    /**
+     * 唯一ID
+     */
+    private String id;
+    
+    /**
+     * 消息唯一 ID
+     */
     private String messageId;
     
-    @JsonProperty("conversation_id")
+    /**
+     * 会话 ID
+     */
     private String conversationId;
     
-    @JsonProperty("mode")
-    private String mode;                             // chat
+    /**
+     * App 模式，固定为 chat
+     */
+    private String mode;
     
-    @JsonProperty("answer")
-    private String answer;                           // 完整的回复内容
+    /**
+     * 完整回复内容
+     */
+    private String answer;
     
-    @JsonProperty("metadata")
-    private Metadata metadata;                        // 元数据
+    /**
+     * 元数据
+     */
+    private Metadata metadata;
     
-    @Data
-    public static class Metadata {
-        @JsonProperty("usage")
-        private Usage usage;                          // token使用情况
-        
-        @JsonProperty("retriever_resources")
-        private List<RetrieverResource> retrieverResources; // 引用来源
-    }
+    /**
+     * 模型用量信息
+     */
+    private Usage usage;
     
-    @Data
-    public static class Usage {
-        @JsonProperty("prompt_tokens")
-        private int promptTokens;
-        
-        @JsonProperty("completion_tokens")
-        private int completionTokens;
-        
-        @JsonProperty("total_tokens")
-        private int totalTokens;
-    }
+    /**
+     * 引用和归属分段列表
+     */
+    private List<RetrieverResource> retrieverResources;
     
-    @Data
-    public static class RetrieverResource {
-        private int position;
-        @JsonProperty("dataset_id")
-        private String datasetId;
-        @JsonProperty("dataset_name")
-        private String datasetName;
-        @JsonProperty("document_id")
-        private String documentId;
-        @JsonProperty("document_name")
-        private String documentName;
-        @JsonProperty("segment_id")
-        private String segmentId;
-        private double score;
-        private String content;
-    }
-    
-    @JsonProperty("created_at")
-    private long createdAt;
+    /**
+     * 消息创建时间戳，如：1705395332
+     */
+    private Long createdAt;
 }

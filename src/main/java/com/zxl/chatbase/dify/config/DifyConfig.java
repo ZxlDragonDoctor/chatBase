@@ -15,8 +15,15 @@ public class DifyConfig {
     @Value("${difyApp.timeOut}")
     private int timeout;
 
+    /**
+     * 可选：Dify 知识库 ID（dataset_id），用于存储群聊消息
+     */
+    @Value("${difyApp.datasetId:}")
+    private String datasetId;
+
     // Getters
     public String getApiUrl() { return apiUrl; }
     public String getApiKey() { return apiKey; }
     public int getTimeout() { return timeout; }
+    public String getDatasetId() { return datasetId; }
 }

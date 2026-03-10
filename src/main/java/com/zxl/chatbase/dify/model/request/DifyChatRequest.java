@@ -1,6 +1,9 @@
 package com.zxl.chatbase.dify.model.request;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import lombok.Builder;
 import lombok.Data;
 import java.util.List;
 import java.util.Map;
@@ -8,29 +11,39 @@ import java.util.Map;
 @Data
 public class DifyChatRequest {
     
-    @JsonProperty("inputs")
-    private Map<String, Object> inputs;           // 变量值
+    /**
+     * 输入参数
+     * 必填，{}
+     */
+    private Map<String, Object> inputs;
     
-    @JsonProperty("query")
-    private String query;                          // 用户问题
+    /**
+     * 用户查询内容
+     */
+    private String query;
+
+    /**
+     * 响应模式: streaming 或 blocking
+     */
+    private String responseMode;
     
-    @JsonProperty("response_mode")
-    private String responseMode;                   // streaming 或 blocking
+    /**
+     * 会话ID，空字符串表示新会话
+     */
+    private String conversationId;
     
-    @JsonProperty("conversation_id")
-    private String conversationId;                  // 会话ID，续聊时传入
+    /**
+     * 用户标识
+     */
+    private String user;
     
-    @JsonProperty("user")
-    private String user;                            // 用户标识
+    /**
+     * 文件列表
+     */
+    private List<FileInfo> files;
     
-    @JsonProperty("files")
-    private List<FileInfo> files;                   // 文件列表（可选）
-    
-    @Data
-    public static class FileInfo {
-        private String type;                         // image, document 等
-        @JsonProperty("transfer_method")
-        private String transferMethod;                // remote_url 或 local_file
-        private String url;                           // 文件URL
-    }
+    /**
+     * 是否自动生成标题
+     */
+    private Boolean autoGenerateName = true; //默认为TRUE,必须赋值
 }
