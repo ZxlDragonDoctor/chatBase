@@ -10,3 +10,20 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/chat_base?useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: root
+    password: zxl123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  redis:
+    host: localhost
+    port: 6379
+    database: 0

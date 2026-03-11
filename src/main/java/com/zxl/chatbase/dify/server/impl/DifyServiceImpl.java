@@ -165,6 +165,43 @@ public class DifyServiceImpl implements DifyService {
     }
 
     @Override
+    public String createDataset(String name, String description) {
+        String url = difyConfig.getApiUrl() + "/datasets";
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+        httpPost.setHeader("Content-Type", "application/json");
+
+        try {
+            HashMap<String, Object> body = new HashMap<>();
+            body.put("name", name);
+            if (description != null && !description.trim().isEmpty()) {
+                body.put("description", description);
+            }
+            // 使用高质量索引，权限仅自己可见
+            body.put("indexing_technique", "high_quality");
+            body.put("permission", "only_me");
+
+            String json = objectMapper.writeValueAsString(body);
+            httpPost.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                int statusCode = response.getStatusLine().getStatusCode();
+                log.info("Dify 创建知识库响应: status={}, body={}", statusCode, resp);
+                if (statusCode == 200 || statusCode == 201) {
+                    return objectMapper.readTree(resp).path("id").asText(null);
+                } else {
+                    log.error("创建 Dify 知识库失败: status={}, body={}", statusCode, resp);
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            log.error("调用 Dify 创建知识库接口异常", e);
+            return null;
+        }
+    }
+
+    @Override
     public String createDatasetDocument(String title, String content) {
         String datasetId = difyConfig.getDatasetId();
         if (datasetId == null || datasetId.trim().isEmpty()) {
@@ -172,9 +209,11 @@ public class DifyServiceImpl implements DifyService {
             return null;
         }
 
-        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/documents";
+        // 按 Dify 知识库接口文档，纯文本创建文档的路径为：
+        // POST /datasets/{dataset_id}/document/create-by-text
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-text";
         HttpPost httpPost = new HttpPost(url);
-        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getApiKey());
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
         httpPost.setHeader("Content-Type", "application/json");
 
         try {
@@ -193,7 +232,7 @@ public class DifyServiceImpl implements DifyService {
                 log.info("Dify 数据集文档创建响应: status={}, body={}", statusCode, resp);
                 if (statusCode == 200 || statusCode == 201) {
                     // 文档创建成功，解析出 id
-                    return objectMapper.readTree(resp).path("id").asText(null);
+                    return objectMapper.readTree(resp).path("document").path("id").asText(null);
                 } else {
                     log.error("创建 Dify 知识库文档失败: status={}, body={}", statusCode, resp);
                     return null;

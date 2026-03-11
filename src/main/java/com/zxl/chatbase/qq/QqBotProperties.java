@@ -36,5 +36,10 @@ public class QqBotProperties {
      * 机器人自身 QQ 号
      */
     private long selfId;
+
+    /**
+     * NapCat HTTP 请求的 Base URL
+     */
+    private String httpBaseUrl;
 }
 

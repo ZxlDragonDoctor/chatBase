@@ -9,6 +9,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
+
 /**
  * 使用 Redis 维护会话 ID 的统一聊天服务
  */
@@ -37,6 +39,7 @@ public class ChatServiceImpl implements ChatService {
         // 将新的会话 ID 回写到 Redis，便于后续连续对话
         if (response != null && StringUtils.hasText(response.getConversationId())) {
             stringRedisTemplate.opsForValue().set(sessionKey, response.getConversationId());
+            log.info("会话Id写入redis成功,time={}", LocalDateTime.now());
         }
 
         return response;

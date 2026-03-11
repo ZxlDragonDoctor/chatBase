@@ -51,4 +51,13 @@ public interface DifyService {
      */
     String createDatasetDocument(String title, String content);
 
+    /**
+     * 创建一个新的空知识库（Dataset）
+     *
+     * @param name        知识库名称
+     * @param description 描述（可选）
+     * @return 新建知识库的 ID（dataset_id），失败返回 null
+     */
+    String createDataset(String name, String description);
+
 }
