@@ -1,10 +1,11 @@
 package com.zxl.chatbase.dify.config;
 
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.concurrent.*;
 
-
+@Configuration
 public class ThreadPoolConfig {
 
     /**
@@ -58,5 +59,9 @@ public class ThreadPoolConfig {
         }
     }
 
+    @Bean(name = "threadPool")
+    public ThreadPoolExecutor threadPool() {
+        return createCustomThreadPool();
+    }
 
 }

@@ -9,6 +9,7 @@ import com.zxl.chatbase.dify.server.DifyService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Objects;
@@ -35,13 +37,22 @@ public class DifyServiceImpl implements DifyService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private final CloseableHttpClient httpClient;
+    private CloseableHttpClient httpClient;
 
-    public DifyServiceImpl() {
+    /**
+     * Spring Bean 的生命周期中：
+     * 构造函数执行 → 此时 @Autowired 字段还未注入
+     * 属性赋值 → @Autowired 注解的字段才被注入
+     */
+    @PostConstruct
+    public void init() {
         // 配置HttpClient
+        int timeoutMs = Math.max(difyConfig.getTimeout(), 30) * 1000;
         RequestConfig config = RequestConfig.custom()
-                .setConnectTimeout(30000)
-                .setSocketTimeout(30000)
+                .setConnectTimeout(timeoutMs)
+                .setSocketTimeout(timeoutMs)
+                .setConnectionRequestTimeout(timeoutMs)
+                .setCookieSpec(CookieSpecs.STANDARD)
                 .build();
         this.httpClient = HttpClients.custom()
                 .setDefaultRequestConfig(config)
@@ -54,7 +65,7 @@ public class DifyServiceImpl implements DifyService {
         DifyChatRequest request = new DifyChatRequest();
         request.setQuery(query);
         request.setConversationId(conversationId);
-        request.setUser(userId);
+        request.setUser((userId == null || userId.trim().isEmpty()) ? "abc-123" : userId);
         request.setResponseMode("blocking");  // 第一阶段先用阻塞模式
         request.setInputs(new HashMap<>());   // 空变量
 
@@ -70,6 +81,10 @@ public class DifyServiceImpl implements DifyService {
         httpPost.setHeader("Content-Type", "application/json");
 
         try {
+            // Dify 要求 user 必填
+            if (request.getUser() == null || request.getUser().trim().isEmpty()) {
+                request.setUser("abc-123");
+            }
             // 序列化请求体
             String jsonRequest = objectMapper.writeValueAsString(request);
             log.info("Dify请求: {}", jsonRequest);
@@ -96,7 +111,11 @@ public class DifyServiceImpl implements DifyService {
         } catch (Exception e) {
             log.error("调用Dify API异常", e);
             DifyChatResponse errorResponse = new DifyChatResponse();
-            errorResponse.setAnswer("【系统错误】" + e.getMessage());
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("timed out")) {
+                errorResponse.setAnswer("【系统繁忙】大模型回答超时，请稍后再试");
+            } else {
+                errorResponse.setAnswer("【系统错误】" + e.getMessage());
+            }
             return errorResponse;
         }
     }
