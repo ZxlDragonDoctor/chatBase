@@ -70,6 +70,7 @@ public class GroupMessageSyncServiceImpl implements GroupMessageSyncService {
                         ? list.get(0).getMessageTime().format(DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss"))
                         : System.currentTimeMillis());
 
+        //TODO: 这里需要追加写入到文档的分段，一个群聊一个文档
         String documentId = difyService.createDatasetDocument(title, content);
 
        if(documentId != null){
@@ -83,5 +84,34 @@ public class GroupMessageSyncServiceImpl implements GroupMessageSyncService {
            log.info("本次群消息同步完成，已标记为 synced=true,documentId={}",documentId);
        }
     }
+
+    public void saveGroupMessage(String messageId, String groupId, String userId,
+                                  String rawMessage, String messageType, long time) {
+        try {
+            GroupMessage gm = new GroupMessage();
+            gm.setMessageId(messageId);
+            gm.setGroupId(groupId);
+            gm.setUserId(userId);
+            gm.setMessageId(messageId);
+            gm.setMessageType(messageType);
+            gm.setRawMessage(rawMessage);
+            if (time > 0) {
+                gm.setMessageTime(java.time.LocalDateTime.ofEpochSecond(
+                        time, 0, java.time.ZoneOffset.ofHours(8)));
+            } else {
+                gm.setMessageTime(java.time.LocalDateTime.now());
+            }
+            gm.setCreateTime(java.time.LocalDateTime.now());
+            groupMessageMapper.insert(gm);
+            log.info("群消息写库成功");
+        } catch (Exception e) {
+            log.error("保存群消息失败", e);
+        }
+    }
+
+    public void saveGroupMessage(String userId, String rawMessage, String messageType, long time) {
+        saveGroupMessage(null,null,userId,rawMessage,messageType,time);
+    }
+
 }
 

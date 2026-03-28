@@ -8,6 +8,13 @@ export type DifyChatResponse = {
   retrieverResources?: RetrieverResource[]
 }
 
+export type ChatFileInfo = {
+  type: 'image' | 'document' | 'audio' | 'video' | string
+  transferMethod: 'remote_url' | 'local_file'
+  url?: string
+  uploadFileId?: string
+}
+
 export type DifyFileUploadResponse = {
   id?: string
   name?: string

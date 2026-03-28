@@ -2,8 +2,11 @@ package com.zxl.chatbase.chat.impl;
 
 import com.zxl.chatbase.chat.ChatService;
 import com.zxl.chatbase.config.ChatProperties;
+import com.zxl.chatbase.dify.model.request.DifyChatRequest;
+import com.zxl.chatbase.dify.model.request.FileInfo;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
+import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -12,6 +15,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * 使用 Redis 维护会话 ID 的统一聊天服务
@@ -24,12 +31,19 @@ public class ChatServiceImpl implements ChatService {
     private final DifyService difyService;
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatProperties chatProperties;
+    private final GroupMessageSyncService groupMessageSyncService;
+    private final ThreadPoolExecutor threadPool;
 
     private static final String CONVERSATION_KEY_PREFIX = "chat:conversation:";
     private static final String TURNS_KEY_PREFIX = "chat:turns:";
 
     @Override
     public DifyChatResponse chat(String channel, String userId, String groupId, String query) {
+        return chat(channel, userId, groupId, query, null);
+    }
+
+    @Override
+    public DifyChatResponse chat(String channel, String userId, String groupId, String query, List<FileInfo> files) {
         // Dify 要求 user 必填，这里统一兜底
         String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
 
@@ -51,7 +65,32 @@ public class ChatServiceImpl implements ChatService {
         log.info("开始对话, channel={}, userId={}, groupId={}, sessionKey={}, conversationId={}",
                 channel, safeUserId, groupId, sessionKey, conversationId);
 
-        DifyChatResponse response = difyService.sendChatMessage(query, conversationId, safeUserId);
+        DifyChatRequest req = new DifyChatRequest();
+        req.setInputs(new HashMap<>());
+        req.setQuery(query);
+        req.setResponseMode("blocking");
+        req.setConversationId(conversationId);
+        req.setUser(safeUserId);
+        req.setFiles(files);
+
+
+        //判断消息类型
+        //一般消息要么是文本，要么是混合消息
+        //前端拦截空消息
+        String messageType;
+        if (!query.isEmpty() && !files.isEmpty()) {
+            messageType = "Mixed";
+        } else {
+            messageType = "text";
+        }
+
+        //TODO: w保存web消息到数据库
+        if (groupId == null || channel.equals("web")) {
+            CompletableFuture.runAsync(()
+                            -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis()),
+                    threadPool);
+        }
+        DifyChatResponse response = difyService.sendChatMessage(req);
 
         // 将新的会话 ID / 轮数 回写到 Redis，便于后续连续对话
         if (response != null && StringUtils.hasText(response.getConversationId())) {

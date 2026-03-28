@@ -7,6 +7,7 @@ import com.zxl.chatbase.config.ChatProperties;
 import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
+import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -41,6 +42,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final QqBotProperties qqBotProperties;
     private final GroupMessageMapper groupMessageMapper;
+    private final GroupMessageSyncService groupMessageSyncService;
     private final RestTemplate restTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatProperties chatProperties;
@@ -74,13 +76,13 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
 
         String messageId = root.path("message_id").asText();
         long time = root.path("time").asLong(0L);
-        long groupId = root.path("group_id").asLong();
-        long userId = root.path("user_id").asLong();
+        String groupId = root.path("group_id").asText();
+        String userId = root.path("user_id").asText();
         String rawMessage = root.path("raw_message").asText(root.path("message").asText(""));
 
         // 1. 无论是否 @ 机器人，先采集消息到数据库（异步写入，避免阻塞消息处理）
         CompletableFuture.runAsync(
-                () -> saveGroupMessage(messageId, groupId, userId, rawMessage, messageType, time),
+                () -> groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, messageType, time),
                 threadPool
         );
 
@@ -124,37 +126,13 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     }
 
 
-    private void saveGroupMessage(String messageId, long groupId, long userId,
-                                  String rawMessage, String messageType, long time) {
-        try {
-            GroupMessage gm = new GroupMessage();
-            gm.setPlatform("qq");
-            gm.setGroupId(String.valueOf(groupId));
-            gm.setUserId(String.valueOf(userId));
-            gm.setMessageId(messageId);
-            gm.setMessageType(messageType);
-            gm.setRawMessage(rawMessage);
-            if (time > 0) {
-                gm.setMessageTime(java.time.LocalDateTime.ofEpochSecond(
-                        time, 0, java.time.ZoneOffset.ofHours(8)));
-            } else {
-                gm.setMessageTime(java.time.LocalDateTime.now());
-            }
-            gm.setCreateTime(java.time.LocalDateTime.now());
-            groupMessageMapper.insert(gm);
-            log.info("群消息写库成功");
-        } catch (Exception e) {
-            log.error("保存群消息失败", e);
-        }
-    }
-
     /**
      * 向 OneBot 发送群消息
      *
      * 部分实现（例如 NapCat 的 OneBot 适配）对 action 名比较严格，
      * 这里采用兼容性更好的通用接口 send_msg，显式指定 message_type=group。
      */
-    private void sendGroupMessage(WebSocketSession session, long groupId, String text) {
+    private void sendGroupMessage(WebSocketSession session, String groupId, String text) {
         try {
             String baseUrl = qqBotProperties.getHttpBaseUrl();
             if (!StringUtils.hasText(baseUrl)) {
@@ -208,7 +186,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         return result.replaceAll("^@\\S+\\s*", "").trim();
     }
 
-    private boolean isRateLimited(long groupId, long userId) {
+    private boolean isRateLimited(String groupId, String userId) {
         ChatProperties.RateLimit rl = chatProperties.getRateLimit();
         long windowSeconds = Math.max(1, rl.getWindowSeconds());
         long maxRequests = Math.max(1, rl.getMaxRequests());

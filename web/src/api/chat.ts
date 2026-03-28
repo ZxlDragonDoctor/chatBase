@@ -1,8 +1,8 @@
 import { api } from './client'
-import type { DifyChatResponse } from '../types/dify'
+import type { ChatFileInfo, DifyChatResponse } from '../types/dify'
 
-export async function webChat(text: string, userId: string): Promise<DifyChatResponse> {
-  const resp = await api.post<DifyChatResponse>('/chat/web', { text, userId })
+export async function webChat(text: string, userId: string, files?: ChatFileInfo[]): Promise<DifyChatResponse> {
+  const resp = await api.post<DifyChatResponse>('/chat/web', { text, userId, files: files || [] })
   return resp.data
 }
 

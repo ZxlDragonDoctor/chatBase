@@ -154,7 +154,7 @@ public class DifyServiceImpl implements DifyService {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 // 处理响应
-                if (statusCode == 200) {
+                if (statusCode == 200 || statusCode == 201) {
 
                     return objectMapper.readValue(jsonResponse, DifyFileUploadResponse.class);
                 } else {

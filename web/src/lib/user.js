@@ -1,9 +1,5 @@
+import { getAuth } from './auth';
+/** @deprecated 使用 getAuth().userId；保留以兼容旧调用 */
 export function getOrCreateUserId() {
-    const key = 'chatbase_user_id';
-    const existing = localStorage.getItem(key);
-    if (existing && existing.trim())
-        return existing;
-    const id = `web-${crypto.randomUUID()}`;
-    localStorage.setItem(key, id);
-    return id;
+    return getAuth().userId;
 }
