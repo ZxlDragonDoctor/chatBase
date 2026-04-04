@@ -25,3 +25,14 @@ ALTER TABLE `group_message`
 show create table group_message;
 
 select * from group_message;
+
+
+#  群聊和文档映射表 一对一
+CREATE TABLE `group_kb_mapping` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `group_id` varchar(64) NOT NULL COMMENT '群ID',
+    `kb_document_id` varchar(128) NOT NULL COMMENT '知识库文档ID',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    PRIMARY KEY (`id`)
+)

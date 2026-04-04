@@ -1,9 +1,14 @@
 package com.zxl.chatbase.im.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.zxl.chatbase.im.entity.GroupMessage;
+import org.springframework.stereotype.Service;
+
 /**
  * 群消息同步到知识库的服务接口
  */
-public interface GroupMessageSyncService {
+@Service
+public interface GroupMessageSyncService  extends IService<GroupMessage> {
 
     /**
      * 将未同步的群消息增量同步到知识库（例如 Dify 知识库）

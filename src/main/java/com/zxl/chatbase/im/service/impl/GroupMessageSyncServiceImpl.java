@@ -1,6 +1,7 @@
 package com.zxl.chatbase.im.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
@@ -26,7 +27,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GroupMessageSyncServiceImpl implements GroupMessageSyncService {
+public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,GroupMessage> implements GroupMessageSyncService {
 
     private final GroupMessageMapper groupMessageMapper;
     private final DifyService difyService;
@@ -49,7 +50,7 @@ public class GroupMessageSyncServiceImpl implements GroupMessageSyncService {
 
         log.info("开始同步群消息到Dify知识库，本次数量={}", list.size());
 
-        // 简单示例：把这些消息按时间顺序拼成一篇长文本
+        // 把这些消息按时间顺序拼成一篇长文本
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String content = list.stream()
                 .map(msg -> {

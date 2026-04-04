@@ -84,7 +84,7 @@ public class ChatServiceImpl implements ChatService {
             messageType = "text";
         }
 
-        //TODO: w保存web消息到数据库
+        //TODO: 保存web消息到数据库
         if (groupId == null || channel.equals("web")) {
             CompletableFuture.runAsync(()
                             -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis()),
