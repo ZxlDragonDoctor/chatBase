@@ -51,6 +51,17 @@ public interface DifyService {
      */
     String createDatasetDocument(String title, String content);
 
+
+    /**
+     * 用文本更新 Dify 知识库中的已有文档
+     *
+     * @param documentId 文档ID
+     * @param name       文档名称
+     * @param content    文本内容
+     * @return 是否更新成功
+     */
+    boolean updateDatasetDocument(String documentId, String name, String content);
+
     /**
      * 创建一个新的空知识库（Dataset）
      *

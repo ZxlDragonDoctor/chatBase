@@ -220,6 +220,8 @@ public class DifyServiceImpl implements DifyService {
         }
     }
 
+
+
     @Override
     public String createDatasetDocument(String title, String content) {
         String datasetId = difyConfig.getDatasetId();
@@ -262,4 +264,50 @@ public class DifyServiceImpl implements DifyService {
             return null;
         }
     }
+
+    @Override
+    public boolean updateDatasetDocument(String documentId, String name, String content) {
+        String datasetId = difyConfig.getDatasetId();
+        if (datasetId == null || datasetId.trim().isEmpty()) {
+            log.warn("未配置 difyApp.datasetId，无法更新文档");
+            return false;
+        }
+        if (documentId == null || documentId.trim().isEmpty()) {
+            log.warn("文档ID为空，无法更新");
+            return false;
+        }
+
+        // POST /datasets/{dataset_id}/documents/{document_id}/update-by-text
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId + "/update-by-text";
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+        httpPost.setHeader("Content-Type", "application/json");
+
+        try {
+            HashMap<String, Object> body = new HashMap<>();
+            body.put("name", name);
+            body.put("text", content);
+
+            String json = objectMapper.writeValueAsString(body);
+            httpPost.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                int statusCode = response.getStatusLine().getStatusCode();
+                log.info("Dify 文档更新响应: status={}, body={}", statusCode, resp);
+                if (statusCode == 200 || statusCode == 201) {
+                    log.info("Dify 文档更新成功: documentId={}", documentId);
+                    return true;
+                } else {
+                    log.error("更新 Dify 文档失败: documentId={}, status={}, body={}", documentId, statusCode, resp);
+                    return false;
+                }
+            }
+        } catch (Exception e) {
+            log.error("调用 Dify 更新文档接口异常: documentId={}", documentId, e);
+            return false;
+        }
+    }
+
+
 }
