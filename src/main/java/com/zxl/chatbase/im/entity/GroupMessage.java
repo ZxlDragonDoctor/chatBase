@@ -66,5 +66,6 @@ public class GroupMessage {
      * 在知识库中的文档ID（如果有）
      */
     private String kbDocumentId;
+
 }
 

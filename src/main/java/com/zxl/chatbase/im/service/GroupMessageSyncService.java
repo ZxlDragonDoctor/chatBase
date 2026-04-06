@@ -28,12 +28,12 @@ public interface GroupMessageSyncService  extends IService<GroupMessage> {
                           String rawMessage, String messageType, long time);
 
     /**
-     * 保存web消息
+     * 保存web消息，无具体群聊id
      * @param userId
      * @param rawMessage
      * @param messageType
      * @param time
      */
     void saveGroupMessage(String userId, String rawMessage, String messageType, long time);
-}
+}   
 

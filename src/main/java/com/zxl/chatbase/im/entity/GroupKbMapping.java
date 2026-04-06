@@ -36,4 +36,9 @@ public class GroupKbMapping {
      * 记录更新时间
      */
     private LocalDateTime updateTime;
+
+    public  GroupKbMapping(Long id, String groupId){
+        this.groupId = groupId;
+        this.id = id;
+    }
 }
