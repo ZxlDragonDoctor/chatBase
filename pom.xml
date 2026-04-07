@@ -85,6 +85,18 @@
             <version>2.11.0</version>
         </dependency>
 
+        <!-- Validation 支持 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Fastjson -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>2.0.40</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

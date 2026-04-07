@@ -105,8 +105,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         log.info("处理群聊消息: groupId={}, userId={}, query={}", groupId, userId, query);
         
         // 4. 异步回答，避免阻塞 WebSocket 消息线程
-        CompletableFuture
-                .supplyAsync(() -> chatService.chat(
+        CompletableFuture.supplyAsync(() -> chatService.chat(
                         "im",
                         String.valueOf(userId),
                         String.valueOf(groupId),

@@ -7,6 +7,5 @@ import org.springframework.stereotype.Service;
 /**
  * 群聊和文档映射服务
  */
-@Service
 public interface GroupKbMappingService extends IService<GroupKbMapping> {
 }

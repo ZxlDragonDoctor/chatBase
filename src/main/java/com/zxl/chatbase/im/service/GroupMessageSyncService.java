@@ -2,12 +2,11 @@ package com.zxl.chatbase.im.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.zxl.chatbase.im.entity.GroupMessage;
-import org.springframework.stereotype.Service;
+
 
 /**
  * 群消息同步到知识库的服务接口
  */
-@Service
 public interface GroupMessageSyncService  extends IService<GroupMessage> {
 
     /**

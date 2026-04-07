@@ -12,7 +12,7 @@ public interface ChatService {
     /**
      * 发送聊天消息，自动维护会话 ID（存储在 Redis）
      *
-     * @param channel 渠道标识：im / web
+     * @param channel 渠道标识：im / web / wx
      * @param userId  终端用户唯一标识
      * @param groupId 群聊 ID（web 渠道可为空）
      * @param query   用户问题
