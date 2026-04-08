@@ -6,8 +6,10 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target
 
+
 application-local.yaml
 ./web/node_modules/
+./.env
 
 ### STS ###
 .apt_generated

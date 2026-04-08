@@ -134,7 +134,6 @@
                 <version>${spring-boot.version}</version>
                 <configuration>
                     <mainClass>com.zxl.chatbase.ChatBaseApplication</mainClass>
-                    <skip>true</skip>
                 </configuration>
                 <executions>
                     <execution>

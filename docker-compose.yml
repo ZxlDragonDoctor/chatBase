@@ -1,0 +1,73 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chatbase-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: chat_base
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--default-authentication-plugin=mysql_native_password"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql:ro
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:7
+    container_name: chatbase-redis
+    restart: unless-stopped
+    command: >
+      sh -c '
+      if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        redis-server --appendonly yes;
+      fi
+      '
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  chatbase-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chatbase-backend:latest
+    container_name: chatbase-backend
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      DIFYAPP_API_KEY: ${DIFYAPP_API_KEY}
+      DIFYAPP_DATASET_API_KEY: ${DIFYAPP_DATASET_API_KEY}
+      DIFYAPP_DATASET_ID: ${DIFYAPP_DATASET_ID}
+      QQ_BOT_ACCESS_TOKEN: ${QQ_BOT_ACCESS_TOKEN}
+
+      WECHAT_CORP_STOKEN: ${WECHAT_CORP_STOKEN}
+      WECHAT_CORP_S_ENCODING_AES_KEY: ${WECHAT_CORP_S_ENCODING_AES_KEY}
+      WECHAT_CORP_BOT_ID: ${WECHAT_CORP_BOT_ID}
+      WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
+
+      JAVA_OPTS: ${JAVA_OPTS}
+    volumes:
+      - qq_files:/data/qq_files/
+
+volumes:
+  mysql_data:
+  redis_data:
+  qq_files:

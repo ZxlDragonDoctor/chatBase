@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  datasource:
+    url: jdbc:mysql://mysql:3306/chat_base?useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    # 允许为空：为空时 Redis 按空密码校验（取决于 Redis 是否设置 requirepass）
+    password: ${SPRING_REDIS_PASSWORD:}
+
+difyApp:
+  url: https://api.dify.ai/v1
+  apiKey: ${DIFYAPP_API_KEY}
+  datasetApiKey: ${DIFYAPP_DATASET_API_KEY}
+  datasetId: ${DIFYAPP_DATASET_ID:}
+  timeOut: 90
+
+qq:
+  bot:
+    enable: false
+    ws-port: 8081
+    access-token: ${QQ_BOT_ACCESS_TOKEN:}
+    file-save-path: /data/qq_files/
+    self-id: 0
+    http-base-url: http://127.0.0.1:3000
+
+wechat:
+  corp:
+    stoken: ${WECHAT_CORP_STOKEN:}
+    sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY:}
+#    botId: ${WECHAT_CORP_BOT_ID:}
+#    secret: ${WECHAT_CORP_SECRET:}
+
+chat:
+  max-turns-per-session: 20
+  session-ttl-days: 7
+  rate-limit:
+    window-seconds: 5
+    max-requests: 1

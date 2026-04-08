@@ -46,7 +46,6 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     private final RestTemplate restTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatProperties chatProperties;
-    @Qualifier("threadPool")
     private final ThreadPoolExecutor threadPool;
 
     private static final String RATE_KEY_PREFIX = "chat:rate:im:";
@@ -69,6 +68,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        // 只开放群聊功能
         String messageType = root.path("message_type").asText();
         if (!"group".equals(messageType)) {
             return;
@@ -80,9 +80,10 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         String userId = root.path("user_id").asText();
         String rawMessage = root.path("raw_message").asText(root.path("message").asText(""));
 
+        // TODO: 判断消息类型
         // 1. 无论是否 @ 机器人，先采集消息到数据库（异步写入，避免阻塞消息处理）
         CompletableFuture.runAsync(
-                () -> groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, messageType, time),
+                () -> groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, "text", time),
                 threadPool
         );
 

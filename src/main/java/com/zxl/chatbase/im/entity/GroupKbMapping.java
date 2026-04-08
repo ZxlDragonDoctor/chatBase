@@ -37,8 +37,8 @@ public class GroupKbMapping {
      */
     private LocalDateTime updateTime;
 
-    public  GroupKbMapping(Long id, String groupId){
+    public  GroupKbMapping(String groupId,String kbDocumentId){
         this.groupId = groupId;
-        this.id = id;
+        this.kbDocumentId = kbDocumentId;
     }
 }

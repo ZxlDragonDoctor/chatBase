@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.dify.model.request.DifyChatRequest;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
+import com.zxl.chatbase.wxroboot.webhook.util.WeChatUtil;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -15,6 +16,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.web.util.WebUtils;
 
 import javax.annotation.Resource;
 import java.io.IOException;
@@ -69,6 +71,14 @@ class ChatBaseApplicationTests {
     @Test
     void testUploadFile(){
         
+    }
+
+    @Test
+    void testWxGroupUrl(){
+        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?" +
+                "response_code=rSBTBHJSRUSPn1WkozaMugAA_d9JVTl_EYU6bY" +
+                "m0g0F_QNE05CLsgNMWU_REVkVDxphS_Zr1d31pRV0dzNlaCtK0k";
+        WeChatUtil.sendText(url, "hello world");
     }
 
 }

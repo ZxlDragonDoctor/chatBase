@@ -88,7 +88,7 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
 //                            ? listGroupMessage.get(0).getMessageTime().format(DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss"))
 //                            : System.currentTimeMillis());
 //
-//            //TODO: 这里需要追加写入到文档的分段，一个群聊一个文档,暂时写到一个文档里面
+//            //: 这里需要追加写入到文档的分段，一个群聊一个文档,暂时写到一个文档里面
 //            String documentId = difyService.createDatasetDocument(title, content);
 //
 //            if(documentId != null){
@@ -199,7 +199,7 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
                     log.info("群[{}]无文档，创建新文档（共{}条消息）", groupId, allMessages.size());
                     documentId = difyService.createDatasetDocument(title, content);
                     // 记录映射关系
-                    groupKbMappingService.save(new GroupKbMapping(Long.valueOf(documentId), groupId));
+                    groupKbMappingService.save(new GroupKbMapping(documentId, groupId));
                     success = (documentId != null);
                 }
 
@@ -236,7 +236,8 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             gm.setMessageId(messageId);
             gm.setGroupId(groupId);
             gm.setUserId(userId);
-            gm.setMessageId(messageId);
+            // TODO: 设置消息来源平台
+            gm.setPlatform("qq");
             gm.setMessageType(messageType);
             gm.setRawMessage(rawMessage);
             if (time > 0) {

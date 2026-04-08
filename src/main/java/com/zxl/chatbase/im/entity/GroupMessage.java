@@ -33,7 +33,7 @@ public class GroupMessage {
     private String userId;
 
     /**
-     * 平台消息 ID
+     * 平台消息 ID --》记录websocket返回的消息Id,其他平台无记录
      */
     private String messageId;
 
@@ -48,7 +48,7 @@ public class GroupMessage {
     private String rawMessage;
 
     /**
-     * 消息发送时间（由 QQ 上报的时间戳转换）
+     * 消息发送时间（由 平台上报的时间戳转换）
      */
     private LocalDateTime messageTime;
 

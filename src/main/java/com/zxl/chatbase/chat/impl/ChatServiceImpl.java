@@ -78,18 +78,19 @@ public class ChatServiceImpl implements ChatService {
         //一般消息要么是文本，要么是混合消息
         //前端拦截空消息
         String messageType;
-        if (!query.isEmpty() && !files.isEmpty()) {
-            messageType = "Mixed";
-        } else {
+        if(files!=null && !files.isEmpty()){
+            messageType =  "Mixed";
+        }else{
             messageType = "text";
         }
 
         //TODO: 保存web消息到数据库
-        if (groupId == null || channel.equals("web")) {
+        if(groupId==null && channel.equals("web")){
             CompletableFuture.runAsync(()
-                            -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis()),
+                            -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis() / 1000),
                     threadPool);
         }
+
         DifyChatResponse response = difyService.sendChatMessage(req);
 
         // 将新的会话 ID / 轮数 回写到 Redis，便于后续连续对话
