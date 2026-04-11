@@ -70,14 +70,12 @@ class ChatBaseApplicationTests {
 
     @Test
     void testUploadFile(){
-        
+
     }
 
     @Test
     void testWxGroupUrl(){
-        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?" +
-                "response_code=rSBTBHJSRUSPn1WkozaMugAA_d9JVTl_EYU6bY" +
-                "m0g0F_QNE05CLsgNMWU_REVkVDxphS_Zr1d31pRV0dzNlaCtK0k";
+        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=61wFNMtsTj6oNFwDHvaKEAAA_g8dEJ_LvyvFG41vu6ghgsrez-w7RzTca0EEpf5sB6P8weswkl31YX_aRmXc0K8BS";
         WeChatUtil.sendText(url, "hello world");
     }
 

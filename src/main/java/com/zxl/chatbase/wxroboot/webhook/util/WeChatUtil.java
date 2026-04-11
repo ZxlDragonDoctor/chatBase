@@ -20,12 +20,14 @@ public class WeChatUtil {
 
 	/**
 	 * 发送文本消息
+	 * @deprecated  最新企业消息不支持纯文本消息，改使用markdown格式的消息
 	 * @author zhuxu
 	 * @date 2022/3/4
 	 * @param bot 企业微信机器人链接
 	 * @param text 文本内容
 	 * @return boolean 是否发送成功
 	 */
+	@Deprecated
 	public static boolean sendText(String bot, String text) {
 		Map<String, Object> item = new HashMap<>();
 		item.put("msgtype", "text");
@@ -174,5 +176,6 @@ public class WeChatUtil {
 			return false;
 		}
 	}
+
 
 }

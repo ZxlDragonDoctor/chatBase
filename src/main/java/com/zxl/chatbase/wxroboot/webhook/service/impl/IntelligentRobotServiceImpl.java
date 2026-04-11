@@ -2,6 +2,7 @@ package com.zxl.chatbase.wxroboot.webhook.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.ChatService;
 import com.zxl.chatbase.common.MonitorException;
@@ -15,6 +16,7 @@ import com.zxl.chatbase.wxroboot.webhook.mapper.IntelligentRobotMapper;
 import com.zxl.chatbase.wxroboot.webhook.util.WeChatUtil;
 import com.zxl.chatbase.wxroboot.webhook.util.aes.WXBizJsonMsgCrypt;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.util.EntityUtils;
 import org.springframework.data.annotation.Reference;
 import org.springframework.stereotype.Service;
 
@@ -128,12 +130,11 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                         });
                 DifyChatResponse difyChatResponse = completableFuture.get();
                 // TODO; 发送消息
-                reply_content  = difyChatResponse.getAnswer();
+                reply_content  = decodeUnicode(difyChatResponse.getAnswer());
+                String sendMessage = reply_content;
                 // 群聊机器人链接
-                String distributionRobotUrl = this.getBaseMapper().selectOne(new LambdaQueryWrapper<DutyChatGroup>()
-                        .eq(DutyChatGroup::getChatGroupUrlId, msg.getChatid())).getDistributionRobotUrl();
                 CompletableFuture.runAsync(()->
-                        WeChatUtil.sendText(distributionRobotUrl,difyChatResponse.getAnswer())
+                        WeChatUtil.sendMarkdown(msg.getResponseUrl(),sendMessage)
                         ,threadPool);
                 return buildReturnString(reply_content,timestamp, nonce);
             } else {
@@ -169,6 +170,23 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             log.info("-->" + e.getMessage());
             throw MonitorException.build(e.getMessage());
         }
+    }
+
+    // 解码 Unicode 转义
+    public static String decodeUnicode(String str) {
+        StringBuilder sb = new StringBuilder();
+        int len = str.length();
+        for (int i = 0; i < len; i++) {
+            char c = str.charAt(i);
+            if (c == '\\' && i + 1 < len && str.charAt(i + 1) == 'u') {
+                String hex = str.substring(i + 2, i + 6);
+                sb.append((char) Integer.parseInt(hex, 16));
+                i += 5;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private String buildNullReturnString(String timestamp, String nonce) {

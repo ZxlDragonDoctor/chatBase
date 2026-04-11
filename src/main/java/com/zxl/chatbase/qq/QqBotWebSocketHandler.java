@@ -78,7 +78,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         long time = root.path("time").asLong(0L);
         String groupId = root.path("group_id").asText();
         String userId = root.path("user_id").asText();
-        String rawMessage = root.path("raw_message").asText(root.path("message").asText(""));
+        String rawMessage = root.path("raw_message").asText(root.path("message").asText("")); //解码UniCode内容
 
         // TODO: 判断消息类型
         // 1. 无论是否 @ 机器人，先采集消息到数据库（异步写入，避免阻塞消息处理）
