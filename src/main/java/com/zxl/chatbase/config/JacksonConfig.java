@@ -19,7 +19,7 @@ public class JacksonConfig {
     @Primary
     public ObjectMapper objectMapper() {
         return Jackson2ObjectMapperBuilder.json()
-                .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+                //.propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE) //驼峰策略，返回数据为下划线形式
                 .featuresToDisable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .build();
     }

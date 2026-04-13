@@ -1,12 +1,9 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { ref, watch, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
-import { useAuth } from '../composables/useAuth';
-import { webChat, listWebSessions, registerWebSession } from '../api/chat';
+import { ref } from 'vue';
+import { webChat } from '../api/chat';
+import { getOrCreateUserId } from '../lib/user';
 import { uploadFile } from '../api/upload';
-import { loadLocalMessages, saveLocalMessages, loadActiveSessionId, saveActiveSessionId, } from '../lib/chatMessages';
-const retentionHint = 30;
-const { auth } = useAuth();
+const userId = getOrCreateUserId();
 const input = ref('');
 const urlInput = ref('');
 const loading = ref(false);
@@ -16,17 +13,10 @@ const pendingFiles = ref([]);
 const menuOpen = ref(false);
 const urlPanelOpen = ref(false);
 const fileInputRef = ref(null);
-const sessions = ref([]);
-const activeSessionId = ref('');
 function truncate(s, max) {
     if (!s)
         return '';
     return s.length > max ? `${s.slice(0, max)}…` : s;
-}
-function formatTime(ms) {
-    if (!ms)
-        return '';
-    return new Date(ms).toLocaleString();
 }
 function togglePlusMenu() {
     menuOpen.value = !menuOpen.value;
@@ -46,66 +36,7 @@ function confirmUrlAndClose() {
     addUrlFile();
     urlPanelOpen.value = false;
 }
-function persistCurrentMessages() {
-    if (!activeSessionId.value)
-        return;
-    saveLocalMessages(auth.value.userId, activeSessionId.value, messages.value);
-}
-async function refreshSessions() {
-    try {
-        const list = await listWebSessions(auth.value.userId);
-        sessions.value = [...list].sort((a, b) => b.updatedAt - a.updatedAt);
-    }
-    catch {
-        sessions.value = [];
-    }
-}
-async function newSession() {
-    persistCurrentMessages();
-    const id = crypto.randomUUID();
-    activeSessionId.value = id;
-    messages.value = [];
-    saveActiveSessionId(auth.value.userId, id);
-    try {
-        await registerWebSession(auth.value.userId, id);
-    }
-    catch {
-        /* 离线时仍允许本地聊，首条消息会再次同步 */
-    }
-    await refreshSessions();
-    if (!sessions.value.some((s) => s.sessionId === id)) {
-        sessions.value = [{ sessionId: id, title: '新对话', updatedAt: Date.now() }, ...sessions.value];
-    }
-}
-async function selectSession(id) {
-    if (id === activeSessionId.value)
-        return;
-    persistCurrentMessages();
-    activeSessionId.value = id;
-    saveActiveSessionId(auth.value.userId, id);
-    messages.value = loadLocalMessages(auth.value.userId, id);
-}
-async function bootstrapSessions() {
-    await refreshSessions();
-    let sid = loadActiveSessionId(auth.value.userId);
-    if (sid) {
-        activeSessionId.value = sid;
-        messages.value = loadLocalMessages(auth.value.userId, sid);
-        if (!sessions.value.some((s) => s.sessionId === sid)) {
-            sessions.value = [{ sessionId: sid, title: '新对话', updatedAt: Date.now() }, ...sessions.value];
-        }
-        return;
-    }
-    if (sessions.value.length > 0) {
-        sid = sessions.value[0].sessionId;
-        activeSessionId.value = sid;
-        saveActiveSessionId(auth.value.userId, sid);
-        messages.value = loadLocalMessages(auth.value.userId, sid);
-        return;
-    }
-    await newSession();
-}
-function resetThread() {
+function reset() {
     messages.value = [];
     error.value = null;
     input.value = '';
@@ -113,38 +44,28 @@ function resetThread() {
     pendingFiles.value = [];
     menuOpen.value = false;
     urlPanelOpen.value = false;
-    if (activeSessionId.value) {
-        saveLocalMessages(auth.value.userId, activeSessionId.value, []);
-    }
 }
 async function send() {
     const text = input.value.trim();
     if (!text)
         return;
-    if (!activeSessionId.value)
-        await newSession();
     error.value = null;
     messages.value.push({ role: 'user', text });
     input.value = '';
     loading.value = true;
-    persistCurrentMessages();
     try {
         const files = [...pendingFiles.value];
-        const sid = activeSessionId.value;
-        const resp = await webChat(text, auth.value.userId, sid, files);
+        const resp = await webChat(text, userId, files);
         messages.value.push({
             role: 'assistant',
             text: resp.answer || '（无返回）',
             sources: resp.retrieverResources || [],
         });
         pendingFiles.value = [];
-        persistCurrentMessages();
-        await refreshSessions();
     }
     catch (e) {
         error.value = e?.message || '请求失败';
         messages.value.push({ role: 'assistant', text: '【系统错误】请求失败，请稍后再试' });
-        persistCurrentMessages();
     }
     finally {
         loading.value = false;
@@ -169,7 +90,7 @@ async function uploadLocalFile(e) {
     loading.value = true;
     error.value = null;
     try {
-        const resp = await uploadFile(file, auth.value.userId);
+        const resp = await uploadFile(file, userId);
         if (resp.id) {
             pendingFiles.value.push({
                 type: guessFileTypeFromName(file.name),
@@ -205,60 +126,15 @@ function guessFileTypeFromUrl(url) {
         return 'document';
     }
 }
-onMounted(() => {
-    bootstrapSessions();
-});
-watch(() => auth.value.userId, () => {
-    bootstrapSessions();
-});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "chatShell" },
+    ...{ class: "pageShell" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
-    ...{ class: "sessionSidebar" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.newSession) },
-    type: "button",
-    ...{ class: "btn btnNewChat" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "sessionList" },
-});
-for (const [s] of __VLS_getVForSourceType((__VLS_ctx.sessions))) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                __VLS_ctx.selectSession(s.sessionId);
-            } },
-        key: (s.sessionId),
-        type: "button",
-        ...{ class: "sessionItem" },
-        ...{ class: ({ active: s.sessionId === __VLS_ctx.activeSessionId }) },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "sessionTitle" },
-    });
-    (s.title);
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "sessionTime" },
-    });
-    (__VLS_ctx.formatTime(s.updatedAt));
-}
-if (__VLS_ctx.sessions.length === 0) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "sessionEmpty muted" },
-    });
-}
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "sidebarHint muted" },
-});
-(__VLS_ctx.retentionHint);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "card chatCard" },
+    ...{ class: "card" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "cardHeader" },
@@ -271,29 +147,17 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "muted" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.code, __VLS_intrinsicElements.code)({});
-(__VLS_ctx.auth.displayName);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.code, __VLS_intrinsicElements.code)({});
-(__VLS_ctx.auth.userId);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "right" },
 });
-const __VLS_0 = {}.RouterLink;
-/** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
-// @ts-ignore
-const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    ...{ class: "btn btnGhost" },
-    to: "/login",
-}));
-const __VLS_2 = __VLS_1({
-    ...{ class: "btn btnGhost" },
-    to: "/login",
-}, ...__VLS_functionalComponentArgsRest(__VLS_1));
-__VLS_3.slots.default;
-var __VLS_3;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "pill" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.code, __VLS_intrinsicElements.code)({});
+(__VLS_ctx.userId);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.resetThread) },
+    ...{ onClick: (__VLS_ctx.reset) },
     ...{ class: "btn btnGhost" },
-    type: "button",
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "chat" },
@@ -302,7 +166,6 @@ if (__VLS_ctx.messages.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "empty" },
     });
-    (__VLS_ctx.activeSessionId ? '请输入问题开始对话。' : '正在准备会话…');
 }
 for (const [m, idx] of __VLS_getVForSourceType((__VLS_ctx.messages))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -471,7 +334,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ class: "btn" },
     type: "submit",
-    disabled: (__VLS_ctx.loading || !__VLS_ctx.input.trim() || !__VLS_ctx.activeSessionId),
+    disabled: (__VLS_ctx.loading || !__VLS_ctx.input.trim()),
 });
 (__VLS_ctx.loading ? '发送中…' : '发送');
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
@@ -483,26 +346,13 @@ if (__VLS_ctx.error) {
     });
     (__VLS_ctx.error);
 }
-/** @type {__VLS_StyleScopedClasses['chatShell']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionSidebar']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnNewChat']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionList']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionItem']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionTitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionTime']} */ ;
-/** @type {__VLS_StyleScopedClasses['sessionEmpty']} */ ;
-/** @type {__VLS_StyleScopedClasses['muted']} */ ;
-/** @type {__VLS_StyleScopedClasses['sidebarHint']} */ ;
-/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['pageShell']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
-/** @type {__VLS_StyleScopedClasses['chatCard']} */ ;
 /** @type {__VLS_StyleScopedClasses['cardHeader']} */ ;
 /** @type {__VLS_StyleScopedClasses['h1']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['right']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
+/** @type {__VLS_StyleScopedClasses['pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
 /** @type {__VLS_StyleScopedClasses['chat']} */ ;
@@ -550,9 +400,7 @@ var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
-            RouterLink: RouterLink,
-            retentionHint: retentionHint,
-            auth: auth,
+            userId: userId,
             input: input,
             urlInput: urlInput,
             loading: loading,
@@ -562,18 +410,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             menuOpen: menuOpen,
             urlPanelOpen: urlPanelOpen,
             fileInputRef: fileInputRef,
-            sessions: sessions,
-            activeSessionId: activeSessionId,
             truncate: truncate,
-            formatTime: formatTime,
             togglePlusMenu: togglePlusMenu,
             closePlusMenu: closePlusMenu,
             pickLocalFile: pickLocalFile,
             openUrlPanelFromMenu: openUrlPanelFromMenu,
             confirmUrlAndClose: confirmUrlAndClose,
-            newSession: newSession,
-            selectSession: selectSession,
-            resetThread: resetThread,
+            reset: reset,
             send: send,
             uploadLocalFile: uploadLocalFile,
         };

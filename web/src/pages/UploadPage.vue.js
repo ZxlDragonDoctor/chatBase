@@ -33,6 +33,9 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "pageShell" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
     ...{ class: "card" },
 });
@@ -87,6 +90,7 @@ if (__VLS_ctx.error) {
     });
     (__VLS_ctx.error);
 }
+/** @type {__VLS_StyleScopedClasses['pageShell']} */ ;
 /** @type {__VLS_StyleScopedClasses['card']} */ ;
 /** @type {__VLS_StyleScopedClasses['cardHeader']} */ ;
 /** @type {__VLS_StyleScopedClasses['h1']} */ ;

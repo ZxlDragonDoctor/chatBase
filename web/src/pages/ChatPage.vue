@@ -1,4 +1,5 @@
 <template>
+  <div class="pageShell">
   <section class="card">
     <div class="cardHeader">
       <div>
@@ -101,6 +102,7 @@
       {{ error }}
     </div>
   </section>
+  </div>
 </template>
 
 <script setup lang="ts">

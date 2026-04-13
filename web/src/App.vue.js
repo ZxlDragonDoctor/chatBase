@@ -1,22 +1,17 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { useAuth } from './composables/useAuth';
-const { auth, logoutToGuest, refresh } = useAuth();
-function onGuest() {
-    logoutToGuest();
-    refresh();
-}
+import { RouterLink } from 'vue-router';
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "app" },
+    ...{ class: "app appLayout" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.header, __VLS_intrinsicElements.header)({
-    ...{ class: "topbar" },
+__VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
+    ...{ class: "appNav" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "brand" },
+    ...{ class: "appNavBrand" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "logo" },
@@ -29,19 +24,19 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "sub" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.nav, __VLS_intrinsicElements.nav)({
-    ...{ class: "nav" },
+    ...{ class: "appNavList" },
 });
 const __VLS_0 = {}.RouterLink;
 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
 // @ts-ignore
 const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-    ...{ class: "link" },
-    to: "/chat",
+    ...{ class: "navItem" },
+    to: "/console/dashboard",
     activeClass: "active",
 }));
 const __VLS_2 = __VLS_1({
-    ...{ class: "link" },
-    to: "/chat",
+    ...{ class: "navItem" },
+    to: "/console/dashboard",
     activeClass: "active",
 }, ...__VLS_functionalComponentArgsRest(__VLS_1));
 __VLS_3.slots.default;
@@ -50,13 +45,13 @@ const __VLS_4 = {}.RouterLink;
 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
 // @ts-ignore
 const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
-    ...{ class: "link" },
-    to: "/upload",
+    ...{ class: "navItem" },
+    to: "/console/im",
     activeClass: "active",
 }));
 const __VLS_6 = __VLS_5({
-    ...{ class: "link" },
-    to: "/upload",
+    ...{ class: "navItem" },
+    to: "/console/im",
     activeClass: "active",
 }, ...__VLS_functionalComponentArgsRest(__VLS_5));
 __VLS_7.slots.default;
@@ -65,58 +60,67 @@ const __VLS_8 = {}.RouterLink;
 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
 // @ts-ignore
 const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
-    ...{ class: "link" },
-    to: "/login",
+    ...{ class: "navItem" },
+    to: "/chat",
     activeClass: "active",
 }));
 const __VLS_10 = __VLS_9({
-    ...{ class: "link" },
-    to: "/login",
+    ...{ class: "navItem" },
+    to: "/chat",
     activeClass: "active",
 }, ...__VLS_functionalComponentArgsRest(__VLS_9));
 __VLS_11.slots.default;
 var __VLS_11;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "pill pillNav" },
+const __VLS_12 = {}.RouterLink;
+/** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+// @ts-ignore
+const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
+    ...{ class: "navItem" },
+    to: "/upload",
+    activeClass: "active",
+}));
+const __VLS_14 = __VLS_13({
+    ...{ class: "navItem" },
+    to: "/upload",
+    activeClass: "active",
+}, ...__VLS_functionalComponentArgsRest(__VLS_13));
+__VLS_15.slots.default;
+var __VLS_15;
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "appNavFoot muted" },
 });
-(__VLS_ctx.auth.displayName);
-if (__VLS_ctx.auth.mode === 'user') {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.onGuest) },
-        type: "button",
-        ...{ class: "btn btnGhost btnTiny" },
-    });
-}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "appBody" },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.main)({
-    ...{ class: "main" },
+    ...{ class: "appMain" },
 });
-const __VLS_12 = {}.RouterView;
+const __VLS_16 = {}.RouterView;
 /** @type {[typeof __VLS_components.RouterView, ]} */ ;
 // @ts-ignore
-const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({}));
-const __VLS_14 = __VLS_13({}, ...__VLS_functionalComponentArgsRest(__VLS_13));
+const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({}));
+const __VLS_18 = __VLS_17({}, ...__VLS_functionalComponentArgsRest(__VLS_17));
 /** @type {__VLS_StyleScopedClasses['app']} */ ;
-/** @type {__VLS_StyleScopedClasses['topbar']} */ ;
-/** @type {__VLS_StyleScopedClasses['brand']} */ ;
+/** @type {__VLS_StyleScopedClasses['appLayout']} */ ;
+/** @type {__VLS_StyleScopedClasses['appNav']} */ ;
+/** @type {__VLS_StyleScopedClasses['appNavBrand']} */ ;
 /** @type {__VLS_StyleScopedClasses['logo']} */ ;
 /** @type {__VLS_StyleScopedClasses['title']} */ ;
 /** @type {__VLS_StyleScopedClasses['sub']} */ ;
-/** @type {__VLS_StyleScopedClasses['nav']} */ ;
-/** @type {__VLS_StyleScopedClasses['link']} */ ;
-/** @type {__VLS_StyleScopedClasses['link']} */ ;
-/** @type {__VLS_StyleScopedClasses['link']} */ ;
-/** @type {__VLS_StyleScopedClasses['pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['pillNav']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnTiny']} */ ;
-/** @type {__VLS_StyleScopedClasses['main']} */ ;
+/** @type {__VLS_StyleScopedClasses['appNavList']} */ ;
+/** @type {__VLS_StyleScopedClasses['navItem']} */ ;
+/** @type {__VLS_StyleScopedClasses['navItem']} */ ;
+/** @type {__VLS_StyleScopedClasses['navItem']} */ ;
+/** @type {__VLS_StyleScopedClasses['navItem']} */ ;
+/** @type {__VLS_StyleScopedClasses['appNavFoot']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['appBody']} */ ;
+/** @type {__VLS_StyleScopedClasses['appMain']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
-            auth: auth,
-            onGuest: onGuest,
+            RouterLink: RouterLink,
         };
     },
 });
