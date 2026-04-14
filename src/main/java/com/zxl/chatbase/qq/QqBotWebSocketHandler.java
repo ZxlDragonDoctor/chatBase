@@ -5,7 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.ChatService;
 import com.zxl.chatbase.config.ChatProperties;
 import com.zxl.chatbase.im.entity.GroupMessage;
+import com.zxl.chatbase.im.entity.ImGroup;
+import com.zxl.chatbase.im.entity.ImUser;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
+import com.zxl.chatbase.im.mapper.ImGroupMapper;
+import com.zxl.chatbase.im.mapper.ImUserMapper;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +47,8 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     private final QqBotProperties qqBotProperties;
     private final GroupMessageMapper groupMessageMapper;
     private final GroupMessageSyncService groupMessageSyncService;
+    private final ImGroupMapper imGroupMapper;
+    private final ImUserMapper imUserMapper;
     private final RestTemplate restTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatProperties chatProperties;
@@ -83,7 +89,10 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         // TODO: 判断消息类型
         // 1. 无论是否 @ 机器人，先采集消息到数据库（异步写入，避免阻塞消息处理）
         CompletableFuture.runAsync(
-                () -> groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, "text", time),
+                () -> {
+                    groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, "text", time);
+                    syncGroupAndUser(groupId, userId, root);
+                },
                 threadPool
         );
 
@@ -197,6 +206,89 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             stringRedisTemplate.expire(key, Duration.ofSeconds(windowSeconds));
         }
         return count != null && count > maxRequests;
+    }
+
+    private void syncGroupAndUser(String groupId, String userId, JsonNode root) {
+        try {
+            syncGroup(groupId, root);
+            syncUser(userId, groupId, root);
+        } catch (Exception e) {
+            log.error("同步群组/用户信息失败: groupId={}, userId={}", groupId, userId, e);
+        }
+    }
+
+    private void syncGroup(String groupId, JsonNode root) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImGroup> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImGroup>()
+                        .eq(ImGroup::getPlatform, "qq")
+                        .eq(ImGroup::getGroupId, groupId);
+        ImGroup imGroup = imGroupMapper.selectOne(wrapper);
+        if (imGroup == null) {
+            imGroup = new ImGroup();
+            imGroup.setPlatform("qq");
+            imGroup.setGroupId(groupId);
+            imGroup.setStatus(true);
+            imGroup.setAutoReply(true);
+            imGroup.setMemberCount(0);
+        }
+        JsonNode groupNameNode = root.path("group_name");
+        if (groupNameNode.isTextual()) {
+            imGroup.setGroupName(groupNameNode.asText());
+        }
+        JsonNode senderNode = root.path("sender");
+        if (senderNode.isObject()) {
+            JsonNode roleNode = senderNode.path("role");
+            if (roleNode.isTextual() && "owner".equals(roleNode.asText())) {
+                JsonNode userIdNode = senderNode.path("user_id");
+                if (userIdNode.isTextual()) {
+                    imGroup.setOwnerId(userIdNode.asText());
+                }
+            }
+        }
+        if (imGroup.getId() == null) {
+            imGroupMapper.insert(imGroup);
+        } else {
+            imGroupMapper.updateById(imGroup);
+        }
+    }
+
+    private void syncUser(String userId, String groupId, JsonNode root) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImUser> wrapper =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ImUser>()
+                        .eq(ImUser::getPlatform, "qq")
+                        .eq(ImUser::getUserId, userId);
+        ImUser imUser = imUserMapper.selectOne(wrapper);
+        if (imUser == null) {
+            imUser = new ImUser();
+            imUser.setPlatform("qq");
+            imUser.setUserId(userId);
+            imUser.setStatus(true);
+            imUser.setRole("member");
+            imUser.setMessageCount(0);
+        }
+        imUser.setGroupId(groupId);
+        JsonNode senderNode = root.path("sender");
+        if (senderNode.isObject()) {
+            JsonNode nicknameNode = senderNode.path("nickname");
+            if (nicknameNode.isTextual()) {
+                imUser.setNickname(nicknameNode.asText());
+            }
+            JsonNode cardNode = senderNode.path("card");
+            if (cardNode.isTextual() && cardNode.asText().length() > 0) {
+                imUser.setNickname(cardNode.asText());
+            }
+            JsonNode roleNode = senderNode.path("role");
+            if (roleNode.isTextual()) {
+                imUser.setRole(roleNode.asText());
+            }
+        }
+        imUser.setLastMessageTime(java.time.LocalDateTime.now());
+        imUser.setMessageCount(imUser.getMessageCount() + 1);
+        if (imUser.getId() == null) {
+            imUserMapper.insert(imUser);
+        } else {
+            imUserMapper.updateById(imUser);
+        }
     }
 }
 

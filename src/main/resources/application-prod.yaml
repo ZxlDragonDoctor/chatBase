@@ -33,12 +33,12 @@ difyApp:
 
 qq:
   bot:
-    enable: false
+    enable: ${QQ_BOT_ENABLE:false}
     ws-port: 8081
     access-token: ${QQ_BOT_ACCESS_TOKEN:}
     file-save-path: /data/qq_files/
-    self-id: 0
-    http-base-url: http://127.0.0.1:3000
+    self-id: ${QQ_BOT_SELF_ID:0}
+    http-base-url: ${QQ_BOT_HTTP_BASE_URL:http://napcat:3000}
 
 wechat:
   corp:

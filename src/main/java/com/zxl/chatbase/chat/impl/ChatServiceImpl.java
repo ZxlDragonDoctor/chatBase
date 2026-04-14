@@ -7,6 +7,7 @@ import com.zxl.chatbase.dify.model.request.FileInfo;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.kb.service.IKbConversationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,6 +33,7 @@ public class ChatServiceImpl implements ChatService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ChatProperties chatProperties;
     private final GroupMessageSyncService groupMessageSyncService;
+    private final IKbConversationService kbConversationService;
     private final ThreadPoolExecutor threadPool;
 
     private static final String CONVERSATION_KEY_PREFIX = "chat:conversation:";
@@ -73,7 +75,6 @@ public class ChatServiceImpl implements ChatService {
         req.setUser(safeUserId);
         req.setFiles(files);
 
-
         //判断消息类型
         //一般消息要么是文本，要么是混合消息
         //前端拦截空消息
@@ -84,14 +85,40 @@ public class ChatServiceImpl implements ChatService {
             messageType = "text";
         }
 
-        //TODO: 保存web消息到数据库
+        // 保存web消息到数据库
         if(groupId==null && channel.equals("web")){
             CompletableFuture.runAsync(()
                             -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis() / 1000),
                     threadPool);
         }
 
+        long startTime = System.currentTimeMillis();
         DifyChatResponse response = difyService.sendChatMessage(req);
+        int latencyMs = (int) (System.currentTimeMillis() - startTime);
+
+        // 保存会话记录到 kb_conversation
+        String finalConversationId = response != null ? response.getConversationId() : null;
+        boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
+        String answer = response != null ? response.getAnswer() : null;
+        Long tokens = response != null && response.getUsage() != null ? response.getUsage().getCompletionTokens().longValue() : null;
+        String errorMessage = null;
+        if (!success && response != null && response.getAnswer() != null) {
+            errorMessage = response.getAnswer();
+        }
+        
+        finalConversationId = finalConversationId != null ? finalConversationId : (conversationId != null ? conversationId : "new");
+        kbConversationService.saveConversation(
+                finalConversationId,
+                safeUserId,
+                channel,
+                groupId,
+                query,
+                answer,
+                tokens,
+                latencyMs,
+                success,
+                errorMessage
+        );
 
         // 将新的会话 ID / 轮数 回写到 Redis，便于后续连续对话
         if (response != null && StringUtils.hasText(response.getConversationId())) {

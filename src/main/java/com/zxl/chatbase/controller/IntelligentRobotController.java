@@ -1,4 +1,4 @@
-package com.zxl.chatbase.wxroboot.webhook.controller;
+package com.zxl.chatbase.controller;
 
 import com.zxl.chatbase.wxroboot.webhook.service.IntelligentRobotService;
 import lombok.extern.slf4j.Slf4j;

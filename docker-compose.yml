@@ -45,6 +45,7 @@ services:
     depends_on:
       - mysql
       - redis
+      - napcat
     ports:
       - "8080:8080"
     environment:
@@ -56,7 +57,10 @@ services:
       DIFYAPP_API_KEY: ${DIFYAPP_API_KEY}
       DIFYAPP_DATASET_API_KEY: ${DIFYAPP_DATASET_API_KEY}
       DIFYAPP_DATASET_ID: ${DIFYAPP_DATASET_ID}
+      QQ_BOT_ENABLE: ${QQ_BOT_ENABLE}
       QQ_BOT_ACCESS_TOKEN: ${QQ_BOT_ACCESS_TOKEN}
+      QQ_BOT_SELF_ID: ${QQ_BOT_SELF_ID}
+      QQ_BOT_HTTP_BASE_URL: ${QQ_BOT_HTTP_BASE_URL}
 
       WECHAT_CORP_STOKEN: ${WECHAT_CORP_STOKEN}
       WECHAT_CORP_S_ENCODING_AES_KEY: ${WECHAT_CORP_S_ENCODING_AES_KEY}
@@ -67,7 +71,30 @@ services:
     volumes:
       - qq_files:/data/qq_files/
 
+  napcat:
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}
+    container_name: chatbase-napcat
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "6099:6099"
+    volumes:
+      - napcat_data:/app/.config/QQ
+
+  chatbase-frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: chatbase-frontend:latest
+    container_name: chatbase-frontend
+    restart: unless-stopped
+    depends_on:
+      - chatbase-backend
+    ports:
+      - "80:80"
+
 volumes:
   mysql_data:
   redis_data:
   qq_files:
+  napcat_data:

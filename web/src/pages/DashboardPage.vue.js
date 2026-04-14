@@ -23,6 +23,7 @@ const botWecom = computed(() => ({ ...defaultBots().wecom, ...overview.value?.bo
 onMounted(async () => {
     try {
         overview.value = await fetchOverview();
+        console.log(overview.value);
     }
     catch (e) {
         loadErr.value = e?.message || '无法加载概览（请确认后端已启动）';

@@ -65,3 +65,6 @@ CREATE TABLE `t_duty_chat_group`
     KEY `idx_creator_id` (`creator_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='微信值班群聊表';
+
+
+

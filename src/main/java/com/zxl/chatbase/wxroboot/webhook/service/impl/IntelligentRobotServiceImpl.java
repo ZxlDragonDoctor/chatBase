@@ -1,8 +1,6 @@
 package com.zxl.chatbase.wxroboot.webhook.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.ChatService;
 import com.zxl.chatbase.common.MonitorException;
@@ -16,8 +14,6 @@ import com.zxl.chatbase.wxroboot.webhook.mapper.IntelligentRobotMapper;
 import com.zxl.chatbase.wxroboot.webhook.util.WeChatUtil;
 import com.zxl.chatbase.wxroboot.webhook.util.aes.WXBizJsonMsgCrypt;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.util.EntityUtils;
-import org.springframework.data.annotation.Reference;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -48,6 +44,10 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     private ThreadPoolExecutor threadPool;
     @Resource
     private GroupMessageSyncService groupMessageSyncService;
+    @Resource
+    private com.zxl.chatbase.im.service.ImGroupService imGroupService;
+    @Resource
+    private com.zxl.chatbase.im.service.ImUserService imUserService;
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
@@ -106,10 +106,18 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             // // TODO： 图片等其他文件内容需要oss存储并记录其URL
             groupMessage.setRawMessage(msg.getText().getContent());
             groupMessage.setMessageTime(LocalDateTime.now());
-            // 保存微信群聊消息内容
+            // 保存微信群聊消息内容 + 同步群组/用户信息
             CompletableFuture.runAsync(()->{
                 groupMessageSyncService.save(groupMessage);
-            },threadPool);
+                // 同步群组信息
+                imGroupService.getOrCreateGroup("wecom", msg.getChatid(), null);
+                // 同步用户信息
+                imUserService.getOrCreateUser("wecom", msg.getFrom().getUserid(), msg.getChatid(), msg.getFrom().getUserid());
+            },threadPool)
+            .exceptionally(e -> {
+                log.error("保存群消息失败，platform={},groupId={}, userId={}","wx", msg.getChatid(), msg.getFrom().getUserid(), e);
+                return null;
+            });
 
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
                 String query = msg.getText().getContent();
