@@ -142,8 +142,11 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 String sendMessage = reply_content;
                 // 群聊机器人链接
                 CompletableFuture.runAsync(()->
-                        WeChatUtil.sendMarkdown(msg.getResponseUrl(),sendMessage)
-                        ,threadPool);
+                        WeChatUtil.sendMarkdown(msg.getResponse_url(),sendMessage)
+                        ,threadPool).exceptionally(e -> {
+                    log.error("发送消息失败，groupId={}, userId={}", msg.getChatid(), msg.getFrom().getUserid(), e);
+                    return null;
+                });
                 return buildReturnString(reply_content,timestamp, nonce);
             } else {
                 reply_content = "未知的消息类型";
@@ -154,7 +157,6 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             throw MonitorException.build(e.getMessage());
         }
     }
-
 
 
     //解密

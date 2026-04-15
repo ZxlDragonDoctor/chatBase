@@ -225,6 +225,12 @@ CREATE TABLE IF NOT EXISTS group_message (
   KEY idx_synced (synced)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 修改message_id字段运行为空
+ALTER TABLE group_message
+    MODIFY COLUMN message_id VARCHAR(100) DEFAULT '' NOT NULL;
+
+
+
 -- group_kb_mapping：群聊和知识库文档映射表
 CREATE TABLE IF NOT EXISTS group_kb_mapping (
   id BIGINT NOT NULL AUTO_INCREMENT,

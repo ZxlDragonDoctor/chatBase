@@ -193,6 +193,12 @@ public class WXBizJsonMsgCrypt {
 
 	}
 
+	/**
+	 * 对字节流密文进行解密.
+	 * @param encryptedData
+	 * @return
+	 * @throws AesException
+	 */
     public byte[] decrypt(byte[] encryptedData) throws AesException {
         byte[] original;
         try {

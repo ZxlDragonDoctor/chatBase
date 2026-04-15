@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.ChatService;
 import com.zxl.chatbase.config.ChatProperties;
-import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.entity.ImUser;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
@@ -15,10 +14,12 @@ import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -149,22 +150,25 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
             String url = baseUrl.endsWith("/") ? baseUrl + "send_msg" : baseUrl + "/send_msg";
-    
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            String accessToken = qqBotProperties.getAccessToken();
+            if (StringUtils.hasText(accessToken)) {
+                headers.set("Authorization", "Bearer " + accessToken);
+            }
+
             Map<String, Object> body = new HashMap<>();
             body.put("message_type", "group");
             body.put("group_id", groupId);
             body.put("message", text);
-    
+
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
             log.info("调用 OneBot HTTP 接口发送群消息, url={}, body={}", url, body);
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = (Map<String, Object>) restTemplate.postForObject(url, body, Map.class);
-            if (response != null && "failed".equals(String.valueOf(response.get("status")))) {
-                // 简单重试一次
-                log.warn("OneBot send_msg 失败，准备重试一次: {}", response);
-                @SuppressWarnings("unchecked")
-                Map<String, Object> retryResponse = (Map<String, Object>) restTemplate.postForObject(url, body, Map.class);
-                response = retryResponse;
-            }
+            Map<String, Object> response = (Map<String, Object>) restTemplate.postForObject(url, requestEntity, Map.class);
             log.info("OneBot HTTP send_msg 响应: {}", response);
         } catch (Exception e) {
             log.error("发送群消息失败", e);

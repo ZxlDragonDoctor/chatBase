@@ -97,7 +97,11 @@ public class ChatServiceImpl implements ChatService {
         int latencyMs = (int) (System.currentTimeMillis() - startTime);
 
         // 保存会话记录到 kb_conversation
-        String finalConversationId = response != null ? response.getConversationId() : null;
+        // 优先使用 conversationId，其次使用 response.getId()，最后生成 UUID
+        String convIdFromResponse = response != null ? response.getConversationId() : null;
+        String responseId = response != null ? response.getId() : null;
+        String finalConversationId = selectConversationId(convIdFromResponse, responseId, conversationId);
+
         boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
         String answer = response != null ? response.getAnswer() : null;
         Long tokens = response != null && response.getUsage() != null ? response.getUsage().getCompletionTokens().longValue() : null;
@@ -105,8 +109,7 @@ public class ChatServiceImpl implements ChatService {
         if (!success && response != null && response.getAnswer() != null) {
             errorMessage = response.getAnswer();
         }
-        
-        finalConversationId = finalConversationId != null ? finalConversationId : (conversationId != null ? conversationId : "new");
+
         kbConversationService.saveConversation(
                 finalConversationId,
                 safeUserId,
@@ -165,6 +168,31 @@ public class ChatServiceImpl implements ChatService {
             log.warn("读取 turns 失败，默认当作 0: key={}", turnsKey, e);
             return 0L;
         }
+    }
+
+    /**
+     * 选择会话ID：优先使用 conversationId，其次 response.getId()，最后使用传入的 conversationId，否则生成 UUID
+     */
+    private String selectConversationId(String conversationId, String responseId, String inputConversationId) {
+        // 有效的 UUID 格式：8-4-4-4-12
+        if (isValidUuid(conversationId)) {
+            return conversationId;
+        }
+        if (isValidUuid(responseId)) {
+            return responseId;
+        }
+        if (isValidUuid(inputConversationId)) {
+            return inputConversationId;
+        }
+        return java.util.UUID.randomUUID().toString();
+    }
+
+    private boolean isValidUuid(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+        // 简单的 UUID 格式校验：32位字符+4个横杠
+        return str.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     }
 }
 

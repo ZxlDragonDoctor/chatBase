@@ -18,7 +18,7 @@ public class IntelligentBotMsg implements Serializable {
 
     private String msgtype;
 
-    private  String responseUrl; //企微群聊回复链接，有限时间为一个小时
+    private  String response_url; //企微群聊回复链接，有限时间为一个小时
 
     private MsgTypeText text;
     private MsgTypeImage image;

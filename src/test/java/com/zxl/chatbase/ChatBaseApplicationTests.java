@@ -75,8 +75,8 @@ class ChatBaseApplicationTests {
 
     @Test
     void testWxGroupUrl(){
-        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=61wFNMtsTj6oNFwDHvaKEAAA_g8dEJ_LvyvFG41vu6ghgsrez-w7RzTca0EEpf5sB6P8weswkl31YX_aRmXc0K8BS";
-        WeChatUtil.sendText(url, "hello world");
+        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=quQdPAS5RWm8501EAqcHdgAA_D_S6liLB-p55Y7of2LbD5gUY8mrn9_dtIcXrUeNUdnJpdGtnPNpUDYQL5SfujrP-";
+        WeChatUtil.sendMarkdown(url, "hello world");
     }
 
 }

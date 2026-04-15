@@ -30,7 +30,7 @@ public class IntelligentRobotController {
     }
 
 //Urldecode
-    @PostMapping("/callback/handle") // 路劲与get检验URL相同
+    @PostMapping("/callback/handle") // 路径与get检验URL相同
     public Map<String, String> handleMessage(@RequestParam("msg_signature") String msgSignature,
                                 @RequestParam("timestamp") String timestamp,
                                 @RequestParam("nonce") String nonce,
