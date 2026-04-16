@@ -54,8 +54,13 @@ qq:
     self-id: 你的机器人QQ号
     http-base-url: "http://127.0.0.1:3000"
 ```
+想要使用QQ机器人，需要使用NapCat开源项目作为中间件监听QQ消息  
+项目地址：https://github.com/NapNeko/NapCatQQ  
+务必使用小号登录NapCat，防止被封禁账号
+下载完成并启动后进入 http://127.0.0.1:6099/webui/ 控制台登录QQ账号并授权后，在网络配置中进行以下配置
+NapCat 配置反向 WebSocket：`ws://localhost:8080/qq/ws`  
+NapCat 配置 HTTP服务器 API：`http://localhost:8080/qq/api`
 
-NapCat 配置反向 WebSocket：`ws://localhost:8080/qq/ws`
 
 ### 5. 启动
 
@@ -115,7 +120,7 @@ QQ群消息 → NapCat → WebSocket(/qq/ws) → 入库 + 同步im_group/im_user
 
 ## 配置说明
 
-主要配置在 `application-local.yaml`：
+主要配置在 `application-local.yaml`(本地创建配置文件)：
 
 ```yaml
 # Dify配置
@@ -144,12 +149,13 @@ chat:
 ```
 
 ## Docker 部署
-
+1. 复制.env.example 为 .env 并修改配置
+2. 执行docker compose命令启动：
 ```bash
 docker compose up -d --build
 ```
 
-服务端口：MySQL(3306)、Redis(6379)、Backend(8080)
+服务端口：MySQL(3306)、Redis(6379)、Backend(8080)、NapCat(3000,3001)、Web(80)
 
 ## 常见问题
 
