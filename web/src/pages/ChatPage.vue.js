@@ -1,88 +1,157 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { ref } from 'vue';
-import { webChat } from '../api/chat';
+import { ref, computed, onMounted } from 'vue';
+import { Plus, Trash2, Paperclip, Link, Send, ThumbsUp, ThumbsDown } from 'lucide-vue-next';
+import { webChatWithSession } from '../api/chat';
+import { submitFeedback as submitFeedbackApi } from '../api/feedback';
 import { getOrCreateUserId } from '../lib/user';
 import { uploadFile } from '../api/upload';
+import { createSession, listSessions, getSessionMessages, deleteSession as deleteSessionApi } from '../api/session';
 const userId = getOrCreateUserId();
 const input = ref('');
 const urlInput = ref('');
 const loading = ref(false);
 const error = ref(null);
+const sessions = ref([]);
+const currentSession = ref(null);
 const messages = ref([]);
 const pendingFiles = ref([]);
-const menuOpen = ref(false);
-const urlPanelOpen = ref(false);
+const showAttachMenu = ref(false);
+const showUrlInput = ref(false);
 const fileInputRef = ref(null);
-function truncate(s, max) {
-    if (!s)
+function truncate(s, max) { return s && s.length > max ? `${s.slice(0, max)}...` : s; }
+function getDateKey(t) {
+    if (!t)
+        return 'unknown';
+    const d = new Date(t);
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function formatDateTitle(t) {
+    if (!t)
+        return '未知日期';
+    const d = new Date(t);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate()) {
+        return '今天';
+    }
+    if (d.getFullYear() === yesterday.getFullYear() && d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate()) {
+        return '昨天';
+    }
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+function formatTime(t) {
+    if (!t)
         return '';
-    return s.length > max ? `${s.slice(0, max)}…` : s;
+    const d = new Date(t);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    if (diff < 60000)
+        return '刚刚';
+    if (diff < 3600000)
+        return `${Math.floor(diff / 60000)}分钟前`;
+    if (diff < 86400000)
+        return `${Math.floor(diff / 3600000)}小时前`;
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
-function togglePlusMenu() {
-    menuOpen.value = !menuOpen.value;
-}
-function closePlusMenu() {
-    menuOpen.value = false;
-}
-function pickLocalFile() {
-    closePlusMenu();
-    fileInputRef.value?.click();
-}
-function openUrlPanelFromMenu() {
-    closePlusMenu();
-    urlPanelOpen.value = true;
-}
-function confirmUrlAndClose() {
-    addUrlFile();
-    urlPanelOpen.value = false;
-}
-function reset() {
-    messages.value = [];
-    error.value = null;
-    input.value = '';
-    urlInput.value = '';
-    pendingFiles.value = [];
-    menuOpen.value = false;
-    urlPanelOpen.value = false;
-}
-async function send() {
-    const text = input.value.trim();
-    if (!text)
-        return;
-    error.value = null;
-    messages.value.push({ role: 'user', text });
-    input.value = '';
-    loading.value = true;
-    try {
-        const files = [...pendingFiles.value];
-        const resp = await webChat(text, userId, files);
-        messages.value.push({
-            role: 'assistant',
-            text: resp.answer || '（无返回）',
-            sources: resp.retrieverResources || [],
+const groupedSessions = computed(() => {
+    const groups = [];
+    const groupMap = new Map();
+    for (const s of sessions.value) {
+        const key = getDateKey(s.lastMessageTime || s.createTime);
+        if (!groupMap.has(key)) {
+            groupMap.set(key, []);
+        }
+        groupMap.get(key).push(s);
+    }
+    const sortedKeys = Array.from(groupMap.keys()).sort((a, b) => {
+        const [ay, am, ad] = a.split('-').map(Number);
+        const [by, bm, bd] = b.split('-').map(Number);
+        return (by * 10000 + bm * 100 + bd) - (ay * 10000 + am * 100 + ad);
+    });
+    for (const key of sortedKeys) {
+        const sessionList = groupMap.get(key);
+        const sampleTime = sessionList[0]?.lastMessageTime || sessionList[0]?.createTime;
+        groups.push({
+            dateKey: key,
+            dateTitle: formatDateTitle(sampleTime),
+            sessions: sessionList
         });
-        pendingFiles.value = [];
+    }
+    return groups;
+});
+async function loadSessions() {
+    try {
+        const resp = await listSessions(userId, 'web', 1, 50);
+        sessions.value = resp.records || [];
+        if (sessions.value.length > 0 && !currentSession.value) {
+            await switchSession(sessions.value[0]);
+        }
     }
     catch (e) {
-        error.value = e?.message || '请求失败';
-        messages.value.push({ role: 'assistant', text: '【系统错误】请求失败，请稍后再试' });
-    }
-    finally {
-        loading.value = false;
+        error.value = e?.message || '加载会话列表失败';
     }
 }
-function addUrlFile() {
-    const u = urlInput.value.trim();
-    if (!u)
+async function createNewSession() {
+    try {
+        const session = await createSession(userId, 'web');
+        sessions.value.unshift(session);
+        await switchSession(session);
+    }
+    catch (e) {
+        error.value = e?.message || '创建会话失败';
+    }
+}
+async function switchSession(session) {
+    currentSession.value = session;
+    messages.value = [];
+    error.value = null;
+    pendingFiles.value = [];
+    try {
+        const msgs = await getSessionMessages(session.sessionId);
+        for (const m of msgs) {
+            if (m.query) {
+                messages.value.push({ role: 'user', text: m.query });
+            }
+            if (m.answer) {
+                messages.value.push({ role: 'assistant', text: m.answer });
+            }
+        }
+    }
+    catch (e) {
+        error.value = e?.message || '加载消息失败';
+    }
+}
+async function deleteSession(session) {
+    if (!confirm('确定删除此对话吗？'))
         return;
-    pendingFiles.value.push({
-        type: guessFileTypeFromUrl(u),
-        transferMethod: 'remote_url',
-        url: u,
-    });
-    urlInput.value = '';
+    try {
+        await deleteSessionApi(session.sessionId);
+        sessions.value = sessions.value.filter(s => s.sessionId !== session.sessionId);
+        if (currentSession.value?.sessionId === session.sessionId) {
+            if (sessions.value.length > 0) {
+                await switchSession(sessions.value[0]);
+            }
+            else {
+                currentSession.value = null;
+                messages.value = [];
+            }
+        }
+    }
+    catch (e) {
+        error.value = e?.message || '删除失败';
+    }
 }
-async function uploadLocalFile(e) {
+function toggleAttachMenu() {
+    showAttachMenu.value = !showAttachMenu.value;
+    if (showUrlInput.value)
+        showUrlInput.value = false;
+}
+function pickLocalFile() {
+    showAttachMenu.value = false;
+    fileInputRef.value?.click();
+}
+async function handleFileUpload(e) {
     const el = e.target;
     const file = el.files?.[0];
     if (!file)
@@ -92,11 +161,7 @@ async function uploadLocalFile(e) {
     try {
         const resp = await uploadFile(file, userId);
         if (resp.id) {
-            pendingFiles.value.push({
-                type: guessFileTypeFromName(file.name),
-                transferMethod: 'local_file',
-                uploadFileId: resp.id,
-            });
+            pendingFiles.value.push({ type: guessFileType(file.name), transfer_method: 'local_file', upload_file_id: resp.id });
         }
     }
     catch (err) {
@@ -107,7 +172,15 @@ async function uploadLocalFile(e) {
         el.value = '';
     }
 }
-function guessFileTypeFromName(name) {
+function addUrlFile() {
+    const u = urlInput.value.trim();
+    if (!u)
+        return;
+    pendingFiles.value.push({ type: guessFileType(u), transfer_method: 'remote_url', url: u });
+    urlInput.value = '';
+    showUrlInput.value = false;
+}
+function guessFileType(name) {
     const n = name.toLowerCase();
     if (/\.(png|jpg|jpeg|gif|webp|bmp)$/.test(n))
         return 'image';
@@ -117,130 +190,319 @@ function guessFileTypeFromName(name) {
         return 'video';
     return 'document';
 }
-function guessFileTypeFromUrl(url) {
-    try {
-        const path = new URL(url).pathname;
-        return guessFileTypeFromName(path);
+async function send() {
+    const text = input.value.trim();
+    if (!text || loading.value)
+        return;
+    if (!currentSession.value) {
+        await createNewSession();
+        if (!currentSession.value)
+            return;
     }
-    catch {
-        return 'document';
+    error.value = null;
+    messages.value.push({ role: 'user', text });
+    input.value = '';
+    loading.value = true;
+    try {
+        const files = [...pendingFiles.value];
+        const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files);
+        messages.value.push({ role: 'assistant', text: resp.answer || '（无返回）', sources: resp.retrieverResources || [] });
+        pendingFiles.value = [];
+        currentSession.value.messageCount = (currentSession.value.messageCount || 0) + 2;
+        currentSession.value.lastMessageTime = new Date().toISOString();
+        if (!currentSession.value.title) {
+            currentSession.value.title = text.length > 50 ? text.substring(0, 50) + '...' : text;
+        }
+    }
+    catch (e) {
+        error.value = e?.message || '请求失败';
+        messages.value.push({ role: 'assistant', text: '【系统错误】请求失败，请稍后再试' });
+    }
+    finally {
+        loading.value = false;
     }
 }
+async function submitFeedback(msgIdx, rating) {
+    if (!currentSession.value)
+        return;
+    try {
+        await submitFeedbackApi(currentSession.value.sessionId, msgIdx, rating);
+        messages.value[msgIdx].feedback = rating;
+    }
+    catch {
+        error.value = '反馈提交失败';
+    }
+}
+onMounted(loadSessions);
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['anime-chat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-date']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-delete']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "pageShell" },
+    ...{ class: "anime-page-shell" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "card" },
+    ...{ class: "anime-card anime-chat-card" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "cardHeader" },
+    ...{ class: "anime-card-header" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "h1" },
+    ...{ class: "anime-card-title" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "muted" },
+    ...{ class: "anime-card-desc" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.code, __VLS_intrinsicElements.code)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-code" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-pill" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-code" },
+});
+(__VLS_ctx.userId.slice(0, 12));
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "right" },
+    ...{ class: "anime-card-actions" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "pill" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.code, __VLS_intrinsicElements.code)({});
-(__VLS_ctx.userId);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.reset) },
-    ...{ class: "btn btnGhost" },
+    ...{ onClick: (__VLS_ctx.createNewSession) },
+    ...{ class: "anime-btn primary" },
+});
+const __VLS_0 = {}.Plus;
+/** @type {[typeof __VLS_components.Plus, ]} */ ;
+// @ts-ignore
+const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
+    size: (18),
+}));
+const __VLS_2 = __VLS_1({
+    size: (18),
+}, ...__VLS_functionalComponentArgsRest(__VLS_1));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-chat-layout" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.aside, __VLS_intrinsicElements.aside)({
+    ...{ class: "anime-chat-sidebar" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "chat" },
+    ...{ class: "anime-session-list" },
+});
+if (__VLS_ctx.sessions.length === 0) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-empty" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-empty-icon" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-empty-text" },
+    });
+}
+for (const [group] of __VLS_getVForSourceType((__VLS_ctx.groupedSessions))) {
+    (group.dateKey);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-session-date" },
+    });
+    (group.dateTitle);
+    for (const [s] of __VLS_getVForSourceType((group.sessions))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onClick: (...[$event]) => {
+                    __VLS_ctx.switchSession(s);
+                } },
+            key: (s.sessionId),
+            ...{ class: "anime-session-item" },
+            ...{ class: ({ active: __VLS_ctx.currentSession?.sessionId === s.sessionId }) },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-session-title" },
+        });
+        (s.title || '新对话');
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-session-meta" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (s.messageCount || 0);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (__VLS_ctx.formatTime(s.lastMessageTime));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    __VLS_ctx.deleteSession(s);
+                } },
+            ...{ class: "anime-session-delete" },
+        });
+        const __VLS_4 = {}.Trash2;
+        /** @type {[typeof __VLS_components.Trash2, ]} */ ;
+        // @ts-ignore
+        const __VLS_5 = __VLS_asFunctionalComponent(__VLS_4, new __VLS_4({
+            size: (14),
+        }));
+        const __VLS_6 = __VLS_5({
+            size: (14),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_5));
+    }
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-chat-main" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-chat-messages" },
 });
 if (__VLS_ctx.messages.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "empty" },
+        ...{ class: "anime-empty" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-empty-icon" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-empty-text" },
     });
 }
 for (const [m, idx] of __VLS_getVForSourceType((__VLS_ctx.messages))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         key: (idx),
-        ...{ class: "msgRow" },
+        ...{ class: "anime-chat-message anime-fade-in" },
         ...{ class: (m.role) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "avatar" },
+        ...{ class: "anime-chat-avatar" },
     });
-    (m.role === 'user' ? '我' : 'AI');
+    (m.role === 'user' ? 'U' : 'AI');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "bubble" },
+        ...{ class: "anime-chat-bubble" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "content" },
+        ...{ style: {} },
     });
     (m.text);
     if (m.sources?.length) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "sources" },
+            ...{ style: {} },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "sourcesTitle" },
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "anime-badge blue" },
         });
         for (const [s, i] of __VLS_getVForSourceType((m.sources))) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 key: (i),
-                ...{ class: "sourceItem" },
+                ...{ style: {} },
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "sourceMeta" },
+                ...{ style: {} },
             });
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                ...{ class: "badge" },
+                ...{ class: "anime-badge muted" },
             });
-            (s.datasetName || s.datasetId || 'dataset');
+            (s.datasetName || s.datasetId || 'KB');
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                ...{ class: "badge" },
+                ...{ class: "anime-badge pink" },
             });
-            (s.documentName || s.documentId || 'doc');
+            (s.documentName || s.documentId || 'DOC');
             if (typeof s.score === 'number') {
                 __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                    ...{ class: "badge" },
+                    ...{ class: "anime-code" },
                 });
                 (s.score.toFixed(3));
             }
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-                ...{ class: "sourceText" },
+                ...{ style: {} },
             });
             (s.content);
         }
     }
+    if (m.role === 'assistant' && m.feedback === undefined) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(m.role === 'assistant' && m.feedback === undefined))
+                        return;
+                    __VLS_ctx.submitFeedback(idx, 5);
+                } },
+            ...{ class: "anime-btn ghost" },
+            ...{ style: {} },
+        });
+        const __VLS_8 = {}.ThumbsUp;
+        /** @type {[typeof __VLS_components.ThumbsUp, ]} */ ;
+        // @ts-ignore
+        const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
+            size: (16),
+        }));
+        const __VLS_10 = __VLS_9({
+            size: (16),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_9));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!(m.role === 'assistant' && m.feedback === undefined))
+                        return;
+                    __VLS_ctx.submitFeedback(idx, 1);
+                } },
+            ...{ class: "anime-btn ghost" },
+            ...{ style: {} },
+        });
+        const __VLS_12 = {}.ThumbsDown;
+        /** @type {[typeof __VLS_components.ThumbsDown, ]} */ ;
+        // @ts-ignore
+        const __VLS_13 = __VLS_asFunctionalComponent(__VLS_12, new __VLS_12({
+            size: (16),
+        }));
+        const __VLS_14 = __VLS_13({
+            size: (16),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_13));
+    }
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.form, __VLS_intrinsicElements.form)({
-    ...{ onSubmit: (__VLS_ctx.send) },
-    ...{ class: "composer" },
-});
-if (__VLS_ctx.menuOpen) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div)({
-        ...{ onClick: (__VLS_ctx.closePlusMenu) },
-        ...{ class: "menuOverlay" },
-        'aria-hidden': "true",
+if (__VLS_ctx.loading) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-chat-message assistant anime-fade-in" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-chat-avatar" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-chat-bubble" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "anime-loader-spinner" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ style: {} },
     });
 }
 if (__VLS_ctx.pendingFiles.length) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "fileTags" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "anime-badge pink" },
+    });
+    (__VLS_ctx.pendingFiles.length);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
     });
     for (const [f, i] of __VLS_getVForSourceType((__VLS_ctx.pendingFiles))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             key: (i),
-            ...{ class: "badge" },
+            ...{ class: "anime-pill" },
         });
-        (f.transferMethod === 'local_file' ? `本地:${f.uploadFileId?.slice(0, 8)}…` : `链接:${__VLS_ctx.truncate(f.url, 24)}`);
+        (f.transfer_method === 'local_file' ? `本地:${f.upload_file_id?.slice(0, 8)}...` : `链接:${__VLS_ctx.truncate(f.url || '', 20)}`);
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
@@ -248,177 +510,242 @@ if (__VLS_ctx.pendingFiles.length) {
                     return;
                 __VLS_ctx.pendingFiles = [];
             } },
-        ...{ class: "btn btnGhost" },
-        type: "button",
+        ...{ class: "anime-btn ghost" },
+        ...{ style: {} },
     });
 }
-if (__VLS_ctx.urlPanelOpen) {
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-chat-composer" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (__VLS_ctx.toggleAttachMenu) },
+    ...{ class: "anime-btn ghost" },
+    type: "button",
+});
+const __VLS_16 = {}.Plus;
+/** @type {[typeof __VLS_components.Plus, ]} */ ;
+// @ts-ignore
+const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
+    size: (18),
+}));
+const __VLS_18 = __VLS_17({
+    size: (18),
+}, ...__VLS_functionalComponentArgsRest(__VLS_17));
+if (__VLS_ctx.showAttachMenu) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "urlPanel" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.pickLocalFile) },
+        ...{ class: "anime-btn ghost" },
+        type: "button",
+    });
+    const __VLS_20 = {}.Paperclip;
+    /** @type {[typeof __VLS_components.Paperclip, ]} */ ;
+    // @ts-ignore
+    const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({
+        size: (16),
+    }));
+    const __VLS_22 = __VLS_21({
+        size: (16),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_21));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showAttachMenu))
+                    return;
+                __VLS_ctx.showUrlInput = true;
+                __VLS_ctx.showAttachMenu = false;
+            } },
+        ...{ class: "anime-btn ghost" },
+        type: "button",
+    });
+    const __VLS_24 = {}.Link;
+    /** @type {[typeof __VLS_components.Link, ]} */ ;
+    // @ts-ignore
+    const __VLS_25 = __VLS_asFunctionalComponent(__VLS_24, new __VLS_24({
+        size: (16),
+    }));
+    const __VLS_26 = __VLS_25({
+        size: (16),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_25));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    ...{ onChange: (__VLS_ctx.handleFileUpload) },
+    ref: "fileInputRef",
+    type: "file",
+    ...{ style: {} },
+    disabled: (__VLS_ctx.loading),
+});
+/** @type {typeof __VLS_ctx.fileInputRef} */ ;
+if (__VLS_ctx.showUrlInput) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-        ...{ onKeyup: (__VLS_ctx.confirmUrlAndClose) },
-        ...{ class: "input urlPanelInput" },
-        placeholder: "粘贴文件或图片的直链 URL（https://…）",
+        ...{ onKeyup: (__VLS_ctx.addUrlFile) },
+        ...{ class: "anime-input anime-chat-input" },
+        placeholder: "输入文件URL (https://...)",
         disabled: (__VLS_ctx.loading),
     });
     (__VLS_ctx.urlInput);
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.confirmUrlAndClose) },
-        ...{ class: "btn btnGhost" },
-        type: "button",
-        disabled: (!__VLS_ctx.urlInput.trim() || __VLS_ctx.loading),
+        ...{ onClick: (__VLS_ctx.addUrlFile) },
+        ...{ class: "anime-btn blue" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
-                if (!(__VLS_ctx.urlPanelOpen))
+                if (!(__VLS_ctx.showUrlInput))
                     return;
-                __VLS_ctx.urlPanelOpen = false;
+                __VLS_ctx.showUrlInput = false;
+                __VLS_ctx.urlInput = '';
             } },
-        ...{ class: "btn btnGhost" },
-        type: "button",
+        ...{ class: "anime-btn ghost" },
     });
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "composerRow" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "plusWrap" },
-});
+else {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-chat-input" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ onKeyup: (__VLS_ctx.send) },
+        ...{ class: "anime-input" },
+        placeholder: "输入问题，按Enter发送...",
+        disabled: (__VLS_ctx.loading),
+    });
+    (__VLS_ctx.input);
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.togglePlusMenu) },
-    type: "button",
-    ...{ class: "plusBtn" },
-    'aria-expanded': (__VLS_ctx.menuOpen),
-    title: "添加附件",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "plusMenu" },
-    role: "menu",
-});
-__VLS_asFunctionalDirective(__VLS_directives.vShow)(null, { ...__VLS_directiveBindingRestFields, value: (__VLS_ctx.menuOpen) }, null, null);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.pickLocalFile) },
-    type: "button",
-    ...{ class: "plusMenuItem" },
-    role: "menuitem",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "plusMenuIco" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ onClick: (__VLS_ctx.openUrlPanelFromMenu) },
-    type: "button",
-    ...{ class: "plusMenuItem" },
-    role: "menuitem",
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "plusMenuIco" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ onChange: (__VLS_ctx.uploadLocalFile) },
-    ref: "fileInputRef",
-    type: "file",
-    ...{ class: "fileHidden" },
-    disabled: (__VLS_ctx.loading),
-});
-/** @type {typeof __VLS_ctx.fileInputRef} */ ;
-__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
-    ...{ class: "input inputMain" },
-    placeholder: "尽管问，带图也行",
-    disabled: (__VLS_ctx.loading),
-});
-(__VLS_ctx.input);
-__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ class: "btn" },
-    type: "submit",
+    ...{ onClick: (__VLS_ctx.send) },
+    ...{ class: "anime-btn primary" },
     disabled: (__VLS_ctx.loading || !__VLS_ctx.input.trim()),
 });
-(__VLS_ctx.loading ? '发送中…' : '发送');
-__VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "attachHint" },
-});
+const __VLS_28 = {}.Send;
+/** @type {[typeof __VLS_components.Send, ]} */ ;
+// @ts-ignore
+const __VLS_29 = __VLS_asFunctionalComponent(__VLS_28, new __VLS_28({
+    size: (18),
+}));
+const __VLS_30 = __VLS_29({
+    size: (18),
+}, ...__VLS_functionalComponentArgsRest(__VLS_29));
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+(__VLS_ctx.loading ? '发送中...' : '发送');
 if (__VLS_ctx.error) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "error" },
+        ...{ class: "anime-error" },
+        ...{ style: {} },
     });
     (__VLS_ctx.error);
 }
-/** @type {__VLS_StyleScopedClasses['pageShell']} */ ;
-/** @type {__VLS_StyleScopedClasses['card']} */ ;
-/** @type {__VLS_StyleScopedClasses['cardHeader']} */ ;
-/** @type {__VLS_StyleScopedClasses['h1']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-page-shell']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-card-header']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-card-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-card-desc']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-card-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-layout']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-sidebar']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-date']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-title']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-meta']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-session-delete']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-messages']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-fade-in']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-bubble']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['blue']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
-/** @type {__VLS_StyleScopedClasses['right']} */ ;
-/** @type {__VLS_StyleScopedClasses['pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
-/** @type {__VLS_StyleScopedClasses['chat']} */ ;
-/** @type {__VLS_StyleScopedClasses['empty']} */ ;
-/** @type {__VLS_StyleScopedClasses['msgRow']} */ ;
-/** @type {__VLS_StyleScopedClasses['avatar']} */ ;
-/** @type {__VLS_StyleScopedClasses['bubble']} */ ;
-/** @type {__VLS_StyleScopedClasses['content']} */ ;
-/** @type {__VLS_StyleScopedClasses['sources']} */ ;
-/** @type {__VLS_StyleScopedClasses['sourcesTitle']} */ ;
-/** @type {__VLS_StyleScopedClasses['sourceItem']} */ ;
-/** @type {__VLS_StyleScopedClasses['sourceMeta']} */ ;
-/** @type {__VLS_StyleScopedClasses['badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['sourceText']} */ ;
-/** @type {__VLS_StyleScopedClasses['composer']} */ ;
-/** @type {__VLS_StyleScopedClasses['menuOverlay']} */ ;
-/** @type {__VLS_StyleScopedClasses['fileTags']} */ ;
-/** @type {__VLS_StyleScopedClasses['badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
-/** @type {__VLS_StyleScopedClasses['urlPanel']} */ ;
-/** @type {__VLS_StyleScopedClasses['input']} */ ;
-/** @type {__VLS_StyleScopedClasses['urlPanelInput']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['btnGhost']} */ ;
-/** @type {__VLS_StyleScopedClasses['composerRow']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusWrap']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusBtn']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusMenu']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusMenuItem']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusMenuIco']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusMenuItem']} */ ;
-/** @type {__VLS_StyleScopedClasses['plusMenuIco']} */ ;
-/** @type {__VLS_StyleScopedClasses['fileHidden']} */ ;
-/** @type {__VLS_StyleScopedClasses['input']} */ ;
-/** @type {__VLS_StyleScopedClasses['inputMain']} */ ;
-/** @type {__VLS_StyleScopedClasses['btn']} */ ;
-/** @type {__VLS_StyleScopedClasses['attachHint']} */ ;
-/** @type {__VLS_StyleScopedClasses['error']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['pink']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-message']} */ ;
+/** @type {__VLS_StyleScopedClasses['assistant']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-fade-in']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-bubble']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-loader-spinner']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['pink']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-composer']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['blue']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-chat-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-error']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
+            Plus: Plus,
+            Trash2: Trash2,
+            Paperclip: Paperclip,
+            Link: Link,
+            Send: Send,
+            ThumbsUp: ThumbsUp,
+            ThumbsDown: ThumbsDown,
             userId: userId,
             input: input,
             urlInput: urlInput,
             loading: loading,
             error: error,
+            sessions: sessions,
+            currentSession: currentSession,
             messages: messages,
             pendingFiles: pendingFiles,
-            menuOpen: menuOpen,
-            urlPanelOpen: urlPanelOpen,
+            showAttachMenu: showAttachMenu,
+            showUrlInput: showUrlInput,
             fileInputRef: fileInputRef,
             truncate: truncate,
-            togglePlusMenu: togglePlusMenu,
-            closePlusMenu: closePlusMenu,
+            formatTime: formatTime,
+            groupedSessions: groupedSessions,
+            createNewSession: createNewSession,
+            switchSession: switchSession,
+            deleteSession: deleteSession,
+            toggleAttachMenu: toggleAttachMenu,
             pickLocalFile: pickLocalFile,
-            openUrlPanelFromMenu: openUrlPanelFromMenu,
-            confirmUrlAndClose: confirmUrlAndClose,
-            reset: reset,
+            handleFileUpload: handleFileUpload,
+            addUrlFile: addUrlFile,
             send: send,
-            uploadLocalFile: uploadLocalFile,
+            submitFeedback: submitFeedback,
         };
     },
 });

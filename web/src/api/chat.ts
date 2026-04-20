@@ -6,3 +6,8 @@ export async function webChat(text: string, userId: string, files?: ChatFileInfo
   return resp.data
 }
 
+export async function webChatWithSession(sessionId: string, text: string, userId: string, files?: ChatFileInfo[]): Promise<DifyChatResponse> {
+  const resp = await api.post<DifyChatResponse>('/chat/web/session', { sessionId, text, userId, files: files || [] })
+  return resp.data
+}
+

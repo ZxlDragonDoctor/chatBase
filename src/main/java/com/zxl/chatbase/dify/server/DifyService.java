@@ -2,9 +2,14 @@ package com.zxl.chatbase.dify.server;
 
 
 import com.zxl.chatbase.dify.model.request.DifyChatRequest;
+import com.zxl.chatbase.dify.model.response.BatchUploadResponse;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
+import com.zxl.chatbase.dify.model.response.DifyDatasetResponse;
+import com.zxl.chatbase.dify.model.response.DifyDocumentResponse;
 import com.zxl.chatbase.dify.model.response.DifyFileUploadResponse;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 
 public interface DifyService {
@@ -43,6 +48,28 @@ public interface DifyService {
     }
 
     /**
+     * 批量上传文件到Dify知识库
+     * 由于Dify限制每次最多上传5个文件，会自动分批处理
+     *
+     * @param files      文件列表
+     * @param user       用户标识
+     * @param datasetId  目标知识库ID
+     * @return 批量上传结果
+     */
+    BatchUploadResponse batchUploadFiles(List<MultipartFile> files, String user, String datasetId);
+
+    /**
+     * 批量上传文件到Dify知识库（带默认用户标识）
+     *
+     * @param files      文件列表
+     * @param datasetId  目标知识库ID
+     * @return 批量上传结果
+     */
+    default BatchUploadResponse batchUploadFiles(List<MultipartFile> files, String datasetId) {
+        return batchUploadFiles(files, "abc-123", datasetId);
+    }
+
+    /**
      * 将一段纯文本作为文档写入 Dify 知识库（Dataset）
      *
      * @param title   文档标题
@@ -70,5 +97,29 @@ public interface DifyService {
      * @return 新建知识库的 ID（dataset_id），失败返回 null
      */
     String createDataset(String name, String description);
+
+    /**
+     * 获取Dify中已创建的知识库列表
+     *
+     * @return Dify知识库列表
+     */
+    List<DifyDatasetResponse> listDatasets();
+
+    /**
+     * 获取Dify知识库中的文档列表
+     *
+     * @param datasetId 知识库ID
+     * @return 文档列表
+     */
+    List<DifyDocumentResponse> listDatasetDocuments(String datasetId);
+
+    /**
+     * 删除Dify知识库中的文档
+     *
+     * @param datasetId 知识库ID
+     * @param documentId 文档ID
+     * @return 是否删除成功
+     */
+    boolean deleteDatasetDocument(String datasetId, String documentId);
 
 }

@@ -1,4 +1,4 @@
-package com.zxl.chatbase.chat;
+package com.zxl.chatbase.chat.service;
 
 import com.zxl.chatbase.dify.model.request.FileInfo;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
@@ -31,5 +31,17 @@ public interface ChatService {
      * @return Dify 回复
      */
     DifyChatResponse chat(String channel, String userId, String groupId, String query, List<FileInfo> files);
+
+    /**
+     * 发送聊天消息（指定会话ID）
+     *
+     * @param sessionId 本地会话ID
+     * @param channel   渠道标识
+     * @param userId    用户标识
+     * @param query     用户问题
+     * @param files     附件列表
+     * @return Dify 回复
+     */
+    DifyChatResponse chatWithSession(String sessionId, String channel, String userId, String query, List<FileInfo> files);
 }
 

@@ -10,9 +10,9 @@ export type DifyChatResponse = {
 
 export type ChatFileInfo = {
   type: 'image' | 'document' | 'audio' | 'video' | string
-  transferMethod: 'remote_url' | 'local_file'
+  transfer_method: 'remote_url' | 'local_file'
   url?: string
-  uploadFileId?: string
+  upload_file_id?: string
 }
 
 export type DifyFileUploadResponse = {
@@ -22,5 +22,19 @@ export type DifyFileUploadResponse = {
   extension?: string
   mimeType?: string
   createdAt?: number | string
+}
+
+export type FileUploadResult = {
+  fileName: string
+  success: boolean
+  message: string
+  difyFileId?: string
+}
+
+export type BatchUploadResponse = {
+  totalCount: number
+  successCount: number
+  failedCount: number
+  results: FileUploadResult[]
 }
 

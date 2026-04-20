@@ -1,12 +1,15 @@
-package com.zxl.chatbase.chat.impl;
+package com.zxl.chatbase.chat.service.impl;
 
-import com.zxl.chatbase.chat.ChatService;
+import com.zxl.chatbase.chat.entity.ChatSession;
+import com.zxl.chatbase.chat.service.ChatService;
+import com.zxl.chatbase.chat.service.ChatSessionService;
 import com.zxl.chatbase.config.ChatProperties;
 import com.zxl.chatbase.dify.model.request.DifyChatRequest;
 import com.zxl.chatbase.dify.model.request.FileInfo;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.kb.entity.KbConversation;
 import com.zxl.chatbase.kb.service.IKbConversationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +21,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -34,6 +36,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatProperties chatProperties;
     private final GroupMessageSyncService groupMessageSyncService;
     private final IKbConversationService kbConversationService;
+    private final ChatSessionService chatSessionService;
     private final ThreadPoolExecutor threadPool;
 
     private static final String CONVERSATION_KEY_PREFIX = "chat:conversation:";
@@ -75,21 +78,11 @@ public class ChatServiceImpl implements ChatService {
         req.setUser(safeUserId);
         req.setFiles(files);
 
-        //判断消息类型
-        //一般消息要么是文本，要么是混合消息
-        //前端拦截空消息
         String messageType;
         if(files!=null && !files.isEmpty()){
             messageType =  "Mixed";
         }else{
             messageType = "text";
-        }
-
-        // 保存web消息到数据库
-        if(groupId==null && channel.equals("web")){
-            CompletableFuture.runAsync(()
-                            -> groupMessageSyncService.saveGroupMessage(userId, query, messageType, System.currentTimeMillis() / 1000),
-                    threadPool);
         }
 
         long startTime = System.currentTimeMillis();
@@ -193,6 +186,68 @@ public class ChatServiceImpl implements ChatService {
         }
         // 简单的 UUID 格式校验：32位字符+4个横杠
         return str.matches("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    }
+
+    @Override
+    public DifyChatResponse chatWithSession(String sessionId, String channel, String userId, String query, List<FileInfo> files) {
+        String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
+        
+        ChatSession session = chatSessionService.getSessionById(sessionId);
+        if (session == null) {
+            log.warn("会话不存在，自动创建: sessionId={}", sessionId);
+            session = chatSessionService.createSession(safeUserId, channel);
+        }
+
+        String difyConversationId = session.getDifyConversationId();
+
+        log.info("会话对话: sessionId={}, userId={}, difyConversationId={}", sessionId, safeUserId, difyConversationId);
+
+        DifyChatRequest req = new DifyChatRequest();
+        req.setInputs(new HashMap<>());
+        req.setQuery(query);
+        req.setResponseMode("blocking");
+        req.setConversationId(difyConversationId);
+        req.setUser(safeUserId);
+        req.setFiles(files);
+
+        long startTime = System.currentTimeMillis();
+        DifyChatResponse response = difyService.sendChatMessage(req);
+        int latencyMs = (int) (System.currentTimeMillis() - startTime);
+
+        boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
+        String answer = response != null ? response.getAnswer() : null;
+        Long tokens = response != null && response.getUsage() != null ? response.getUsage().getCompletionTokens().longValue() : null;
+        String errorMessage = null;
+        if (!success && response != null && response.getAnswer() != null) {
+            errorMessage = response.getAnswer();
+        }
+
+        String finalConversationId = response != null && StringUtils.hasText(response.getConversationId()) 
+                ? response.getConversationId() 
+                : java.util.UUID.randomUUID().toString();
+
+        KbConversation message = new KbConversation();
+        message.setSessionId(sessionId);
+        message.setConversationId(finalConversationId);
+        message.setUserId(safeUserId);
+        message.setChannel(channel);
+        message.setQuery(query);
+        message.setAnswer(answer);
+        message.setTokens(tokens != null ? tokens.intValue() : 0);
+        message.setLatencyMs(latencyMs);
+        message.setStatus(success);
+        message.setErrorMessage(errorMessage);
+        message.setCreateTime(LocalDateTime.now());
+
+        chatSessionService.addMessageToSession(sessionId, message);
+
+        if (response != null && StringUtils.hasText(response.getConversationId()) && session.getDifyConversationId() == null) {
+            session.setDifyConversationId(response.getConversationId());
+            session.setUpdateTime(LocalDateTime.now());
+            chatSessionService.updateById(session);
+        }
+
+        return response;
     }
 }
 

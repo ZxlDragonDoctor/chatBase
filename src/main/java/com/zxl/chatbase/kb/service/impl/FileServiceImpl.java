@@ -82,7 +82,6 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
     public void deleteFile(Long fileId) {
         KbFile file = kbFileMapper.selectById(fileId);
         if (file != null) {
@@ -95,6 +94,11 @@ public class FileServiceImpl implements FileService {
             }
             log.info("文件删除: id={}, name={}", fileId, file.getFileName());
         }
+    }
+
+    @Override
+    public void saveKbFile(KbFile kbFile) {
+        kbFileMapper.insert(kbFile);
     }
 
     private String getFileExt(String fileName) {

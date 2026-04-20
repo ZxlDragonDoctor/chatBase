@@ -16,7 +16,6 @@ import java.util.Map;
 @RequestMapping("intellrobot")
 @Slf4j
 public class IntelligentRobotController {
-    //TODO 路由地址规范，需要修改前端api中的路由
     @Resource
     private IntelligentRobotService intelligentRobotService;
 

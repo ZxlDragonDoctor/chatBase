@@ -2,7 +2,7 @@ package com.zxl.chatbase.wxroboot.webhook.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zxl.chatbase.chat.ChatService;
+import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.MonitorException;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.im.entity.GroupMessage;

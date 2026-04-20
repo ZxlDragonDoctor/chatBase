@@ -12,4 +12,6 @@ public interface FileService {
     List<KbFile> listFiles(String source, String sourceId);
 
     void deleteFile(Long fileId);
+
+    void saveKbFile(KbFile kbFile);
 }

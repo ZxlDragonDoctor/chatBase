@@ -86,4 +86,39 @@ public class KbConversationServiceImpl extends ServiceImpl<KbConversationMapper,
         
         return feedbackMapper.insert(feedback) > 0;
     }
+
+    @Override
+    @Transactional
+    public boolean addFeedbackBySession(String sessionId, Integer messageIndex, Integer rating, String feedbackType, String content) {
+        LambdaQueryWrapper<KbConversation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KbConversation::getSessionId, sessionId)
+                .eq(KbConversation::getStatus, true)
+                .orderByAsc(KbConversation::getCreateTime);
+        
+        var messages = list(wrapper);
+        if (messages == null || messages.isEmpty()) {
+            log.warn("会话中没有消息: sessionId={}", sessionId);
+            return false;
+        }
+        
+        // messageIndex 对应的是 assistant 消息（每2条消息中第二条是assistant）
+        int actualIndex = messageIndex;
+        if (actualIndex < 0 || actualIndex >= messages.size()) {
+            log.warn("消息索引超出范围: sessionId={}, index={}, size={}", sessionId, actualIndex, messages.size());
+            return false;
+        }
+        
+        KbConversation conversation = messages.get(actualIndex);
+        
+        KbFeedback feedback = new KbFeedback();
+        feedback.setConversationId(conversation.getId());
+        feedback.setUserId(conversation.getUserId());
+        feedback.setRating(rating);
+        feedback.setFeedbackType(feedbackType);
+        feedback.setFeedbackContent(content);
+        feedback.setCreateTime(LocalDateTime.now());
+        feedback.setStatus(false);
+        
+        return feedbackMapper.insert(feedback) > 0;
+    }
 }

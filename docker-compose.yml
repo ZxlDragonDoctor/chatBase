@@ -72,7 +72,7 @@ services:
       - qq_files:/data/qq_files/
 
   napcat:
-    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:4.17.46}
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:v4.17.46}
     container_name: chatbase-napcat
     restart: unless-stopped
     ports:

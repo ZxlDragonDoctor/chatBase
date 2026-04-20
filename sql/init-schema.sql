@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS `kb_file` (
   `file_name` VARCHAR(255) NOT NULL COMMENT '文件名',
   `file_path` VARCHAR(500) NOT NULL COMMENT '文件存储路径',
   `file_size` BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小（字节）',
-  `file_type` VARCHAR(50) DEFAULT NULL COMMENT '文件类型（MIME）',
+  `file_type` VARCHAR(100) DEFAULT NULL COMMENT '文件类型（MIME）',
   `file_ext` VARCHAR(20) DEFAULT NULL COMMENT '文件扩展名',
   `bucket` VARCHAR(50) DEFAULT 'local' COMMENT '存储桶：local/oss/s3',
   `source` VARCHAR(32) NOT NULL DEFAULT 'manual' COMMENT '来源：manual/manual_upload/im_sync/web',
@@ -287,6 +287,10 @@ CREATE TABLE IF NOT EXISTS `kb_file` (
   KEY `idx_upload_user_id` (`upload_user_id`),
   KEY `idx_dify_file_id` (`dify_file_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件管理表';
+
+#  word或者奇特类型的文件类型格式比较长
+ALTER TABLE kb_file MODIFY COLUMN file_type VARCHAR(100) DEFAULT NULL COMMENT
+    '文件类型（MIME）';
 
 -- =============================================
 -- 系统模块：系统配置

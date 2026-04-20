@@ -15,4 +15,6 @@ public interface IKbConversationService extends IService<KbConversation> {
     Page<KbConversation> pageList(String userId, String channel, Integer pageNum, Integer pageSize);
     
     boolean addFeedback(Long conversationId, Integer rating, String feedbackType, String content);
+    
+    boolean addFeedbackBySession(String sessionId, Integer messageIndex, Integer rating, String feedbackType, String content);
 }

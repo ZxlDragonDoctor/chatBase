@@ -10,4 +10,3 @@ export async function uploadFile(file: File, user: string): Promise<DifyFileUplo
   })
   return resp.data
 }
-

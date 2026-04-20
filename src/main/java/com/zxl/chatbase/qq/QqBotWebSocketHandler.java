@@ -2,7 +2,7 @@ package com.zxl.chatbase.qq;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zxl.chatbase.chat.ChatService;
+import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.config.ChatProperties;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.entity.ImUser;

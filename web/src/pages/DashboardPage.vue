@@ -1,65 +1,129 @@
 <template>
-  <div class="pageShell">
-    <section class="card">
-      <div class="cardHeader">
+  <div class="anime-page-shell">
+    <section class="anime-card">
+      <div class="anime-card-header">
         <div>
-          <div class="h1">概览</div>
-          <div class="muted">采集消息、机器人状态与 Web 问答入口</div>
+          <div class="anime-card-title">系统概览</div>
+          <div class="anime-card-desc">实时系统状态监控 · 机器人配置 · 消息采集统计</div>
         </div>
-        <div class="right">
-          <RouterLink class="btn" to="/chat">Web 问答</RouterLink>
-          <RouterLink class="btn btnGhost" to="/console/im">群聊管理</RouterLink>
+        <div class="anime-card-actions">
+          <button class="anime-btn ghost" @click="reload">
+            <RefreshCw :size="18" :class="{ 'animate-spin': loading }" />
+            <span>刷新</span>
+          </button>
         </div>
       </div>
 
-      <div v-if="loadErr" class="error" style="margin: 18px">{{ loadErr }}</div>
+      <div v-if="error" class="anime-error" style="margin: 16px 28px;">{{ error }}</div>
 
-      <div v-else-if="!overview" class="empty" style="margin: 24px">加载中…</div>
-
-      <div v-else class="dashBody">
-        <div class="statGrid">
-          <div class="statCard">
-            <div class="statNum">{{ overview.totalMessages }}</div>
-            <div class="statLabel">已采集消息条数</div>
+      <div class="anime-card-body">
+        <div class="anime-stat-grid">
+          <div class="anime-stat-card">
+            <div class="anime-stat-value">{{ formatNumber(overview?.totalMessages) }}</div>
+            <div class="anime-stat-label">已采集消息</div>
           </div>
-          <div class="statCard">
-            <div class="statNum">{{ overview.distinctGroups }}</div>
-            <div class="statLabel">去重群聊数</div>
+          <div class="anime-stat-card">
+            <div class="anime-stat-value blue">{{ formatNumber(overview?.totalConversations) }}</div>
+            <div class="anime-stat-label">问答对话次数</div>
+          </div>
+          <div class="anime-stat-card">
+            <div class="anime-stat-value purple">{{ formatTokens(overview?.totalTokens) }}</div>
+            <div class="anime-stat-label">Token消耗总量</div>
+          </div>
+          <div class="anime-stat-card">
+            <div class="anime-stat-value">{{ overview?.activeGroups || 0 }}</div>
+            <div class="anime-stat-label">活跃群聊数</div>
+          </div>
+          <div class="anime-stat-card">
+            <div class="anime-stat-value blue">{{ overview?.activeUsers || 0 }}</div>
+            <div class="anime-stat-label">活跃用户数</div>
+          </div>
+          <div class="anime-stat-card">
+            <div class="anime-stat-value">{{ overview?.successRate?.toFixed(1) || 0 }}%</div>
+            <div class="anime-stat-label">问答成功率</div>
           </div>
         </div>
 
-        <div class="h2" style="margin-top: 18px">按平台</div>
-        <div class="platformChips">
-          <span v-for="(n, p) in msgByPlatform" :key="p" class="pill">
-            {{ platformLabel(p) }} · 消息 {{ n }}
-            <template v-if="groupByPlatform[p] != null">
-              · 群 {{ groupByPlatform[p] }}
-            </template>
-          </span>
-          <span v-if="platformKeys.length === 0" class="muted">暂无数据</span>
+        <div class="anime-divider"></div>
+
+        <div class="dashboard-grid">
+          <div class="anime-card" style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <BookOpen :size="20" class="anime-nav-icon" style="color: var(--anime-pink);" />
+              <span style="font-size: 16px; font-weight: 700; color: var(--anime-pink);">知识库状态</span>
+            </div>
+            <div style="display: flex; gap: 30px; margin-bottom: 12px;">
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: var(--anime-pink);">{{ overview?.knowledgeBases || 0 }}</div>
+                <div style="font-size: 13px; color: var(--anime-text-muted);">知识库</div>
+              </div>
+              <div>
+                <div style="font-size: 28px; font-weight: 700; color: var(--anime-blue);">{{ overview?.documents || 0 }}</div>
+                <div style="font-size: 13px; color: var(--anime-text-muted);">文档数</div>
+              </div>
+            </div>
+            <RouterLink class="anime-btn ghost" to="/console/knowledge">管理知识库</RouterLink>
+          </div>
+
+          <div class="anime-card" style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <Users :size="20" class="anime-nav-icon" style="color: var(--anime-blue);" />
+              <span style="font-size: 16px; font-weight: 700; color: var(--anime-blue);">机器人状态</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="anime-badge pink">QQ</span>
+                <span style="color: var(--anime-text-primary);">NapCat / OneBot</span>
+                <span class="anime-badge" :class="overview?.bots?.qqEnabled ? 'green' : 'muted'">
+                  {{ overview?.bots?.qqEnabled ? '运行中' : '未启用' }}
+                </span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="anime-badge blue">企微</span>
+                <span style="color: var(--anime-text-primary);">智能机器人</span>
+                <span class="anime-badge" :class="overview?.bots?.wecomEnabled ? 'green' : 'muted'">
+                  {{ overview?.bots?.wecomEnabled ? '运行中' : '未启用' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="anime-card" style="padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <Zap :size="20" class="anime-nav-icon" style="color: var(--anime-purple);" />
+              <span style="font-size: 16px; font-weight: 700; color: var(--anime-purple);">性能指标</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--anime-text-muted); font-size: 14px;">平均响应延迟</span>
+                <span style="color: var(--anime-blue); font-weight: 700;">{{ overview?.avgLatencyMs || 0 }} ms</span>
+              </div>
+              <div class="anime-progress">
+                <div class="anime-progress-bar" :style="{ width: Math.min(100, (overview?.avgLatencyMs || 0) / 50) + '%' }"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--anime-text-muted); font-size: 14px;">系统状态</span>
+                <span class="anime-badge green">✧ 正常 ✧</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="h2" style="margin-top: 22px">机器人</div>
-        <div class="botGrid">
-          <div class="botCard">
-            <div class="botTitle">QQ（NapCat / OneBot）</div>
-            <ul class="botList muted">
-              <li>启用：{{ botQq.enabled ? '是' : '否' }}</li>
-              <li>机器人 QQ：{{ botQq.selfId || '—' }}</li>
-              <li>WS 端口：{{ botQq.wsPort }}</li>
-              <li>HTTP 已配置：{{ botQq.httpConfigured ? '是' : '否' }}</li>
-              <li v-if="botQq.httpBaseUrlPreview">
-                地址预览：<code>{{ botQq.httpBaseUrlPreview }}</code>
-              </li>
-            </ul>
-          </div>
-          <div class="botCard">
-            <div class="botTitle">企业微信智能机器人</div>
-            <ul class="botList muted">
-              <li>回调路径：<code>{{ botWecom.callbackPath }}</code></li>
-              <li>{{ botWecom.note }}</li>
-            </ul>
-          </div>
+        <div class="anime-divider"></div>
+
+        <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+          <RouterLink class="anime-btn primary" to="/console/im">
+            <Users :size="18" />
+            <span>查看群聊采集</span>
+          </RouterLink>
+          <RouterLink class="anime-btn blue" to="/chat">
+            <MessageCircle :size="18" />
+            <span>AI问答</span>
+          </RouterLink>
+          <RouterLink class="anime-btn ghost" to="/console/statistics">
+            <BarChart3 :size="18" />
+            <span>详细统计</span>
+          </RouterLink>
         </div>
       </div>
     </section>
@@ -67,39 +131,53 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { fetchOverview } from '../api/console'
-import type { BotStatus, ConsoleOverview } from '../types/console'
-import { platformLabel } from '../lib/platformLabel'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, RefreshCw, Zap } from 'lucide-vue-next'
+import { fetchSystemOverview } from '../api/statistics'
+import type { SystemOverview } from '../types/statistics'
 
-const overview = ref<ConsoleOverview | null>(null)
-const loadErr = ref<string | null>(null)
+const overview = ref<SystemOverview | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
 
-const msgByPlatform = computed(() => overview.value?.messageCountByPlatform ?? {})
-const groupByPlatform = computed(() => overview.value?.groupCountByPlatform ?? {})
-const platformKeys = computed(() => Object.keys(msgByPlatform.value))
-
-const defaultBots = (): BotStatus => ({
-  qq: {
-    enabled: false,
-    selfId: 0,
-    wsPort: 0,
-    httpConfigured: false,
-    httpBaseUrlPreview: null,
-  },
-  wecom: { callbackPath: '—', note: '—' },
-})
-
-const botQq = computed(() => ({ ...defaultBots().qq, ...overview.value?.bots?.qq }))
-const botWecom = computed(() => ({ ...defaultBots().wecom, ...overview.value?.bots?.wecom }))
-
-onMounted(async () => {
+async function reload() {
+  loading.value = true
+  error.value = null
   try {
-    overview.value = await fetchOverview()
-    console.log(overview.value)
+    overview.value = await fetchSystemOverview()
   } catch (e: any) {
-    loadErr.value = e?.message || '无法加载概览（请确认后端已启动）'
+    error.value = e?.message || '无法加载系统概览'
+  } finally {
+    loading.value = false
   }
-})
+}
+
+function formatNumber(n: number | undefined): string {
+  if (!n) return '0'
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return n.toString()
+}
+
+function formatTokens(n: number | undefined): string {
+  if (!n) return '0'
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return n.toString()
+}
+
+onMounted(reload)
 </script>
+
+<style scoped>
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+</style>

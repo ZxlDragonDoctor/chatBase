@@ -1,9 +1,10 @@
 package com.zxl.chatbase.controller;
 
-import com.zxl.chatbase.chat.ChatService;
+import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.RateLimitException;
 import com.zxl.chatbase.common.service.RateLimitService;
 import com.zxl.chatbase.dify.model.request.FileInfo;
+import com.zxl.chatbase.dify.model.response.BatchUploadResponse;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.model.response.DifyFileUploadResponse;
 import com.zxl.chatbase.dify.server.DifyService;
@@ -53,6 +54,15 @@ public class ChatController {
         return difyService.uploadFile(file, user);
     }
 
+    @PostMapping(value = "/v1/files/batch-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public BatchUploadResponse batchUploadFiles(
+            @RequestPart("files") List<MultipartFile> files,
+            @RequestPart("user") String user,
+            @RequestPart(value = "datasetId", required = false) String datasetId
+    ) {
+        return difyService.batchUploadFiles(files, user, datasetId);
+    }
+
     @PostMapping("/im")
     public DifyChatResponse imChat(@RequestBody ImChatRequest request) {
         try {
@@ -77,6 +87,19 @@ public class ChatController {
             return resp;
         }
         return chatService.chat("web", request.getUserId(), null, request.getText(), request.getFiles());
+    }
+
+    @PostMapping("/web/session")
+    public DifyChatResponse webChatWithSession(@RequestBody SessionChatRequest request) {
+        try {
+            rateLimitService.checkRateLimit("web", request.getUserId(), null);
+            rateLimitService.recordRequest("web", request.getUserId(), null);
+        } catch (RateLimitException e) {
+            DifyChatResponse resp = new DifyChatResponse();
+            resp.setAnswer(e.getMessage());
+            return resp;
+        }
+        return chatService.chatWithSession(request.getSessionId(), "web", request.getUserId(), request.getText(), request.getFiles());
     }
     
     public static class MessageRequest {
@@ -110,6 +133,22 @@ public class ChatController {
         private String userId;
         private List<FileInfo> files;
 
+        public String getText() { return text; }
+        public void setText(String text) { this.text = text; }
+        public String getUserId() { return userId; }
+        public void setUserId(String userId) { this.userId = userId; }
+        public List<FileInfo> getFiles() { return files; }
+        public void setFiles(List<FileInfo> files) { this.files = files; }
+    }
+
+    public static class SessionChatRequest {
+        private String sessionId;
+        private String text;
+        private String userId;
+        private List<FileInfo> files;
+
+        public String getSessionId() { return sessionId; }
+        public void setSessionId(String sessionId) { this.sessionId = sessionId; }
         public String getText() { return text; }
         public void setText(String text) { this.text = text; }
         public String getUserId() { return userId; }

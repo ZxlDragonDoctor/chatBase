@@ -14,6 +14,8 @@ public interface IKbDocumentService extends IService<KbDocument> {
     
     boolean deleteDocument(Long id);
     
+    boolean deleteDocumentWithDify(Long id);
+    
     boolean syncToDify(Long documentId);
     
     boolean batchSyncToDify(Long knowledgeBaseId);
