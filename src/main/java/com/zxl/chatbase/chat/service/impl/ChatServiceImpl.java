@@ -10,22 +10,22 @@ import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import com.zxl.chatbase.kb.entity.KbConversation;
+import com.zxl.chatbase.kb.entity.KbFaq;
 import com.zxl.chatbase.kb.service.IKbConversationService;
+import com.zxl.chatbase.kb.service.IKbFaqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
 
-/**
- * 使用 Redis 维护会话 ID 的统一聊天服务
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,6 +37,7 @@ public class ChatServiceImpl implements ChatService {
     private final GroupMessageSyncService groupMessageSyncService;
     private final IKbConversationService kbConversationService;
     private final ChatSessionService chatSessionService;
+    private final IKbFaqService faqService;
     private final ThreadPoolExecutor threadPool;
 
     private static final String CONVERSATION_KEY_PREFIX = "chat:conversation:";
@@ -49,8 +50,24 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public DifyChatResponse chat(String channel, String userId, String groupId, String query, List<FileInfo> files) {
-        // Dify 要求 user 必填，这里统一兜底
         String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
+        
+        try {
+            KbFaq faq = faqService.findSimilar(query);
+            if (faq != null && faq.getStatus() && faq.getAnswer() != null) {
+                log.info("从FAQ匹配到答案: question={}, faqId={}", query, faq.getId());
+                
+                DifyChatResponse faqResponse = new DifyChatResponse();
+                faqResponse.setAnswer(faq.getAnswer());
+                faqResponse.setId(java.util.UUID.randomUUID().toString());
+                faqResponse.setConversationId(null);
+                faqResponse.setCreatedAt(System.currentTimeMillis());
+                
+                return faqResponse;
+            }
+        } catch (Exception e) {
+            log.warn("FAQ匹配失败: {}", e.getMessage());
+        }
 
         String sessionKey = buildSessionKey(channel, userId, groupId);
         String turnsKey = buildTurnsKey(channel, userId, groupId);
@@ -97,20 +114,51 @@ public class ChatServiceImpl implements ChatService {
 
         boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
         String answer = response != null ? response.getAnswer() : null;
-        Long tokens = response != null && response.getUsage() != null ? response.getUsage().getCompletionTokens().longValue() : null;
+        
+        Integer promptTokens = null;
+        Integer completionTokens = null;
+        BigDecimal promptPrice = null;
+        BigDecimal completionPrice = null;
+        BigDecimal totalPrice = null;
+        
+        if (response != null && response.getUsage() != null) {
+            promptTokens = response.getUsage().getPromptTokens();
+            completionTokens = response.getUsage().getCompletionTokens();
+            try {
+                if (response.getUsage().getPromptPrice() != null) {
+                    promptPrice = new BigDecimal(response.getUsage().getPromptPrice());
+                }
+                if (response.getUsage().getCompletionPrice() != null) {
+                    completionPrice = new BigDecimal(response.getUsage().getCompletionPrice());
+                }
+                if (response.getUsage().getTotalPrice() != null) {
+                    totalPrice = new BigDecimal(response.getUsage().getTotalPrice());
+                }
+            } catch (NumberFormatException e) {
+                log.warn("解析价格失败: {}", e.getMessage());
+            }
+        }
+        
+        log.info("chat方法对话完成: success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
+                success, promptTokens, completionTokens, totalPrice, latencyMs);
+        
         String errorMessage = null;
         if (!success && response != null && response.getAnswer() != null) {
             errorMessage = response.getAnswer();
         }
 
-        kbConversationService.saveConversation(
+        kbConversationService.saveConversationWithCost(
                 finalConversationId,
                 safeUserId,
                 channel,
                 groupId,
                 query,
                 answer,
-                tokens,
+                promptTokens,
+                completionTokens,
+                promptPrice,
+                completionPrice,
+                totalPrice,
                 latencyMs,
                 success,
                 errorMessage
@@ -192,6 +240,42 @@ public class ChatServiceImpl implements ChatService {
     public DifyChatResponse chatWithSession(String sessionId, String channel, String userId, String query, List<FileInfo> files) {
         String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
         
+        try {
+            KbFaq faq = faqService.findSimilar(query);
+            if (faq != null && faq.getStatus() && faq.getAnswer() != null) {
+                log.info("从FAQ匹配到答案: sessionId={}, question={}, faqId={}", sessionId, query, faq.getId());
+                
+                DifyChatResponse faqResponse = new DifyChatResponse();
+                faqResponse.setAnswer(faq.getAnswer());
+                faqResponse.setId(java.util.UUID.randomUUID().toString());
+                faqResponse.setConversationId(null);
+                faqResponse.setCreatedAt(System.currentTimeMillis());
+                
+                try {
+                    KbConversation message = new KbConversation();
+                    message.setSessionId(sessionId);
+                    message.setConversationId(java.util.UUID.randomUUID().toString());
+                    message.setUserId(safeUserId);
+                    message.setChannel(channel);
+                    message.setQuery(query);
+                    message.setAnswer(faq.getAnswer());
+                    message.setTokens(0);
+                    message.setLatencyMs(0);
+                    message.setStatus(true);
+                    message.setErrorMessage("FAQ#" + faq.getId());
+                    message.setCreateTime(LocalDateTime.now());
+                    
+                    chatSessionService.addMessageToSession(sessionId, message);
+                } catch (Exception e) {
+                    log.warn("保存FAQ消息记录失败: {}", e.getMessage());
+                }
+                
+                return faqResponse;
+            }
+        } catch (Exception e) {
+            log.warn("FAQ匹配失败: {}", e.getMessage());
+        }
+        
         ChatSession session = chatSessionService.getSessionById(sessionId);
         if (session == null) {
             log.warn("会话不存在，自动创建: sessionId={}", sessionId);
@@ -216,7 +300,34 @@ public class ChatServiceImpl implements ChatService {
 
         boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
         String answer = response != null ? response.getAnswer() : null;
-        Long tokens = response != null && response.getUsage() != null ? response.getUsage().getCompletionTokens().longValue() : null;
+        
+        Integer promptTokens = null;
+        Integer completionTokens = null;
+        BigDecimal promptPrice = null;
+        BigDecimal completionPrice = null;
+        BigDecimal totalPrice = null;
+        
+        if (response != null && response.getUsage() != null) {
+            promptTokens = response.getUsage().getPromptTokens();
+            completionTokens = response.getUsage().getCompletionTokens();
+            try {
+                if (response.getUsage().getPromptPrice() != null) {
+                    promptPrice = new BigDecimal(response.getUsage().getPromptPrice());
+                }
+                if (response.getUsage().getCompletionPrice() != null) {
+                    completionPrice = new BigDecimal(response.getUsage().getCompletionPrice());
+                }
+                if (response.getUsage().getTotalPrice() != null) {
+                    totalPrice = new BigDecimal(response.getUsage().getTotalPrice());
+                }
+            } catch (NumberFormatException e) {
+                log.warn("解析价格失败: {}", e.getMessage());
+            }
+        }
+        
+        log.info("chatWithSession对话完成: sessionId={}, success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
+                sessionId, success, promptTokens, completionTokens, totalPrice, latencyMs);
+        
         String errorMessage = null;
         if (!success && response != null && response.getAnswer() != null) {
             errorMessage = response.getAnswer();
@@ -233,7 +344,11 @@ public class ChatServiceImpl implements ChatService {
         message.setChannel(channel);
         message.setQuery(query);
         message.setAnswer(answer);
-        message.setTokens(tokens != null ? tokens.intValue() : 0);
+        message.setPromptTokens(promptTokens);
+        message.setCompletionTokens(completionTokens);
+        message.setPromptPrice(promptPrice);
+        message.setCompletionPrice(completionPrice);
+        message.setTotalPrice(totalPrice);
         message.setLatencyMs(latencyMs);
         message.setStatus(success);
         message.setErrorMessage(errorMessage);

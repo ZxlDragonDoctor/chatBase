@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public class GroupSummaryVO {
     private String platform;
     private String groupId;
+    private String groupName;
     private Long messageCount;
     private LocalDateTime lastMessageTime;
 }

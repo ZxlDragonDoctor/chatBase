@@ -1,70 +1,44 @@
 package com.zxl.chatbase.dify.model.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-/**
- * 模型用量信息
- */
 @Data
 public class Usage {
     
-    /**
-     * 提示词tokens数量
-     */
+    @JsonProperty("prompt_tokens")
     private Integer promptTokens;
 
-    /**
-     * 提示词单价
-     */
+    @JsonProperty("prompt_unit_price")
     private String promptUnitPrice;
 
-    /**
-     * 提示词价格单位
-     */
+    @JsonProperty("prompt_price_unit")
     private String promptPriceUnit;
 
-    /**
-     * 完成tokens数量
-     */
+    @JsonProperty("completion_tokens")
     private Integer completionTokens;
     
-    /**
-     * 完成词单价
-     */
+    @JsonProperty("completion_unit_price")
     private String completionUnitPrice;
 
-    /**
-     * 提示词总价
-     */
+    @JsonProperty("prompt_price")
     private String promptPrice;
 
-    /**
-     * 完成词价格单位
-     */
+    @JsonProperty("completion_price_unit")
     private String completionPriceUnit;
     
-    /**
-     * 完成词总价
-     */
+    @JsonProperty("completion_price")
     private String completionPrice;
 
-    /**
-     * 总tokens数量
-     */
+    @JsonProperty("total_tokens")
     private Integer totalTokens;
     
-    /**
-     * 总价
-     */
+    @JsonProperty("total_price")
     private String totalPrice;
-    
-    /**
-     * 货币类型
-     */
+
+    @JsonProperty("currency")
     private String currency;
     
-    /**
-     * 延迟时间
-     */
+    @JsonProperty("latency")
     private Double latency;
 }

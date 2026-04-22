@@ -29,6 +29,11 @@ public interface DifyService {
     DifyChatResponse sendChatMessage(DifyChatRequest request);
 
     /**
+     * 发送聊天消息（流式模式，避免超时）
+     */
+    DifyChatResponse sendChatMessageStream(DifyChatRequest request);
+
+    /**
      * 上传文件
      *
      * @param file 要上传的文件
@@ -121,5 +126,7 @@ public interface DifyService {
      * @return 是否删除成功
      */
     boolean deleteDatasetDocument(String datasetId, String documentId);
+
+    boolean deleteDataset(String datasetId);
 
 }

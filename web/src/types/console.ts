@@ -23,6 +23,7 @@ export type ConsoleOverview = {
 export type GroupSummary = {
   platform: string
   groupId: string
+  groupName?: string | null
   messageCount: number
   lastMessageTime: string | null
 }

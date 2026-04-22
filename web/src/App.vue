@@ -6,7 +6,12 @@
     <span class="anime-star" style="top: 70%; left: 15%; animation-delay: 1s;">★</span>
     <span class="anime-star" style="top: 90%; left: 90%; animation-delay: 1.5s;">✧</span>
   </div>
-  <div class="anime-app">
+  
+  <template v-if="isLoginPage">
+    <RouterView />
+  </template>
+  
+  <div v-else class="anime-app">
     <aside class="anime-nav">
       <div class="anime-nav-brand">
         <div class="anime-logo">✿</div>
@@ -32,12 +37,28 @@
           <BookOpen class="anime-nav-icon" :size="22" />
           <span>知识库</span>
         </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/faq" active-class="active">
+          <HelpCircle class="anime-nav-icon" :size="22" />
+          <span>FAQ</span>
+        </RouterLink>
         <RouterLink class="anime-nav-item" to="/chat" active-class="active">
           <MessageCircle class="anime-nav-icon" :size="22" />
           <span>问答</span>
         </RouterLink>
+        <RouterLink class="anime-nav-item" to="/feedback" active-class="active">
+          <Mail class="anime-nav-icon" :size="22" />
+          <span>反馈</span>
+        </RouterLink>
       </nav>
       <div class="anime-nav-footer">
+        <div class="anime-user-info" v-if="currentUser">
+          <User class="anime-nav-icon" :size="16" />
+          <span class="anime-user-name">{{ currentUser }}</span>
+        </div>
+        <button class="anime-btn ghost sm" v-if="currentUser" @click="handleLogout">
+          <LogOut :size="16" />
+          <span>退出</span>
+        </button>
         <div class="anime-status-badge">
           <span class="anime-status-dot"></span>
           <span>✧ STATUS: ONLINE ✧</span>
@@ -51,6 +72,43 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut } from 'lucide-vue-next'
+
+const router = useRouter()
+const route = useRoute()
+
+const isLoginPage = computed(() => route.path === '/login')
+const currentUser = computed(() => localStorage.getItem('chatbase_user'))
+
+function handleLogout() {
+  localStorage.removeItem('chatbase_token')
+  localStorage.removeItem('chatbase_user')
+  router.push('/login')
+}
 </script>
+
+<style scoped>
+.anime-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--anime-bg);
+  border-radius: var(--anime-radius-lg);
+  margin-bottom: 12px;
+}
+
+.anime-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--anime-purple);
+}
+
+.anime-btn.sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+</style>

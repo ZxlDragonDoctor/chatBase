@@ -62,6 +62,18 @@ async function loadMessages() {
 function getPlatformColor(p) { if (p === 'qq')
     return 'green'; if (p === 'wecom')
     return 'blue'; return 'purple'; }
+function getPlatformLabel(p) { if (p === 'qq')
+    return 'QQ群'; if (p === 'wecom')
+    return '企微群'; return '群聊'; }
+function getGroupName(g) {
+    if (g.groupName && g.groupName.trim())
+        return g.groupName.trim();
+    if (g.platform === 'qq')
+        return `QQ群`;
+    if (g.platform === 'wecom')
+        return `企微群`;
+    return `群聊`;
+}
 function formatTime(t) {
     if (!t)
         return '';
@@ -99,9 +111,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-desc" },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "anime-code" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-actions" },
@@ -192,12 +201,11 @@ for (const [g] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
         ...{ class: "anime-badge" },
         ...{ class: (__VLS_ctx.getPlatformColor(g.platform)) },
     });
-    (g.platform);
+    (__VLS_ctx.getPlatformLabel(g.platform));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "anime-code" },
         ...{ style: {} },
     });
-    (g.groupId);
+    (__VLS_ctx.getGroupName(g));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ style: {} },
     });
@@ -232,11 +240,11 @@ else {
         ...{ class: "anime-badge" },
         ...{ class: (__VLS_ctx.getPlatformColor(__VLS_ctx.selected.platform)) },
     });
-    (__VLS_ctx.selected.platform);
+    (__VLS_ctx.getPlatformLabel(__VLS_ctx.selected.platform));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "anime-code" },
+        ...{ style: {} },
     });
-    (__VLS_ctx.selected.groupId);
+    (__VLS_ctx.getGroupName(__VLS_ctx.selected));
     if (__VLS_ctx.msgLoading) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "anime-empty" },
@@ -263,7 +271,7 @@ else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "anime-badge muted" },
             });
-            (m.messageType || 'text');
+            (m.messageType || '文本');
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "anime-badge" },
                 ...{ class: (m.synced ? 'green' : 'pink') },
@@ -273,11 +281,6 @@ else {
                 ...{ style: {} },
             });
             (__VLS_ctx.formatTime(m.messageTime));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-                ...{ class: "anime-pill" },
-                ...{ style: {} },
-            });
-            (m.userId || '—');
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ style: {} },
             });
@@ -324,7 +327,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
@@ -342,13 +344,11 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-detail-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-loader-spinner']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
@@ -356,7 +356,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
@@ -382,6 +381,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             selectGroup: selectGroup,
             loadMessages: loadMessages,
             getPlatformColor: getPlatformColor,
+            getPlatformLabel: getPlatformLabel,
+            getGroupName: getGroupName,
             formatTime: formatTime,
         };
     },

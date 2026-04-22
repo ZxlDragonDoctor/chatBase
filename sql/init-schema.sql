@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS `kb_document` (
 -- =============================================
 CREATE TABLE IF NOT EXISTS `kb_conversation` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话ID',
+  `session_id` VARCHAR(64) DEFAULT NULL COMMENT '关联会话ID',
   `conversation_id` VARCHAR(64) NOT NULL COMMENT '会话唯一标识（Dify返回）',
   `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',
   `user_nickname` VARCHAR(50) DEFAULT NULL COMMENT '用户昵称',
@@ -118,6 +119,11 @@ CREATE TABLE IF NOT EXISTS `kb_conversation` (
   `answer` LONGTEXT COMMENT 'AI回答',
   `dify_response_id` VARCHAR(64) DEFAULT NULL COMMENT 'Dify响应ID',
   `tokens` INT DEFAULT 0 COMMENT '消耗tokens',
+  `prompt_tokens` INT DEFAULT 0 COMMENT '提示词tokens',
+  `completion_tokens` INT DEFAULT 0 COMMENT '完成tokens',
+  `prompt_price` DECIMAL(10,6) DEFAULT 0 COMMENT '提示词费用',
+  `completion_price` DECIMAL(10,6) DEFAULT 0 COMMENT '完成费用',
+  `total_price` DECIMAL(10,6) DEFAULT 0 COMMENT '总费用',
   `latency_ms` INT DEFAULT 0 COMMENT '响应延迟（毫秒）',
   `source_documents` TEXT COMMENT '引用的知识库文档（JSON）',
   `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-失败，1-成功',
@@ -128,7 +134,8 @@ CREATE TABLE IF NOT EXISTS `kb_conversation` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_channel` (`channel`),
   KEY `idx_knowledge_base_id` (`knowledge_base_id`),
-  KEY `idx_create_time` (`create_time`)
+  KEY `idx_create_time` (`create_time`),
+  KEY `idx_session_id` (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话记录表';
 
 -- =============================================
@@ -193,7 +200,11 @@ CREATE TABLE IF NOT EXISTS `kb_statistics` (
   `user_count` INT NOT NULL DEFAULT 0 COMMENT '独立用户数',
   `avg_tokens` DECIMAL(10,2) DEFAULT 0 COMMENT '平均消耗tokens',
   `total_tokens` BIGINT NOT NULL DEFAULT 0 COMMENT '总消耗tokens',
+  `total_prompt_tokens` BIGINT DEFAULT 0 COMMENT '总提示词tokens',
+  `total_completion_tokens` BIGINT DEFAULT 0 COMMENT '总完成tokens',
   `avg_latency_ms` INT DEFAULT 0 COMMENT '平均响应延迟',
+  `total_cost` DECIMAL(12,4) DEFAULT 0 COMMENT '总费用',
+  `avg_cost` DECIMAL(10,6) DEFAULT 0 COMMENT '平均费用',
   `feedback_count` INT NOT NULL DEFAULT 0 COMMENT '反馈数',
   `positive_feedback` INT NOT NULL DEFAULT 0 COMMENT '正面反馈数',
   `negative_feedback` INT NOT NULL DEFAULT 0 COMMENT '负面反馈数',
@@ -362,8 +373,58 @@ CREATE TABLE IF NOT EXISTS `im_user` (
   `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_platform_user` (`platform`, `user_id`),
-  KEY `idx_group_id` (`group_id`),
-  KEY `idx_last_message_time` (`last_message_time`)
+PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_platform_user` (`platform`, `user_id`),
+    KEY `idx_group_id` (`group_id`),
+    KEY `idx_last_message_time` (`last_message_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IM用户信息表';
+
+-- =============================================
+-- 聊天会话管理表
+-- =============================================
+CREATE TABLE IF NOT EXISTS `chat_session` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话ID',
+  `session_id` VARCHAR(64) NOT NULL COMMENT '会话唯一标识',
+  `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',
+  `channel` VARCHAR(20) NOT NULL DEFAULT 'web' COMMENT '渠道：web/im/wx',
+  `title` VARCHAR(200) DEFAULT NULL COMMENT '会话标题（首条消息摘要）',
+  `dify_conversation_id` VARCHAR(64) DEFAULT NULL COMMENT 'Dify会话ID',
+  `message_count` INT NOT NULL DEFAULT 0 COMMENT '消息数量',
+  `last_message_time` DATETIME DEFAULT NULL COMMENT '最后消息时间',
+  `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-已删除，1-正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_session_id` (`session_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_channel` (`channel`),
+  KEY `idx_last_message_time` (`last_message_time`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天会话表';
+
+-- =============================================
+-- 关键词统计表
+-- =============================================
+CREATE TABLE IF NOT EXISTS `kb_keyword` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `keyword` VARCHAR(100) NOT NULL COMMENT '关键词',
+  `source` VARCHAR(20) NOT NULL DEFAULT 'conversation' COMMENT '来源：conversation-对话/query, im-IM消息, document-文档',
+  `count` INT NOT NULL DEFAULT 1 COMMENT '出现次数',
+  `last_seen_time` DATETIME DEFAULT NULL COMMENT '最后出现时间',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_keyword_source` (`keyword`, `source`),
+  KEY `idx_count` (`count` DESC),
+  KEY `idx_source` (`source`),
+  KEY `idx_last_seen` (`last_seen_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='关键词统计表';
+
+-- =============================================
+-- 初始化管理员账号
+-- 默认账号：admin / admin123
+-- 密码使用 BCrypt 加密（strength=10）
+-- =============================================
+INSERT INTO `sys_user` (`username`, `password`, `nickname`, `role`, `status`, `create_time`, `update_time`, `is_deleted`)
+VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7n92KIX.Hp4W3VpL3k7mK2S', '管理员', 'admin', 1, NOW(), NOW(), 0)
+ON DUPLICATE KEY UPDATE `update_time` = NOW();

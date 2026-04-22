@@ -87,10 +87,22 @@
                 <span class="anime-badge green">{{ selectedKb.name }}</span>
                 <span style="font-weight: 600; color: var(--anime-text-primary);">文档列表</span>
               </div>
-              <button class="anime-btn primary" @click="showCreateDoc = true">
-                <Plus :size="18" />
-                <span>新增文档</span>
-              </button>
+              <div style="display: flex; gap: 12px;">
+                <div class="doc-search-wrapper">
+                  <Search :size="16" class="doc-search-icon" />
+                  <input 
+                    v-model="docSearchKeyword" 
+                    class="doc-search-input" 
+                    placeholder="搜索文档..." 
+                    @input="handleDocSearch"
+                  />
+                  <button v-if="docSearchKeyword" class="doc-search-clear" @click="clearDocSearch">✕</button>
+                </div>
+                <button class="anime-btn primary" @click="showCreateDoc = true">
+                  <Plus :size="18" />
+                  <span>新增文档</span>
+                </button>
+              </div>
             </div>
             <div v-if="docLoading" class="anime-empty">
               <span class="anime-loader-spinner"></span>
@@ -254,7 +266,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Plus, BookOpen, RefreshCw, Edit3, Trash2, Upload, Download } from 'lucide-vue-next'
+import { Plus, BookOpen, RefreshCw, Edit3, Trash2, Upload, Download, Search } from 'lucide-vue-next'
 import { api } from '../api/client'
 import { batchUploadToKb, syncFromDify } from '../api/kb'
 import { subscribeUploadProgress } from '../api/progress'
@@ -275,6 +287,8 @@ const docList = ref<KbDocument[]>([])
 const faqList = ref<any[]>([])
 const selectedKb = ref<KbKnowledgeBase | null>(null)
 const docLoading = ref(false)
+const docSearchKeyword = ref('')
+const docSearchTimer = ref<number | null>(null)
 
 const showCreateKb = ref(false)
 const showCreateDoc = ref(false)
@@ -319,9 +333,34 @@ async function doSyncFromDify() {
 async function loadDocList(kbId: number) {
   docLoading.value = true
   try {
-    const res = await api.get(`/kb/${kbId}/document/page`, { params: { pageNum: 1, pageSize: 100 } })
+    const keyword = docSearchKeyword.value.trim()
+    const res = await api.get(`/kb/${kbId}/document/page`, { 
+      params: { 
+        pageNum: 1, 
+        pageSize: 100,
+        title: keyword || undefined
+      } 
+    })
     docList.value = res.data.records || []
   } finally { docLoading.value = false }
+}
+
+function handleDocSearch() {
+  if (docSearchTimer.value) {
+    clearTimeout(docSearchTimer.value)
+  }
+  docSearchTimer.value = window.setTimeout(() => {
+    if (selectedKb.value) {
+      loadDocList(selectedKb.value.id)
+    }
+  }, 300)
+}
+
+function clearDocSearch() {
+  docSearchKeyword.value = ''
+  if (selectedKb.value) {
+    loadDocList(selectedKb.value.id)
+  }
 }
 
 async function loadFaqList() {
@@ -332,7 +371,7 @@ async function loadFaqList() {
 }
 
 function loadTabData() {
-  if (activeTab.value === 'kb') loadKbList()
+  if (activeTab.value === 'kb' && kbList.value.length === 0) loadKbList()
   else if (activeTab.value === 'faq') loadFaqList()
 }
 
@@ -361,7 +400,12 @@ async function deleteKb(kb: KbKnowledgeBase) {
   catch (e: any) { err.value = e?.message || '删除失败' }
 }
 
-function viewDocs(kb: KbKnowledgeBase) { selectedKb.value = kb; activeTab.value = 'doc'; loadDocList(kb.id) }
+function viewDocs(kb: KbKnowledgeBase) { 
+  selectedKb.value = kb
+  docSearchKeyword.value = ''
+  activeTab.value = 'doc'
+  loadDocList(kb.id)
+}
 
 async function syncKb(kb: KbKnowledgeBase) {
   try {
@@ -499,7 +543,7 @@ function formatSize(bytes: number): string {
 }
 
 onMounted(async () => {
-  await doSyncFromDify()
+  await loadKbList()
 })
 
 onUnmounted(() => {
@@ -513,4 +557,49 @@ onUnmounted(() => {
 .kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
 .faq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .doc-section { min-height: 300px; }
+
+.doc-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  transition: all 0.3s ease;
+}
+
+.doc-search-wrapper:focus-within {
+  border-color: var(--anime-blue);
+}
+
+.doc-search-icon {
+  color: var(--anime-text-muted);
+}
+
+.doc-search-input {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--anime-text-primary);
+  outline: none;
+  width: 150px;
+}
+
+.doc-search-input::placeholder {
+  color: var(--anime-text-muted);
+}
+
+.doc-search-clear {
+  background: transparent;
+  border: none;
+  color: var(--anime-text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.doc-search-clear:hover {
+  color: var(--anime-pink);
+}
 </style>

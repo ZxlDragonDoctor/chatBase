@@ -1,5 +1,8 @@
 package com.zxl.chatbase.dify.server.impl;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.dify.config.DifyConfig;
 import com.zxl.chatbase.dify.model.request.DifyChatRequest;
@@ -74,15 +77,14 @@ public class DifyServiceImpl implements DifyService {
 
     @Override
     public DifyChatResponse sendChatMessage(String query, String conversationId, String userId) {
-        // 构造请求对象
         DifyChatRequest request = new DifyChatRequest();
         request.setQuery(query);
         request.setConversationId(conversationId);
         request.setUser((userId == null || userId.trim().isEmpty()) ? "abc-123" : userId);
-        request.setResponseMode("blocking");  // 第一阶段先用阻塞模式
-        request.setInputs(new HashMap<>());   // 空变量
+        request.setResponseMode("streaming");
+        request.setInputs(new HashMap<>());
 
-        return sendChatMessage(request);
+        return sendChatMessageStream(request);
     }
 
     @Override
@@ -94,25 +96,33 @@ public class DifyServiceImpl implements DifyService {
         httpPost.setHeader("Content-Type", "application/json");
 
         try {
-            // Dify 要求 user 必填
             if (request.getUser() == null || request.getUser().trim().isEmpty()) {
                 request.setUser("abc-123");
             }
-            // 序列化请求体
             String jsonRequest = objectMapper.writeValueAsString(request);
             log.info("Dify请求: {}", jsonRequest);
 
             httpPost.setEntity(new StringEntity(jsonRequest, StandardCharsets.UTF_8));
 
-            // 发送请求
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-                log.info("Dify响应: {}", jsonResponse);
+                log.info("Dify原始响应JSON: {}", jsonResponse);
 
                 int statusCode = response.getStatusLine().getStatusCode();
                 if (statusCode == 200) {
-                    // 解析响应
-                    return objectMapper.readValue(jsonResponse, DifyChatResponse.class);
+                    DifyChatResponse chatResponse = objectMapper.readValue(jsonResponse, DifyChatResponse.class);
+                    
+                    if (chatResponse.getUsage() == null && chatResponse.getMetadata() != null) {
+                        chatResponse.setUsage(chatResponse.getMetadata().getUsage());
+                        log.info("从metadata中提取usage: {}", chatResponse.getUsage());
+                    }
+                    
+                    log.info("Dify响应解析: answer={}, usage={}, metadata={}", 
+                            chatResponse.getAnswer() != null ? chatResponse.getAnswer().substring(0, Math.min(50, chatResponse.getAnswer().length())) : null,
+                            chatResponse.getUsage(),
+                            chatResponse.getMetadata());
+                    
+                    return chatResponse;
                 } else {
                     log.error("Dify API错误: status={}, body={}", statusCode, jsonResponse);
                     DifyChatResponse errorResponse = new DifyChatResponse();
@@ -123,6 +133,96 @@ public class DifyServiceImpl implements DifyService {
 
         } catch (Exception e) {
             log.error("调用Dify API异常", e);
+            DifyChatResponse errorResponse = new DifyChatResponse();
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("timed out")) {
+                errorResponse.setAnswer("【系统繁忙】大模型回答超时，请稍后再试");
+            } else {
+                errorResponse.setAnswer("【系统错误】" + e.getMessage());
+            }
+            return errorResponse;
+        }
+    }
+
+    @Override
+    public DifyChatResponse sendChatMessageStream(DifyChatRequest request) {
+        String url = difyConfig.getApiUrl() + "/chat-messages";
+
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getApiKey());
+        httpPost.setHeader("Content-Type", "application/json");
+
+        try {
+            if (request.getUser() == null || request.getUser().trim().isEmpty()) {
+                request.setUser("abc-123");
+            }
+            request.setResponseMode("streaming");
+            String jsonRequest = objectMapper.writeValueAsString(request);
+            log.info("Dify流式请求: {}", jsonRequest);
+
+            httpPost.setEntity(new StringEntity(jsonRequest, StandardCharsets.UTF_8));
+
+            StringBuilder fullAnswer = new StringBuilder();
+            DifyChatResponse finalResponse = new DifyChatResponse();
+            String conversationId = null;
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                
+                if (statusCode != 200) {
+                    String errorBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                    log.error("Dify流式API错误: status={}, body={}", statusCode, errorBody);
+                    finalResponse.setAnswer("【系统错误】调用Dify API失败，状态码：" + statusCode);
+                    return finalResponse;
+                }
+
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.startsWith("data: ")) {
+                        String jsonStr = line.substring(6).trim();
+                        if (jsonStr.isEmpty() || jsonStr.equals("[DONE]")) {
+                            continue;
+                        }
+
+                        try {
+                            DifyChatResponse chunk = objectMapper.readValue(jsonStr, DifyChatResponse.class);
+                            
+                            if (chunk.getConversationId() != null) {
+                                conversationId = chunk.getConversationId();
+                            }
+                            
+                            if (chunk.getAnswer() != null) {
+                                fullAnswer.append(chunk.getAnswer());
+                            }
+                            
+                            if (chunk.getMetadata() != null && chunk.getMetadata().getUsage() != null) {
+                                finalResponse.setUsage(chunk.getMetadata().getUsage());
+                                log.info("流式响应获取usage: {}", finalResponse.getUsage());
+                            }
+                            
+                            if (chunk.getId() != null) {
+                                finalResponse.setId(chunk.getId());
+                            }
+                        } catch (Exception e) {
+                            log.warn("解析流式数据块失败: {}", jsonStr);
+                        }
+                    }
+                }
+
+                finalResponse.setAnswer(fullAnswer.toString());
+                finalResponse.setConversationId(conversationId);
+                finalResponse.setCreatedAt(System.currentTimeMillis());
+                
+                log.info("Dify流式响应完成: answer长度={}, usage={}, conversationId={}", 
+                        finalResponse.getAnswer().length(), finalResponse.getUsage(), conversationId);
+
+                return finalResponse;
+            }
+
+        } catch (Exception e) {
+            log.error("调用Dify流式API异常", e);
             DifyChatResponse errorResponse = new DifyChatResponse();
             if (e.getMessage() != null && e.getMessage().toLowerCase().contains("timed out")) {
                 errorResponse.setAnswer("【系统繁忙】大模型回答超时，请稍后再试");
@@ -592,6 +692,41 @@ public class DifyServiceImpl implements DifyService {
             }
         } catch (Exception e) {
             log.error("删除Dify文档异常: datasetId={}, documentId={}", datasetId, documentId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean deleteDataset(String datasetId) {
+        if (datasetId == null || datasetId.trim().isEmpty()) {
+            log.warn("删除Dify知识库参数无效: datasetId={}", datasetId);
+            return false;
+        }
+
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId;
+        HttpDelete httpDelete = new HttpDelete(url);
+        httpDelete.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+        try (CloseableHttpResponse response = httpClient.execute(httpDelete)) {
+            int statusCode = response.getStatusLine().getStatusCode();
+            HttpEntity entity = response.getEntity();
+            String jsonResponse = "";
+            if (entity != null) {
+                jsonResponse = EntityUtils.toString(entity, StandardCharsets.UTF_8);
+            }
+            EntityUtils.consumeQuietly(entity);
+
+            log.info("删除Dify知识库: datasetId={}, status={}", datasetId, statusCode);
+
+            if (statusCode == 200 || statusCode == 204) {
+                log.info("Dify知识库删除成功: datasetId={}", datasetId);
+                return true;
+            } else {
+                log.error("删除Dify知识库失败: datasetId={}, status={}, body={}", datasetId, statusCode, jsonResponse);
+                return false;
+            }
+        } catch (Exception e) {
+            log.error("删除Dify知识库异常: datasetId={}", datasetId, e);
             return false;
         }
     }

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -47,6 +48,38 @@ public class KbConversationServiceImpl extends ServiceImpl<KbConversationMapper,
             
             save(conversation);
             log.info("会话记录保存成功: conversationId={}, userId={}, channel={}", conversationId, userId, channel);
+        } catch (Exception e) {
+            log.error("保存会话记录失败", e);
+        }
+    }
+
+    @Override
+    public void saveConversationWithCost(String conversationId, String userId, String channel, String groupId,
+                                           String query, String answer, Integer promptTokens, Integer completionTokens,
+                                           BigDecimal promptPrice, BigDecimal completionPrice, BigDecimal totalPrice,
+                                           Integer latencyMs, boolean success, String errorMessage) {
+        try {
+            KbConversation conversation = new KbConversation();
+            conversation.setConversationId(conversationId);
+            conversation.setUserId(userId);
+            conversation.setChannel(channel);
+            conversation.setGroupId(groupId);
+            conversation.setQuery(query);
+            conversation.setAnswer(answer);
+            conversation.setPromptTokens(promptTokens != null ? promptTokens : 0);
+            conversation.setCompletionTokens(completionTokens != null ? completionTokens : 0);
+            conversation.setTokens((promptTokens != null ? promptTokens : 0) + (completionTokens != null ? completionTokens : 0));
+            conversation.setPromptPrice(promptPrice != null ? promptPrice : BigDecimal.ZERO);
+            conversation.setCompletionPrice(completionPrice != null ? completionPrice : BigDecimal.ZERO);
+            conversation.setTotalPrice(totalPrice != null ? totalPrice : BigDecimal.ZERO);
+            conversation.setLatencyMs(latencyMs != null ? latencyMs : 0);
+            conversation.setStatus(success);
+            conversation.setErrorMessage(errorMessage);
+            conversation.setCreateTime(LocalDateTime.now());
+            
+            save(conversation);
+            log.info("会话记录保存成功(含费用): conversationId={}, tokens={}, cost={}", 
+                    conversationId, conversation.getTokens(), conversation.getTotalPrice());
         } catch (Exception e) {
             log.error("保存会话记录失败", e);
         }
@@ -95,20 +128,19 @@ public class KbConversationServiceImpl extends ServiceImpl<KbConversationMapper,
                 .eq(KbConversation::getStatus, true)
                 .orderByAsc(KbConversation::getCreateTime);
         
-        var messages = list(wrapper);
-        if (messages == null || messages.isEmpty()) {
+        var conversations = list(wrapper);
+        if (conversations == null || conversations.isEmpty()) {
             log.warn("会话中没有消息: sessionId={}", sessionId);
             return false;
         }
         
-        // messageIndex 对应的是 assistant 消息（每2条消息中第二条是assistant）
-        int actualIndex = messageIndex;
-        if (actualIndex < 0 || actualIndex >= messages.size()) {
-            log.warn("消息索引超出范围: sessionId={}, index={}, size={}", sessionId, actualIndex, messages.size());
+        int actualIndex = messageIndex / 2;
+        if (actualIndex < 0 || actualIndex >= conversations.size()) {
+            log.warn("消息索引超出范围: sessionId={}, index={}, size={}", sessionId, actualIndex, conversations.size());
             return false;
         }
         
-        KbConversation conversation = messages.get(actualIndex);
+        KbConversation conversation = conversations.get(actualIndex);
         
         KbFeedback feedback = new KbFeedback();
         feedback.setConversationId(conversation.getId());
@@ -119,6 +151,8 @@ public class KbConversationServiceImpl extends ServiceImpl<KbConversationMapper,
         feedback.setCreateTime(LocalDateTime.now());
         feedback.setStatus(false);
         
-        return feedbackMapper.insert(feedback) > 0;
+        boolean success = feedbackMapper.insert(feedback) > 0;
+        log.info("反馈保存: sessionId={}, conversationId={}, rating={}, success={}", sessionId, conversation.getId(), rating, success);
+        return success;
     }
 }

@@ -83,7 +83,46 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
     @Override
     @Transactional
     public boolean deleteKnowledgeBase(Long id) {
-        return removeById(id);
+        KbKnowledgeBase kb = getById(id);
+        if (kb == null) {
+            log.warn("知识库不存在: id={}", id);
+            return false;
+        }
+
+        LambdaQueryWrapper<KbDocument> docWrapper = new LambdaQueryWrapper<>();
+        docWrapper.eq(KbDocument::getKnowledgeBaseId, id);
+        List<KbDocument> documents = documentService.list(docWrapper);
+
+        for (KbDocument doc : documents) {
+            if (kb.getDifyDatasetId() != null && doc.getDifyDocumentId() != null) {
+                try {
+                    difyService.deleteDatasetDocument(kb.getDifyDatasetId(), doc.getDifyDocumentId());
+                    log.info("删除Dify文档: datasetId={}, documentId={}", kb.getDifyDatasetId(), doc.getDifyDocumentId());
+                } catch (Exception e) {
+                    log.warn("删除Dify文档失败: documentId={}", doc.getDifyDocumentId(), e);
+                }
+            }
+            documentService.removeById(doc.getId());
+        }
+
+        if (kb.getDifyDatasetId() != null) {
+            try {
+                boolean difyDeleted = difyService.deleteDataset(kb.getDifyDatasetId());
+                if (difyDeleted) {
+                    log.info("删除Dify知识库成功: datasetId={}", kb.getDifyDatasetId());
+                } else {
+                    log.warn("删除Dify知识库失败: datasetId={}", kb.getDifyDatasetId());
+                }
+            } catch (Exception e) {
+                log.warn("删除Dify知识库异常: datasetId={}", kb.getDifyDatasetId(), e);
+            }
+        }
+
+        boolean removed = removeById(id);
+        if (removed) {
+            log.info("知识库删除成功: id={}, name={}", id, kb.getName());
+        }
+        return removed;
     }
 
     @Override

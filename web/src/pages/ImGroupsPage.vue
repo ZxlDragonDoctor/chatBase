@@ -5,7 +5,7 @@
         <div>
           <div class="anime-card-title">群聊采集</div>
           <div class="anime-card-desc">
-            <span class="anime-code">group_message</span> 表数据 · QQ/企微群聊消息采集
+            QQ群/企微群消息采集记录
           </div>
         </div>
         <div class="anime-card-actions">
@@ -35,8 +35,8 @@
             </div>
             <button v-for="g in groups" :key="g.platform + ':' + g.groupId" class="im-group-item" :class="{ 'active': selected?.groupId === g.groupId && selected?.platform === g.platform }" @click="selectGroup(g)">
               <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ g.platform }}</span>
-                <span class="anime-code" style="font-size: 12px;">{{ g.groupId }}</span>
+                <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
+                <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(g) }}</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--anime-text-muted);">
                 <span style="color: var(--anime-blue);">{{ g.messageCount }} 条消息</span>
@@ -54,8 +54,8 @@
             </template>
             <template v-else>
               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                <span class="anime-badge" :class="getPlatformColor(selected.platform)">{{ selected.platform }}</span>
-                <span class="anime-code">{{ selected.groupId }}</span>
+                <span class="anime-badge" :class="getPlatformColor(selected.platform)">{{ getPlatformLabel(selected.platform) }}</span>
+                <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(selected) }}</span>
               </div>
               <div v-if="msgLoading" class="anime-empty">
                 <span class="anime-loader-spinner"></span>
@@ -64,10 +64,9 @@
               <div v-else class="message-list">
                 <div v-for="m in messages" :key="m.id" style="padding: 14px; background: rgba(255, 183, 197, 0.05); border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg); margin-bottom: 12px;">
                   <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px;">
-                    <span class="anime-badge muted">{{ m.messageType || 'text' }}</span>
+                    <span class="anime-badge muted">{{ m.messageType || '文本' }}</span>
                     <span class="anime-badge" :class="m.synced ? 'green' : 'pink'">{{ m.synced ? '已同步' : '未同步' }}</span>
                     <span style="font-size: 13px; color: var(--anime-text-muted);">{{ formatTime(m.messageTime) }}</span>
-                    <span class="anime-pill" style="font-size: 12px;">用户: {{ m.userId || '—' }}</span>
                   </div>
                   <div style="font-size: 14px; color: var(--anime-text-primary); white-space: pre-wrap; line-height: 1.5;">{{ m.rawMessage }}</div>
                 </div>
@@ -134,6 +133,13 @@ async function loadMessages() {
 }
 
 function getPlatformColor(p: string): string { if (p === 'qq') return 'green'; if (p === 'wecom') return 'blue'; return 'purple' }
+function getPlatformLabel(p: string): string { if (p === 'qq') return 'QQ群'; if (p === 'wecom') return '企微群'; return '群聊' }
+function getGroupName(g: GroupSummary): string {
+  if (g.groupName && g.groupName.trim()) return g.groupName.trim()
+  if (g.platform === 'qq') return `QQ群`
+  if (g.platform === 'wecom') return `企微群`
+  return `群聊`
+}
 function formatTime(t: any): string {
   if (!t) return ''
   if (Array.isArray(t) && t.length >= 5) {

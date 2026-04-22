@@ -32,7 +32,15 @@ public class KbStatistics {
 
     private Long totalTokens;
 
+    private Long totalPromptTokens;
+
+    private Long totalCompletionTokens;
+
     private Integer avgLatencyMs;
+
+    private BigDecimal totalCost;
+
+    private BigDecimal avgCost;
 
     private Integer feedbackCount;
 

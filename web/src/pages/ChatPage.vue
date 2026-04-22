@@ -5,9 +5,8 @@
         <div>
           <div class="anime-card-title">Web问答</div>
           <div class="anime-card-desc">
-            <span class="anime-code">POST /api/chat/web/session</span>
             <span class="anime-pill" style="margin-left: 12px;">
-              USER: <span class="anime-code">{{ userId.slice(0, 12) }}...</span>
+              当前用户: <span class="anime-code">{{ displayUser }}</span>
             </span>
           </div>
         </div>
@@ -57,7 +56,18 @@
             <div v-for="(m, idx) in messages" :key="idx" class="anime-chat-message anime-fade-in" :class="m.role">
               <div class="anime-chat-avatar">{{ m.role === 'user' ? 'U' : 'AI' }}</div>
               <div class="anime-chat-bubble">
-                <div style="white-space: pre-wrap; line-height: 1.7;">{{ m.text }}</div>
+                <template v-if="m.role === 'assistant' && (m.thinkingHtml || getThinkingHtml(m.text))">
+                  <div class="thinking-section">
+                    <button class="thinking-toggle" @click="toggleThinking(idx)">
+                      <Brain :size="14" />
+                      <span>思考过程</span>
+                      <ChevronDown v-if="!m.showThinking" :size="14" />
+                      <ChevronUp v-else :size="14" />
+                    </button>
+                    <div v-if="m.showThinking" class="thinking-content" v-html="m.thinkingHtml || getThinkingHtml(m.text)"></div>
+                  </div>
+                </template>
+                <div class="message-content" v-html="m.contentHtml || getContentHtml(m.text, m.role)"></div>
                 <div v-if="m.sources?.length" style="margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--anime-border-light);">
                   <div style="margin-bottom: 8px;">
                     <span class="anime-badge blue">引用来源</span>
@@ -72,12 +82,24 @@
                   </div>
                 </div>
                 <div v-if="m.role === 'assistant' && m.feedback === undefined" style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
-                  <button class="anime-btn ghost" style="padding: 6px 12px;" @click="submitFeedback(idx, 5)">
+                  <button class="anime-btn ghost" style="padding: 6px 12px;" @click="submitFeedback(idx, 1)">
                     <ThumbsUp :size="16" />
                   </button>
-                  <button class="anime-btn ghost" style="padding: 6px 12px;" @click="submitFeedback(idx, 1)">
+                  <button class="anime-btn ghost" style="padding: 6px 12px;" @click="submitFeedback(idx, 0)">
                     <ThumbsDown :size="16" />
                   </button>
+                  <RouterLink to="/feedback" class="anime-btn ghost" style="padding: 6px 12px;">
+                    <MessageSquare :size="16" />
+                    <span style="margin-left: 4px;">反馈问题</span>
+                  </RouterLink>
+                </div>
+                <div v-if="m.role === 'assistant' && m.feedback !== undefined" style="margin-top: 12px; display: flex; gap: 10px; align-items: center;">
+                  <span v-if="m.feedback === 1" class="anime-badge green" style="padding: 6px 12px;">
+                    <ThumbsUp :size="14" /> 已点赞
+                  </span>
+                  <span v-if="m.feedback === 0" class="anime-badge pink" style="padding: 6px 12px;">
+                    <ThumbsDown :size="14" /> 已踩
+                  </span>
                 </div>
               </div>
             </div>
@@ -138,18 +160,29 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Plus, Trash2, Paperclip, Link, Send, ThumbsUp, ThumbsDown } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
+import { Plus, Trash2, Paperclip, Link, Send, ThumbsUp, ThumbsDown, MessageSquare, ChevronDown, ChevronUp, Brain } from 'lucide-vue-next'
 import { webChatWithSession } from '../api/chat'
-import { submitFeedback as submitFeedbackApi } from '../api/feedback'
-import { getOrCreateUserId } from '../lib/user'
+import { submitFeedback as submitFeedbackApi, getFeedbackStatus } from '../api/feedback'
+import { getOrCreateUserId, getCurrentUser } from '../lib/user'
 import { uploadFile } from '../api/upload'
 import { createSession, listSessions, getSessionMessages, deleteSession as deleteSessionApi } from '../api/session'
+import { renderMessage } from '../lib/markdown'
 import type { ChatFileInfo, RetrieverResource } from '../types/dify'
 import type { ChatSession, ChatMessage } from '../api/session'
 
-type DisplayMessage = { role: 'user' | 'assistant'; text: string; sources?: RetrieverResource[]; feedback?: number }
+type DisplayMessage = { 
+  role: 'user' | 'assistant'
+  text: string
+  sources?: RetrieverResource[]
+  feedback?: number
+  thinkingHtml?: string | null
+  contentHtml?: string
+  showThinking?: boolean
+}
 
 const userId = getOrCreateUserId()
+const displayUser = computed(() => getCurrentUser() || '访客用户')
 
 const input = ref('')
 const urlInput = ref('')
@@ -164,6 +197,23 @@ const showUrlInput = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 function truncate(s: string, max: number): string { return s && s.length > max ? `${s.slice(0, max)}...` : s }
+
+function getThinkingHtml(text: string): string | null {
+  const { thinkingHtml } = renderMessage(text)
+  return thinkingHtml
+}
+
+function getContentHtml(text: string, role: 'user' | 'assistant'): string {
+  if (role === 'user') {
+    return `<p style="white-space: pre-wrap; line-height: 1.7;">${text}</p>`
+  }
+  const { contentHtml } = renderMessage(text)
+  return contentHtml
+}
+
+function toggleThinking(idx: number) {
+  messages.value[idx].showThinking = !messages.value[idx].showThinking
+}
 
 function getDateKey(t: string | undefined): string {
   if (!t) return 'unknown'
@@ -259,12 +309,24 @@ async function switchSession(session: ChatSession) {
   
   try {
     const msgs = await getSessionMessages(session.sessionId)
+    const feedbackMap = await getFeedbackStatus(session.sessionId)
+    
     for (const m of msgs) {
       if (m.query) {
         messages.value.push({ role: 'user', text: m.query })
       }
       if (m.answer) {
-        messages.value.push({ role: 'assistant', text: m.answer })
+        const idx = messages.value.length
+        const feedback = feedbackMap[idx] !== undefined ? feedbackMap[idx] : undefined
+        const { thinkingHtml, contentHtml } = renderMessage(m.answer)
+        messages.value.push({ 
+          role: 'assistant', 
+          text: m.answer, 
+          feedback,
+          thinkingHtml,
+          contentHtml,
+          showThinking: false
+        })
       }
     }
   } catch (e: any) {
@@ -348,7 +410,15 @@ async function send() {
   try {
     const files = [...pendingFiles.value]
     const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files)
-    messages.value.push({ role: 'assistant', text: resp.answer || '（无返回）', sources: resp.retrieverResources || [] })
+    const { thinkingHtml, contentHtml } = renderMessage(resp.answer || '（无返回）')
+    messages.value.push({ 
+      role: 'assistant', 
+      text: resp.answer || '（无返回）', 
+      sources: resp.retrieverResources || [],
+      thinkingHtml,
+      contentHtml,
+      showThinking: false
+    })
     pendingFiles.value = []
     
     currentSession.value.messageCount = (currentSession.value.messageCount || 0) + 2
@@ -367,8 +437,12 @@ async function send() {
 async function submitFeedback(msgIdx: number, rating: number) {
   if (!currentSession.value) return
   try {
-    await submitFeedbackApi(currentSession.value.sessionId, msgIdx, rating)
-    messages.value[msgIdx].feedback = rating
+    const result = await submitFeedbackApi(currentSession.value.sessionId, msgIdx, rating)
+    if (result.success) {
+      messages.value[msgIdx].feedback = rating
+    } else {
+      error.value = result.message
+    }
   } catch {
     error.value = '反馈提交失败'
   }
@@ -421,4 +495,117 @@ onMounted(loadSessions)
 .anime-chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .anime-chat-messages { flex: 1; overflow-y: auto; padding: 16px; }
 .anime-chat-composer { position: relative; }
+
+.thinking-section {
+  margin-bottom: 12px;
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  background: rgba(255, 183, 197, 0.05);
+}
+
+.thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--anime-purple);
+  transition: all 0.2s;
+}
+
+.thinking-toggle:hover {
+  background: rgba(255, 183, 197, 0.1);
+}
+
+.thinking-content {
+  padding: 12px 14px;
+  border-top: 2px solid var(--anime-border);
+  font-size: 14px;
+  color: var(--anime-text-secondary);
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.message-content {
+  line-height: 1.7;
+}
+
+.message-content p {
+  margin: 0 0 12px 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  border-radius: var(--anime-radius-lg);
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.message-content code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.message-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.message-content ul, .message-content ol {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.message-content li {
+  margin-bottom: 6px;
+}
+
+.message-content h1, .message-content h2, .message-content h3 {
+  margin: 16px 0 8px 0;
+  font-weight: 700;
+}
+
+.message-content h1 { font-size: 20px; }
+.message-content h2 { font-size: 18px; }
+.message-content h3 { font-size: 16px; }
+
+.message-content a {
+  color: var(--anime-blue);
+  text-decoration: underline;
+}
+
+.message-content blockquote {
+  border-left: 4px solid var(--anime-pink);
+  padding-left: 12px;
+  margin: 12px 0;
+  color: var(--anime-text-secondary);
+}
+
+.message-content table {
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.message-content th, .message-content td {
+  border: 2px solid var(--anime-border);
+  padding: 8px 12px;
+}
+
+.message-content th {
+  background: rgba(255, 183, 197, 0.1);
+  font-weight: 600;
+}
 </style>

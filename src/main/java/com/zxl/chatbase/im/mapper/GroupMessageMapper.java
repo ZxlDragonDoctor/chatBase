@@ -11,10 +11,12 @@ import java.util.List;
 @Mapper
 public interface GroupMessageMapper extends BaseMapper<GroupMessage> {
 
-    @Select("SELECT COALESCE(platform,'unknown') AS platform, group_id, "
-            + "COUNT(1) AS messageCount, MAX(message_time) AS lastMessageTime "
-            + "FROM group_message WHERE group_id IS NOT NULL AND CHAR_LENGTH(TRIM(group_id)) > 0 "
-            + "GROUP BY COALESCE(platform,'unknown'), group_id "
+    @Select("SELECT gm.platform, gm.group_id, ig.group_name, "
+            + "COUNT(1) AS messageCount, MAX(gm.message_time) AS lastMessageTime "
+            + "FROM group_message gm "
+            + "LEFT JOIN im_group ig ON gm.platform = ig.platform AND gm.group_id = ig.group_id "
+            + "WHERE gm.group_id IS NOT NULL AND CHAR_LENGTH(TRIM(gm.group_id)) > 0 "
+            + "GROUP BY gm.platform, gm.group_id, ig.group_name "
             + "ORDER BY lastMessageTime DESC LIMIT 500")
     List<GroupSummaryVO> selectGroupSummaries();
 }

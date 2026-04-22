@@ -18,9 +18,6 @@ public class DifyConfig {
     @Value("${difyApp.datasetApiKey}")
     private String datasetApiKey;
 
-    /**
-     * 可选：Dify 知识库 ID（dataset_id），用于存储群聊消息
-     */
     @Value("${difyApp.datasetId:}")
     private String datasetId;
 

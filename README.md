@@ -1,166 +1,183 @@
-# ChatBase 智能聊天与知识库系统
+# ChatBase
 
-基于 Spring Boot + Vue 3 的群聊数据采集 + Dify 知识库 + NapCat + 智能问答系统。
-
-## QqBot、WeChatBot智能机器人展示
-- QqBot
-<img width="1792" height="925" alt="image" src="https://github.com/user-attachments/assets/1474aa11-a4f7-4522-97d8-f203357ee032" />
-
-- WeChatBot
-<img width="1745" height="861" alt="image" src="https://github.com/user-attachments/assets/8602ec5c-803d-49bc-bf53-7cceb460ea60" />
-
+基于 Spring Boot + Vue 3 的智能对话系统，集成 Dify AI 平台，支持 QQ 群聊和企业微信消息收集与智能回复。
 
 ## 功能特性
 
-- **多平台接入**：支持 QQ群、企业微信群消息采集
-- **智能问答**：@机器人 自动调用 Dify 大模型回答
-- **知识库同步**：群消息自动同步到 Dify 知识库
-- **文件管理**：支持文件上传与知识库关联
-- **Web聊天**：提供 Web 端聊天接口
-- **限流保护**：内置限流防刷机制
-- **控制台**：群消息统计与查询
+### 核心功能
+- **智能对话**：集成 Dify AI，支持多轮对话、上下文记忆
+- **知识库管理**：批量上传文档、自动同步到 Dify 知识库、搜索功能
+- **FAQ 管理**：自动提取高频问答、手动维护、优先级匹配、搜索功能
+- **会话管理**：多会话切换、历史记录查询
+
+### IM 集成
+- **QQ 群聊**：通过 NapCat 接入，自动回复群消息
+- **企业微信**：接收企业微信群消息，智能回复
+
+### 数据分析
+- **Token 统计**：消耗趋势图、月度统计、预测分析
+- **费用统计**：Prompt/Completion Tokens 分离计费、费用趋势
+- **关键词热度**：词云展示、多渠道关键词提取
+- **用户反馈**：点赞/踩统计、反馈表单、满意度分析
 
 ## 技术栈
 
-- 后端：Java 17、Spring Boot 2.7.6、MyBatis-Plus、WebSocket、Redis、MySQL
-- 前端：Vue 3、TypeScript、Vite
-- 外部服务：Dify API、NapCat
+### 后端
+- Java 17
+- Spring Boot 2.7.6
+- MyBatis-Plus
+- WebSocket
+- Redis
+- MySQL 8.0
+
+### 前端
+- Vue 3 + TypeScript
+- Vite
+- ECharts
+- Lucide Icons
+
+### AI 平台
+- Dify API
 
 ## 快速开始
 
-### 1. 环境要求
-
-- JDK 17+
-- Maven 3.8+
-- MySQL 8.0+
-- Redis 7+
-
-### 2. 初始化数据库
-
-```sql
-CREATE DATABASE chat_base;
--- 执行 sql/init-schema.sql
-```
-
-### 3. 配置 Dify
-
-在 `application-local.yaml` 中配置：
-
-```yaml
-difyApp:
-  url: "https://api.dify.ai/v1"
-  apiKey: "你的sk-xxx"
-  datasetId: "你的dataset-xxx"
-  timeOut: 90
-```
-需要先在https://cloud.dify.ai/ 工作室中和知识库中创建属于自己的Chatflow和知识库并获取API密钥
-<img width="2548" height="1328" alt="image" src="https://github.com/user-attachments/assets/3c732686-6969-4e0b-b8a5-502f6a9feaae" />
-<img width="2542" height="1351" alt="image" src="https://github.com/user-attachments/assets/c4d2b412-1478-4bc5-b212-6daf2c9aef91" />
-
-### 4. 配置 QQ 机器人
-
-```yaml
-qq:
-  bot:
-    self-id: 你的机器人QQ号
-    http-base-url: "http://127.0.0.1:3000"
-```
-想要使用QQ机器人，需要使用NapCat开源项目作为中间件监听QQ消息  
-项目地址：https://github.com/NapNeko/NapCatQQ  
-下载完成并启动后进入 http://127.0.0.1:6099/webui/ 控制台登录QQ账号并授权后，在网络配置中进行以下配置
-**务必使用小号登录NapCat，防止被封禁账号**  
-
-NapCat 配置反向 WebSocket：`ws://localhost:8080/qq/ws`  
-NapCat 配置 HTTP服务器 API：`http://localhost:8080/qq/api`
-<img width="2520" height="1318" alt="image" src="https://github.com/user-attachments/assets/ae79d8ad-6241-4baf-8618-da10a48302ce" />
-<img width="2538" height="1350" alt="image" src="https://github.com/user-attachments/assets/aa438de9-0baa-46ed-94b8-29ee106e12f7" />
-
-
-### 5.配置企业微信智能机器人
-
-````yaml
-wechat:
-  corp:
-    # 基于webhook的连接配置
-    # 企业微信回调Token
-    stoken: 你的Token
-    # 企业微信加解密AESKey
-    sEncodingAESKey: 你的AesKey
-````
-配置信息在企业微信工作台智能机器人中创建，选择手动创建，选择API模式使用URL创建
-<img width="415" height="421" alt="image" src="https://github.com/user-attachments/assets/ef2b6763-856d-4090-a79e-8bb012c16357" />  
-
-URL需要于src/main/java/com/zxl/chatbase/controller/IntelligentRobotController.java中的verifyUrl接口一致
-**注：由于基于回调的方式企微不支持本地地址ip，所以需要自己配置自己的服务器IP或者域名才能正常使用企微智能机器人功能或者自己扩展基于websocket长连接的接口创建机器人在本地使用测试**
-````java
-@RestController
-@RequestMapping("intellrobot")
-@Slf4j
-public class IntelligentRobotController {
-    @Resource
-    private IntelligentRobotService intelligentRobotService;
-
-    @GetMapping("callback/handle")
-    public String verifyUrl(@RequestParam("msg_signature") String msgSignature,
-                            @RequestParam("timestamp") String timestamp,
-                            @RequestParam("nonce") String nonce,
-                            @RequestParam("echostr") String echoStr
-    ) {
-        return intelligentRobotService.verifyUrl(msgSignature, timestamp, nonce, echoStr);
-    }
-
-//Urldecode
-    @PostMapping("/callback/handle") // 路径与get检验URL相同
-    public Map<String, String> handleMessage(@RequestParam("msg_signature") String msgSignature,
-                                @RequestParam("timestamp") String timestamp,
-                                @RequestParam("nonce") String nonce,
-                                @RequestBody String postData
-    ) {
-        return Map.of("encrypt", intelligentRobotService.handleMessage(msgSignature, timestamp, nonce, postData));
-    }
-}
-````
-
-
-
-### 5. 启动
+### Docker 部署（推荐）
 
 ```bash
-mvn spring-boot:run
+# 1. 克隆项目
+git clone <repository-url>
+cd chatBase
+
+# 2. 配置环境变量
+cp .env.example .env
+vim .env  # 填写 Dify API Key 等必填配置
+
+# 3. 构建并启动
+docker-compose up --build -d
+
+# 4. 查看日志
+docker-compose logs -f chatbase-backend
 ```
 
-## 核心接口
+访问 `http://localhost` 打开前端页面。
 
+详细部署说明请参考 [DEPLOY.md](./DEPLOY.md)。
+
+### 本地开发
+
+```bash
+# 后端
+mvn spring-boot:run
+
+# 前端
+cd web
+npm install
+npm run dev
+```
+
+## 目录结构
+
+```
+chatBase/
+├── src/main/java/com/zxl/chatbase/
+│   ├── chat/           # 聊天服务
+│   ├── dify/           # Dify API 集成
+│   ├── kb/             # 知识库管理
+│   ├── im/             # IM 消息收集
+│   ├── qq/             # QQ Bot WebSocket
+│   ├── statistics/     # 统计分析
+│   ├── feedback/       # 用户反馈
+│   └── controller/     # API 控制器
+│
+├── web/                # Vue 3 前端
+│   ├── src/
+│   │   ├── pages/      # 页面组件
+│   │   ├── api/        # API 接口
+│   │   └── lib/        # 工具库
+│   ├── nginx.conf      # Nginx 配置
+│   └── Dockerfile      # 前端镜像
+│
+├── sql/                # 数据库脚本
+│   └── init-schema.sql # 初始化脚本
+│
+├── Dockerfile          # 后端镜像
+├── docker-compose.yml  # 部署编排
+├── .env.example        # 环境变量示例
+├── DEPLOY.md           # 部署说明
+└── README.md           # 项目说明
+```
+
+## 配置说明
+
+### 必填配置
+
+| 配置项 | 说明 |
+|--------|------|
+| `DIFYAPP_API_KEY` | Dify Chat API Key |
+| `DIFYAPP_DATASET_API_KEY` | Dify Dataset API Key |
+| `MYSQL_PASSWORD` | MySQL 数据库密码 |
+
+### 可选配置
+
+| 配置项 | 说明 |
+|--------|------|
+| `QQ_BOT_ENABLE` | 启用 QQ Bot |
+| `QQ_BOT_SELF_ID` | 机器人 QQ 号 |
+| `WECHAT_CORP_STOKEN` | 企业微信 Token |
+
+## API 接口
+
+### 对话接口
 | 接口 | 方法 | 说明 |
 |------|------|------|
 | `/api/chat/ask` | GET | 简单问答 |
-| `/api/chat/web` | POST | Web端聊天 |
-| `/api/chat/im` | POST | IM机器人聊天 |
+| `/api/chat/web` | POST | Web 端对话 |
+| `/api/chat/im` | POST | IM 端对话 |
 | `/api/chat/v1/files/upload` | POST | 文件上传 |
-| `/api/console/overview` | GET | 采集概览 |
-| `/api/console/messages` | GET | 消息分页 |
+
+### 知识库接口
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/kb` | GET/POST/PUT/DELETE | 知识库 CRUD |
+| `/api/kb/{id}/sync` | POST | 同步到 Dify |
+| `/api/kb/{id}/batch-upload` | POST | 批量上传文件 |
+| `/api/kb/{id}/document/page` | GET | 文档列表（支持搜索） |
+
+### 统计接口
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/statistics/token/chart` | GET | Token 趋势 |
+| `/api/statistics/token/monthly` | GET | 本月统计 |
+| `/api/statistics/cost/chart` | GET | 费用趋势 |
+| `/api/statistics/keyword/cloud` | GET | 关键词词云 |
+| `/api/statistics/aggregate` | POST | 聚合统计 |
+
+### FAQ 接口
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/kb/conversation/faq/page` | GET | FAQ 列表（支持搜索） |
+| `/api/kb/conversation/faq/extract` | POST | 自动提取 FAQ |
 
 ## 数据库表
 
-### IM消息模块
+### 知识库模块
+| 表名 | 说明 |
+|------|------|
+| `kb_knowledge_base` | 知识库管理 |
+| `kb_document` | 文档管理 |
+| `kb_conversation` | 会话记录 |
+| `kb_faq` | 常见问答 |
+| `kb_feedback` | 用户反馈 |
+| `kb_statistics` | 每日统计 |
+| `kb_keyword` | 关键词统计 |
+
+### IM 模块
 | 表名 | 说明 |
 |------|------|
 | `group_message` | 群聊消息采集 |
 | `im_group` | 群组信息 |
 | `im_user` | 用户信息 |
-| `group_kb_mapping` | 群组知识库映射 |
-
-### 知识库模块
-| 表名 | 说明 |
-|------|------|
-| `kb_category` | 分类管理 |
-| `kb_knowledge_base` | 知识库 |
-| `kb_document` | 文档管理 |
-| `kb_conversation` | 会话记录 |
-| `kb_file` | 文件管理 |
-| `kb_faq` | 常见问答 |
-| `kb_feedback` | 用户反馈 |
-| `kb_statistics` | 每日统计 |
+| `chat_session` | 聊天会话 |
 
 ### 系统模块
 | 表名 | 说明 |
@@ -168,59 +185,68 @@ mvn spring-boot:run
 | `sys_user` | 系统用户 |
 | `sys_config` | 系统配置 |
 
-## 数据流
+## QQ Bot 配置
 
-```
-QQ群消息 → NapCat → WebSocket(/qq/ws) → 入库 + 同步im_group/im_user
-企业微信 → 回调 → /intellrobot/callback → 入库 + 同步im_group/im_user
+使用 NapCat 作为 QQ 协议实现：
 
-群消息 → 定时任务 → Dify知识库(kb_document)
-     ↓
- @机器人 → ChatService → Dify → 返回回答 → 发送回群里
-```
-
-## 配置说明
-
-主要配置在 `application-local.yaml`(本地创建配置文件)：
-
-```yaml
-# Dify配置
-difyApp:
-  url: "https://api.dify.ai/v1"
-  apiKey: ""
-  datasetId: ""
-
-# QQ配置
-qq:
-  bot:
-    self-id: 123456789
-    http-base-url: "http://127.0.0.1:3000"
-
-# 限流配置
-chat:
-  rate-limit:
-    window-seconds: 60
-    max-requests: 30
-
-# 清理配置
-chat:
-  cleanup:
-    conversation-days: 30
-    message-days: 90
-```
-
-## Docker 部署
-1. 复制.env.example 为 .env 并修改配置,主要配置dify,qq_bot,wechat,mysql,redis
-2. 执行docker compose命令启动：
+1. 启动 NapCat 容器
 ```bash
-docker compose up -d --build
+docker compose --profile qq up -d
 ```
 
-服务端口：MySQL(3306)、Redis(6379)、Backend(8080)、NapCat(3000,3001)、Web(80)
+2. 访问 `http://<server>:6099` 扫码登录，并配置网络配置
+
+3. 配置反向 WebSocket客户端：
+![img.png](img.png)
+
+4.配置Http服务器
+![img_1.png](img_1.png)
+
+项目地址：https://github.com/NapNeko/NapCatQQ
+
+⚠️ **注意**：务必使用小号登录，防止被封禁。
+
+## 企业微信配置
+
+在企业微信管理后台配置机器人：
+
+1. **回调URL**：`http://<server>/intellrobot/callback/handle`
+2. **配置参数**：
+   - `WECHAT_CORP_STOKEN` - Token
+   - `WECHAT_CORP_S_ENCODING_AES_KEY` - EncodingAESKey
+
+3. 消息处理流程：
+   - GET 请求：URL验证
+   - POST 请求：接收消息并回复
+
+## 数据流程
+
+### QQ 群消息收集
+```
+QQ群消息 → NapCat → WebSocket(/qq/ws) 
+→ QqBotWebSocketHandler → group_message 表
+→ 定时同步到 Dify 知识库
+```
+
+### 企业微信群消息收集
+```
+企业微信群消息 → 回调(/intellrobot/callback/handle)
+→ IntelligentRobotService → 消息解密验证
+→ group_message 表 + im_group/im_user 表同步
+→ ChatService(Dify API) → 返回答案 → Webhook回复群聊
+```
+
+### Web 对话流程
+```
+用户提问 → ChatController → ChatService
+→ FAQ匹配(优先) / Dify API调用
+→ kb_conversation 表 → 返回答案
+```
 
 ## 常见问题
 
 1. **QQ消息收到但不回答**：确认 @机器人 而不是只发消息
-2. **发送失败(1404)**：确认 NapCat HTTP 端口配置正确
-3. **超时问题**：增大 `difyApp.timeOut` 配置值
-4. **企业微信回调**：需在企业微信后台配置服务器URL
+2. **知识库删除失败**：检查 Dify API Key 配置是否正确
+3. **统计数据为空**：调用 `/api/statistics/aggregate` 聚合统计
+4. **Token费用显示为0**：历史数据无费用信息，新对话正常记录
+
