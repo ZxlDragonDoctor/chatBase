@@ -1,12 +1,17 @@
 package com.zxl.chatbase.wxroboot.webhook.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.MonitorException;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.im.entity.GroupMessage;
+import com.zxl.chatbase.im.entity.ImGroup;
+import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.mapper.KbAppMapper;
 import com.zxl.chatbase.wxroboot.webhook.entity.DutyChatGroup;
 import com.zxl.chatbase.wxroboot.webhook.entity.intelligentBot.IntelligentBotMsg;
 import com.zxl.chatbase.wxroboot.webhook.service.IntelligentRobotService;
@@ -48,6 +53,10 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     private com.zxl.chatbase.im.service.ImGroupService imGroupService;
     @Resource
     private com.zxl.chatbase.im.service.ImUserService imUserService;
+    @Resource
+    private ImGroupMapper imGroupMapper;
+    @Resource
+    private KbAppMapper kbAppMapper;
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
@@ -121,9 +130,14 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
                 String query = msg.getText().getContent();
-                // TODO：调用Dify获取模型结果
+                
+                // 获取群组绑定的应用
+                Long appId = getAppIdForGroup(msg.getChatid());
+                log.info("企微群组应用绑定: groupId={}, appId={}", msg.getChatid(), appId);
+                
                 // 异步回答，避免阻塞 WebSocket 消息线程
                 CompletableFuture<DifyChatResponse> completableFuture = CompletableFuture.supplyAsync(() -> chatService.chat(
+                                appId,
                                 "wx",
                                 msg.getFrom().getUserid(),
                                 msg.getChatid(),
@@ -220,6 +234,36 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 "}";
 
         return encryptData(timestamp, nonce, reply);
+    }
+
+    /**
+     * 获取群组绑定的应用ID
+     * 优先使用群组绑定的应用，如果没有则使用默认应用
+     */
+    private Long getAppIdForGroup(String groupId) {
+        try {
+            LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(ImGroup::getGroupId, groupId)
+                    .eq(ImGroup::getStatus, true);
+            ImGroup group = imGroupMapper.selectOne(wrapper);
+            
+            if (group != null && group.getAppId() != null) {
+                KbApp app = kbAppMapper.selectById(group.getAppId());
+                if (app != null && app.getStatus()) {
+                    return app.getId();
+                }
+            }
+            
+            LambdaQueryWrapper<KbApp> appWrapper = new LambdaQueryWrapper<>();
+            appWrapper.eq(KbApp::getStatus, true)
+                    .eq(KbApp::getIsDefault, true)
+                    .last("LIMIT 1");
+            KbApp defaultApp = kbAppMapper.selectOne(appWrapper);
+            return defaultApp != null ? defaultApp.getId() : null;
+        } catch (Exception e) {
+            log.error("获取企微群组应用失败: groupId={}", groupId, e);
+            return null;
+        }
     }
 
 }

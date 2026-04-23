@@ -34,6 +34,16 @@ public interface DifyService {
     DifyChatResponse sendChatMessageStream(DifyChatRequest request);
 
     /**
+     * 发送聊天消息（使用指定API Key）
+     */
+    DifyChatResponse sendChatMessage(DifyChatRequest request, String apiKey);
+
+    /**
+     * 发送聊天消息（流式模式，使用指定API Key）
+     */
+    DifyChatResponse sendChatMessageStream(DifyChatRequest request, String apiKey);
+
+    /**
      * 上传文件
      *
      * @param file 要上传的文件

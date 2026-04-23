@@ -99,7 +99,7 @@ public class ChatController {
             resp.setAnswer(e.getMessage());
             return resp;
         }
-        return chatService.chatWithSession(request.getSessionId(), "web", request.getUserId(), request.getText(), request.getFiles());
+        return chatService.chatWithSession(request.getSessionId(), request.getAppId(), "web", request.getUserId(), request.getText(), request.getFiles());
     }
     
     public static class MessageRequest {
@@ -143,12 +143,15 @@ public class ChatController {
 
     public static class SessionChatRequest {
         private String sessionId;
+        private Long appId;
         private String text;
         private String userId;
         private List<FileInfo> files;
 
         public String getSessionId() { return sessionId; }
         public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+        public Long getAppId() { return appId; }
+        public void setAppId(Long appId) { this.appId = appId; }
         public String getText() { return text; }
         public void setText(String text) { this.text = text; }
         public String getUserId() { return userId; }

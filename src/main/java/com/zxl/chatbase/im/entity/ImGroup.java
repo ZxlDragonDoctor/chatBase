@@ -28,6 +28,10 @@ public class ImGroup {
 
     private Long kbId;
 
+    private Long appId;
+
+    private String appName;
+
     private Boolean status;
 
     private LocalDateTime createTime;

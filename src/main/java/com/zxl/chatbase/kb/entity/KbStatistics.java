@@ -22,6 +22,8 @@ public class KbStatistics {
 
     private Long knowledgeBaseId;
 
+    private Long appId;
+
     private Integer conversationCount;
 
     private Integer messageCount;

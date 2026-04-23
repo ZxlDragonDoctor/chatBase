@@ -29,6 +29,10 @@ public class KbConversation {
 
     private Long knowledgeBaseId;
 
+    private Long appId;
+
+    private String appName;
+
     private String query;
 
     private String answer;

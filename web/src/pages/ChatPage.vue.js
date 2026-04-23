@@ -8,6 +8,7 @@ import { getOrCreateUserId, getCurrentUser } from '../lib/user';
 import { uploadFile } from '../api/upload';
 import { createSession, listSessions, getSessionMessages, deleteSession as deleteSessionApi } from '../api/session';
 import { renderMessage } from '../lib/markdown';
+import { api } from '../api/client';
 const userId = getOrCreateUserId();
 const displayUser = computed(() => getCurrentUser() || '访客用户');
 const input = ref('');
@@ -21,6 +22,8 @@ const pendingFiles = ref([]);
 const showAttachMenu = ref(false);
 const showUrlInput = ref(false);
 const fileInputRef = ref(null);
+const appList = ref([]);
+const selectedAppId = ref(null);
 function truncate(s, max) { return s && s.length > max ? `${s.slice(0, max)}...` : s; }
 function getThinkingHtml(text) {
     const { thinkingHtml } = renderMessage(text);
@@ -107,6 +110,17 @@ async function loadSessions() {
     }
     catch (e) {
         error.value = e?.message || '加载会话列表失败';
+    }
+}
+async function loadApps() {
+    try {
+        const resp = await api.get('/kb/app/list');
+        appList.value = resp.data || [];
+        const defaultApp = appList.value.find(a => a.isDefault);
+        selectedAppId.value = defaultApp?.id || (appList.value.length > 0 ? appList.value[0].id : null);
+    }
+    catch (e) {
+        console.error('加载应用列表失败', e);
     }
 }
 async function createNewSession() {
@@ -233,7 +247,7 @@ async function send() {
     loading.value = true;
     try {
         const files = [...pendingFiles.value];
-        const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files);
+        const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files, selectedAppId.value ?? undefined);
         const { thinkingHtml, contentHtml } = renderMessage(resp.answer || '（无返回）');
         messages.value.push({
             role: 'assistant',
@@ -274,7 +288,10 @@ async function submitFeedback(msgIdx, rating) {
         error.value = '反馈提交失败';
     }
 }
-onMounted(loadSessions);
+onMounted(() => {
+    loadSessions();
+    loadApps();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -306,6 +323,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['message-content']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-content']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-content']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -332,6 +350,25 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
     ...{ class: "anime-code" },
 });
 (__VLS_ctx.displayUser);
+if (__VLS_ctx.appList.length > 0) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "anime-pill" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+        value: (__VLS_ctx.selectedAppId),
+        ...{ class: "anime-app-select" },
+        ...{ style: {} },
+    });
+    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            key: (app.id),
+            value: (app.id),
+        });
+        (app.icon || '🤖');
+        (app.name);
+    }
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-actions" },
 });
@@ -819,6 +856,8 @@ if (__VLS_ctx.error) {
 /** @type {__VLS_StyleScopedClasses['anime-card-desc']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
@@ -920,6 +959,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             showAttachMenu: showAttachMenu,
             showUrlInput: showUrlInput,
             fileInputRef: fileInputRef,
+            appList: appList,
+            selectedAppId: selectedAppId,
             truncate: truncate,
             getThinkingHtml: getThinkingHtml,
             getContentHtml: getContentHtml,

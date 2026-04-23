@@ -5,7 +5,7 @@
         <div>
           <div class="anime-card-title">群聊采集</div>
           <div class="anime-card-desc">
-            QQ群/企微群消息采集记录
+            QQ群/企微群消息采集记录 · 应用绑定
           </div>
         </div>
         <div class="anime-card-actions">
@@ -37,6 +37,7 @@
               <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
                 <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
                 <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(g) }}</span>
+                <span v-if="g.appName" class="anime-badge blue" style="margin-left: 4px;">{{ g.appName }}</span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--anime-text-muted);">
                 <span style="color: var(--anime-blue);">{{ g.messageCount }} 条消息</span>
@@ -57,6 +58,26 @@
                 <span class="anime-badge" :class="getPlatformColor(selected.platform)">{{ getPlatformLabel(selected.platform) }}</span>
                 <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(selected) }}</span>
               </div>
+              
+              <div style="padding: 16px; background: rgba(168, 216, 234, 0.1); border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg); margin-bottom: 16px;">
+                <div style="font-weight: 600; color: var(--anime-text-primary); margin-bottom: 12px;">
+                  <span style="color: var(--anime-pink);">应用绑定</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <select v-model="bindAppId" class="anime-app-select" style="min-width: 200px;">
+                    <option value="">不绑定应用</option>
+                    <option v-for="app in appList" :key="app.id" :value="app.id">{{ app.icon || '🤖' }} {{ app.name }}</option>
+                  </select>
+                  <button class="anime-btn primary" @click="saveBindApp" :disabled="bindSaving">
+                    <span v-if="bindSaving">保存中...</span>
+                    <span v-else>保存绑定</span>
+                  </button>
+                </div>
+                <div v-if="selected.appName" style="margin-top: 10px; font-size: 13px; color: var(--anime-text-muted);">
+                  当前绑定: <span style="color: var(--anime-blue);">{{ selected.appName }}</span>
+                </div>
+              </div>
+              
               <div v-if="msgLoading" class="anime-empty">
                 <span class="anime-loader-spinner"></span>
                 <span class="anime-empty-text">消息加载中...</span>
@@ -88,7 +109,15 @@
 import { ref, watch, onMounted } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { fetchGroups, fetchGroupMessages } from '../api/console'
+import { api } from '../api/client'
 import type { GroupMessageItem, GroupSummary } from '../types/console'
+
+interface KbApp {
+  id: number
+  name: string
+  icon: string
+  isDefault: boolean
+}
 
 const platformTabs = [{ key: 'all' as const, label: '全部' }, { key: 'qq' as const, label: 'QQ 群' }, { key: 'wecom' as const, label: '企微群' }]
 const platform = ref<'all' | 'qq' | 'wecom'>('all')
@@ -102,6 +131,18 @@ const msgLoading = ref(false)
 const msgTotal = ref(0)
 const page = ref(0)
 const pageSize = 40
+const appList = ref<KbApp[]>([])
+const bindAppId = ref<number | string>('')
+const bindSaving = ref(false)
+
+async function loadApps() {
+  try {
+    const resp = await api.get('/kb/app/list')
+    appList.value = resp.data || []
+  } catch (e) {
+    console.error('加载应用列表失败', e)
+  }
+}
 
 async function reload() {
   loading.value = true
@@ -111,12 +152,18 @@ async function reload() {
     if (selected.value) {
       const still = groups.value.find((g) => g.groupId === selected.value!.groupId && g.platform === selected.value!.platform)
       if (!still) { selected.value = null; messages.value = [] }
+      else { selected.value = still; bindAppId.value = still.appId || '' }
     }
   } catch (e: any) { err.value = e?.message || '加载失败'; groups.value = [] }
   finally { loading.value = false }
 }
 
-function selectGroup(g: GroupSummary) { selected.value = g; page.value = 0; loadMessages() }
+function selectGroup(g: GroupSummary) { 
+  selected.value = g
+  bindAppId.value = g.appId || ''
+  page.value = 0
+  loadMessages() 
+}
 
 async function loadMessages() {
   if (!selected.value) return
@@ -130,6 +177,29 @@ async function loadMessages() {
     msgTotal.value = res.total
   } catch { messages.value = []; msgTotal.value = 0 }
   finally { msgLoading.value = false }
+}
+
+async function saveBindApp() {
+  if (!selected.value) return
+  bindSaving.value = true
+  try {
+    const appId = bindAppId.value ? Number(bindAppId.value) : null
+    const appName = appId ? appList.value.find(a => a.id === appId)?.name : null
+    if (appId) {
+      await api.put(`/console/groups/${selected.value.id}/app`, { appId, appName })
+      selected.value.appId = appId
+      selected.value.appName = appName
+    } else {
+      await api.delete(`/console/groups/${selected.value.id}/app`)
+      selected.value.appId = null
+      selected.value.appName = null
+    }
+    reload()
+  } catch (e: any) {
+    err.value = e?.response?.data?.message || '绑定失败'
+  } finally {
+    bindSaving.value = false
+  }
 }
 
 function getPlatformColor(p: string): string { if (p === 'qq') return 'green'; if (p === 'wecom') return 'blue'; return 'purple' }
@@ -151,7 +221,10 @@ function formatTime(t: any): string {
 }
 
 watch(platform, () => { selected.value = null; messages.value = []; reload() })
-onMounted(reload)
+onMounted(() => {
+  reload()
+  loadApps()
+})
 </script>
 
 <style scoped>
@@ -164,4 +237,17 @@ onMounted(reload)
 .im-detail-panel { padding: 20px; max-height: min(70vh, 600px); overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
 .message-list { display: flex; flex-direction: column; gap: 12px; }
 .animate-spin { animation: spin 1s linear infinite; }
+.anime-app-select {
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--anime-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+.anime-app-select:focus {
+  border-color: var(--anime-pink);
+}
 </style>

@@ -18,6 +18,12 @@ public interface IKbConversationService extends IService<KbConversation> {
                                    String query, String answer, Integer promptTokens, Integer completionTokens,
                                    BigDecimal promptPrice, BigDecimal completionPrice, BigDecimal totalPrice,
                                    Integer latencyMs, boolean success, String errorMessage);
+
+    void saveConversationWithCostAndApp(String conversationId, String userId, String channel, String groupId,
+                                   String query, String answer, Long appId, String appName,
+                                   Integer promptTokens, Integer completionTokens,
+                                   BigDecimal promptPrice, BigDecimal completionPrice, BigDecimal totalPrice,
+                                   Integer latencyMs, boolean success, String errorMessage);
     
     Page<KbConversation> pageList(String userId, String channel, Integer pageNum, Integer pageSize);
     

@@ -8,6 +8,14 @@
             <span class="anime-pill" style="margin-left: 12px;">
               当前用户: <span class="anime-code">{{ displayUser }}</span>
             </span>
+            <span v-if="appList.length > 0" class="anime-pill" style="margin-left: 12px;">
+              应用: 
+              <select v-model="selectedAppId" class="anime-app-select" style="margin-left: 4px;">
+                <option v-for="app in appList" :key="app.id" :value="app.id">
+                  {{ app.icon || '🤖' }} {{ app.name }}
+                </option>
+              </select>
+            </span>
           </div>
         </div>
         <div class="anime-card-actions">
@@ -168,8 +176,16 @@ import { getOrCreateUserId, getCurrentUser } from '../lib/user'
 import { uploadFile } from '../api/upload'
 import { createSession, listSessions, getSessionMessages, deleteSession as deleteSessionApi } from '../api/session'
 import { renderMessage } from '../lib/markdown'
+import { api } from '../api/client'
 import type { ChatFileInfo, RetrieverResource } from '../types/dify'
 import type { ChatSession, ChatMessage } from '../api/session'
+
+interface KbApp {
+  id: number
+  name: string
+  icon: string
+  isDefault: boolean
+}
 
 type DisplayMessage = { 
   role: 'user' | 'assistant'
@@ -195,6 +211,8 @@ const pendingFiles = ref<ChatFileInfo[]>([])
 const showAttachMenu = ref(false)
 const showUrlInput = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const appList = ref<KbApp[]>([])
+const selectedAppId = ref<number | null>(null)
 
 function truncate(s: string, max: number): string { return s && s.length > max ? `${s.slice(0, max)}...` : s }
 
@@ -288,6 +306,17 @@ async function loadSessions() {
     }
   } catch (e: any) {
     error.value = e?.message || '加载会话列表失败'
+  }
+}
+
+async function loadApps() {
+  try {
+    const resp = await api.get('/kb/app/list')
+    appList.value = resp.data || []
+    const defaultApp = appList.value.find(a => a.isDefault)
+    selectedAppId.value = defaultApp?.id || (appList.value.length > 0 ? appList.value[0].id : null)
+  } catch (e) {
+    console.error('加载应用列表失败', e)
   }
 }
 
@@ -409,7 +438,7 @@ async function send() {
 
   try {
     const files = [...pendingFiles.value]
-    const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files)
+    const resp = await webChatWithSession(currentSession.value.sessionId, text, userId, files, selectedAppId.value ?? undefined)
     const { thinkingHtml, contentHtml } = renderMessage(resp.answer || '（无返回）')
     messages.value.push({ 
       role: 'assistant', 
@@ -448,7 +477,10 @@ async function submitFeedback(msgIdx: number, rating: number) {
   }
 }
 
-onMounted(loadSessions)
+onMounted(() => {
+  loadSessions()
+  loadApps()
+})
 </script>
 
 <style scoped>
@@ -607,5 +639,20 @@ onMounted(loadSessions)
 .message-content th {
   background: rgba(255, 183, 197, 0.1);
   font-weight: 600;
+}
+
+.anime-app-select {
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  padding: 4px 8px;
+  font-size: 14px;
+  color: var(--anime-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+
+.anime-app-select:focus {
+  border-color: var(--anime-pink);
 }
 </style>

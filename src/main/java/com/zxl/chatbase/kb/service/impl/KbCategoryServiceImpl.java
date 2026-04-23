@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zxl.chatbase.kb.entity.KbCategory;
+import com.zxl.chatbase.kb.entity.KbKnowledgeBase;
 import com.zxl.chatbase.kb.mapper.KbCategoryMapper;
+import com.zxl.chatbase.kb.mapper.KbKnowledgeBaseMapper;
 import com.zxl.chatbase.kb.service.IKbCategoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,19 +24,32 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KbCategoryServiceImpl extends ServiceImpl<KbCategoryMapper, KbCategory> implements IKbCategoryService {
 
+    private final KbKnowledgeBaseMapper kbMapper;
+
     @Override
     public List<KbCategory> treeList() {
         List<KbCategory> allCategories = list();
+        
+        LambdaQueryWrapper<KbKnowledgeBase> kbWrapper = new LambdaQueryWrapper<>();
+        kbWrapper.eq(KbKnowledgeBase::getStatus, true);
+        List<KbKnowledgeBase> allKbs = kbMapper.selectList(kbWrapper);
+        
+        Map<Long, Integer> kbCountMap = allKbs.stream()
+                .filter(kb -> kb.getCategoryId() != null)
+                .collect(Collectors.groupingBy(KbKnowledgeBase::getCategoryId, Collectors.summingInt(e -> 1)));
+        
         Map<Long, List<KbCategory>> grouped = allCategories.stream()
                 .collect(Collectors.groupingBy(KbCategory::getParentId));
         
-        return buildTree(0L, grouped);
+        return buildTree(0L, grouped, kbCountMap);
     }
 
-    private List<KbCategory> buildTree(Long parentId, Map<Long, List<KbCategory>> grouped) {
+    private List<KbCategory> buildTree(Long parentId, Map<Long, List<KbCategory>> grouped, Map<Long, Integer> kbCountMap) {
         List<KbCategory> children = grouped.getOrDefault(parentId, new ArrayList<>());
         return children.stream()
                 .peek(c -> {
+                    c.setKbCount(kbCountMap.getOrDefault(c.getId(), 0));
+                    c.setChildren(buildTree(c.getId(), grouped, kbCountMap));
                 })
                 .collect(Collectors.toList());
     }

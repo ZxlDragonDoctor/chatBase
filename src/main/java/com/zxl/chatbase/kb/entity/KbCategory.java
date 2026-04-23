@@ -1,11 +1,13 @@
 package com.zxl.chatbase.kb.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("kb_category")
@@ -31,4 +33,10 @@ public class KbCategory {
     private LocalDateTime updateTime;
 
     private Long createBy;
+
+    @TableField(exist = false)
+    private Integer kbCount;
+
+    @TableField(exist = false)
+    private List<KbCategory> children;
 }

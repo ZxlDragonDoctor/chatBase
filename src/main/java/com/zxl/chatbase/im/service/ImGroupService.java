@@ -7,4 +7,8 @@ public interface ImGroupService {
     ImGroup getOrCreateGroup(String platform, String groupId, String groupName);
 
     void updateGroupInfo(ImGroup group);
+
+    void bindApp(Long id, Long appId, String appName);
+
+    void unbindApp(Long id);
 }

@@ -4,7 +4,7 @@
       <div class="anime-card-header">
         <div>
           <div class="anime-card-title">知识库管理</div>
-          <div class="anime-card-desc">知识库管理 · 文档同步 · FAQ配置</div>
+          <div class="anime-card-desc">分类管理 · 知识库管理 · 文档同步 · FAQ配置</div>
         </div>
         <div class="anime-card-actions">
           <button class="anime-btn blue" @click="doSyncFromDify" :disabled="syncing">
@@ -12,7 +12,11 @@
             <span v-if="syncing">同步中...</span>
             <span v-else>从Dify同步</span>
           </button>
-          <button class="anime-btn primary" @click="showCreateKb = true">
+          <button v-if="activeTab === 'category'" class="anime-btn primary" @click="showCreateCategory = true">
+            <Plus :size="18" />
+            <span>新建分类</span>
+          </button>
+          <button v-if="activeTab === 'kb'" class="anime-btn primary" @click="showCreateKb = true">
             <Plus :size="18" />
             <span>新建知识库</span>
           </button>
@@ -31,26 +35,117 @@
           <span class="anime-empty-text">加载中...</span>
         </div>
 
+        <!-- 分类管理 Tab -->
+        <div v-else-if="activeTab === 'category'" class="category-section">
+          <div v-if="categoryTree.length === 0" class="anime-empty">
+            <div class="anime-empty-icon">📁</div>
+            <div class="anime-empty-text">暂无分类，点击上方按钮创建</div>
+          </div>
+          <div v-else class="category-tree">
+            <div v-for="cat in categoryTree" :key="cat.id" class="category-item">
+              <div class="category-header">
+                <div class="category-info">
+                  <span class="category-icon">{{ cat.icon || '📁' }}</span>
+                  <span class="category-name">{{ cat.name }}</span>
+                  <span class="anime-badge blue">{{ cat.kbCount || 0 }} 知识库</span>
+                </div>
+                <div class="category-actions">
+                  <button class="anime-btn primary sm" @click="addKbToCategory(cat)">
+                    <Plus :size="14" />
+                    <span>添加知识库</span>
+                  </button>
+                  <button class="anime-btn ghost sm" @click="editCategory(cat)">
+                    <Edit3 :size="14" />
+                  </button>
+                  <button class="anime-btn ghost sm danger" @click="deleteCategory(cat)">
+                    <Trash2 :size="14" />
+                  </button>
+                </div>
+              </div>
+              <div v-if="getCategoryKbList(cat.id).length > 0" class="category-kb-list">
+                <div v-for="kb in getCategoryKbList(cat.id)" :key="kb.id" class="kb-mini-card" @click="viewDocs(kb)">
+                  <span class="kb-mini-name">{{ kb.name }}</span>
+                  <span class="anime-badge muted">{{ kb.docCount || 0 }} 文档</span>
+                  <button class="anime-btn ghost xs" @click.stop="editKb(kb)">
+                    <Edit3 :size="12" />
+                  </button>
+                </div>
+              </div>
+              <div v-else class="category-kb-empty">
+                <span style="color: var(--anime-text-muted); font-size: 13px;">该分类下暂无知识库</span>
+                <button class="anime-btn ghost sm" @click="addKbToCategory(cat)">
+                  <Plus :size="14" />
+                  <span>添加</span>
+                </button>
+              </div>
+              <div v-if="cat.children && cat.children.length > 0" class="category-children">
+                <div v-for="child in cat.children" :key="child.id" class="category-item child">
+                  <div class="category-header">
+                    <div class="category-info">
+                      <span class="category-icon">{{ child.icon || '📂' }}</span>
+                      <span class="category-name">{{ child.name }}</span>
+                      <span class="anime-badge purple">{{ child.kbCount || 0 }} 知识库</span>
+                    </div>
+                    <div class="category-actions">
+                      <button class="anime-btn primary sm" @click="addKbToCategory(child)">
+                        <Plus :size="14" />
+                        <span>添加</span>
+                      </button>
+                      <button class="anime-btn ghost sm" @click="editCategory(child)">
+                        <Edit3 :size="14" />
+                      </button>
+                      <button class="anime-btn ghost sm danger" @click="deleteCategory(child)">
+                        <Trash2 :size="14" />
+                      </button>
+                    </div>
+                  </div>
+                  <div v-if="getCategoryKbList(child.id).length > 0" class="category-kb-list">
+                    <div v-for="kb in getCategoryKbList(child.id)" :key="kb.id" class="kb-mini-card" @click="viewDocs(kb)">
+                      <span class="kb-mini-name">{{ kb.name }}</span>
+                      <span class="anime-badge muted">{{ kb.docCount || 0 }} 文档</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 知识库列表 Tab -->
         <div v-else-if="activeTab === 'kb'" class="kb-list">
-          <div v-if="kbList.length === 0" class="anime-empty">
+          <div class="kb-filter-bar">
+            <div class="filter-group">
+              <span style="font-size: 13px; color: var(--anime-text-muted);">筛选分类:</span>
+              <select v-model="filterCategoryId" class="filter-select" @change="filterKbList">
+                <option value="">全部</option>
+                <option v-for="cat in flatCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+              </select>
+            </div>
+            <div class="kb-count-info">
+              共 {{ filteredKbList.length }} 个知识库
+            </div>
+          </div>
+          
+          <div v-if="filteredKbList.length === 0" class="anime-empty">
             <div class="anime-empty-icon">📚</div>
             <div class="anime-empty-text">暂无知识库</div>
           </div>
-          <div class="kb-grid">
-            <div v-for="kb in kbList" :key="kb.id" class="anime-card" style="padding: 20px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                <span style="font-size: 18px; font-weight: 700; color: var(--anime-pink);">{{ kb.name }}</span>
-                <span class="anime-badge blue">{{ kb.docCount || 0 }} 文档</span>
-              </div>
-              <div style="font-size: 14px; color: var(--anime-text-muted); margin-bottom: 12px;">{{ kb.description || '无描述' }}</div>
-              <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
-                <div style="display: flex; gap: 10px;">
-                  <span class="anime-badge" :class="kb.status ? 'green' : 'pink'">{{ kb.status ? '启用' : '禁用' }}</span>
-                  <span class="anime-code">{{ kb.sourceType }}</span>
+          <div v-else class="kb-grid">
+            <div v-for="kb in filteredKbList" :key="kb.id" class="anime-card kb-card">
+              <div class="kb-header">
+                <span class="kb-name">{{ kb.name }}</span>
+                <div class="kb-badges">
+                  <span v-if="kb.categoryId" class="anime-badge purple">{{ getCategoryName(kb.categoryId) }}</span>
+                  <span class="anime-badge blue">{{ kb.docCount || 0 }} 文档</span>
                 </div>
-                <div style="font-size: 13px; color: var(--anime-text-muted);">创建时间: {{ kb.createTime }}</div>
               </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <div class="kb-desc">{{ kb.description || '无描述' }}</div>
+              <div class="kb-meta">
+                <span class="anime-badge" :class="kb.status ? 'green' : 'pink'">{{ kb.status ? '启用' : '禁用' }}</span>
+                <span class="anime-code">{{ kb.sourceType || '手动' }}</span>
+                <span class="kb-time">创建: {{ kb.createTime }}</span>
+              </div>
+              <div class="kb-actions">
                 <button class="anime-btn ghost" @click="viewDocs(kb)">
                   <BookOpen :size="16" />
                   <span>文档</span>
@@ -67,7 +162,7 @@
                   <Edit3 :size="16" />
                   <span>编辑</span>
                 </button>
-                <button class="anime-btn ghost" style="border-color: var(--anime-pink); color: var(--anime-pink);" @click="deleteKb(kb)">
+                <button class="anime-btn ghost danger" @click="deleteKb(kb)">
                   <Trash2 :size="16" />
                   <span>删除</span>
                 </button>
@@ -76,26 +171,23 @@
           </div>
         </div>
 
+        <!-- 文档列表 Tab -->
         <div v-else-if="activeTab === 'doc'" class="doc-section">
           <div v-if="!selectedKb" class="anime-empty">
             <div class="anime-empty-icon">👈</div>
-            <div class="anime-empty-text">请先选择一个知识库查看文档 ✿</div>
+            <div class="anime-empty-text">请先在知识库列表中选择一个知识库查看文档</div>
           </div>
           <template v-else>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-              <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="doc-header">
+              <div class="doc-title-row">
                 <span class="anime-badge green">{{ selectedKb.name }}</span>
-                <span style="font-weight: 600; color: var(--anime-text-primary);">文档列表</span>
+                <span v-if="selectedKb.categoryId" class="anime-badge purple">{{ getCategoryName(selectedKb.categoryId) }}</span>
+                <span style="font-weight: 600;">文档列表</span>
               </div>
-              <div style="display: flex; gap: 12px;">
+              <div class="doc-actions">
                 <div class="doc-search-wrapper">
                   <Search :size="16" class="doc-search-icon" />
-                  <input 
-                    v-model="docSearchKeyword" 
-                    class="doc-search-input" 
-                    placeholder="搜索文档..." 
-                    @input="handleDocSearch"
-                  />
+                  <input v-model="docSearchKeyword" class="doc-search-input" placeholder="搜索文档..." @input="handleDocSearch" />
                   <button v-if="docSearchKeyword" class="doc-search-clear" @click="clearDocSearch">✕</button>
                 </div>
                 <button class="anime-btn primary" @click="showCreateDoc = true">
@@ -122,8 +214,8 @@
                   <td><span class="anime-badge" :class="getSyncColor(doc.syncStatus)">{{ getSyncText(doc.syncStatus) }}</span></td>
                   <td>{{ doc.createTime }}</td>
                   <td style="display: flex; gap: 8px;">
-                    <button class="anime-btn blue" style="padding: 6px 12px;" @click="syncDoc(doc)">同步</button>
-                    <button class="anime-btn ghost" style="padding: 6px 12px; border-color: var(--anime-pink); color: var(--anime-pink);" @click="deleteDoc(doc)">删除</button>
+                    <button class="anime-btn blue sm" @click="syncDoc(doc)">同步</button>
+                    <button class="anime-btn ghost sm danger" @click="deleteDoc(doc)">删除</button>
                   </td>
                 </tr>
               </tbody>
@@ -131,61 +223,159 @@
           </template>
         </div>
 
+        <!-- FAQ Tab -->
         <div v-else-if="activeTab === 'faq'" class="faq-section">
           <div v-if="faqList.length === 0" class="anime-empty">
             <div class="anime-empty-icon">❓</div>
             <div class="anime-empty-text">暂无FAQ</div>
           </div>
-          <div class="faq-grid">
-            <div v-for="faq in faqList" :key="faq.id" class="anime-card" style="padding: 20px;">
-              <div style="font-size: 16px; font-weight: 600; color: var(--anime-blue); margin-bottom: 12px;">{{ faq.question }}</div>
-              <div style="font-size: 14px; color: var(--anime-text-secondary); line-height: 1.6; margin-bottom: 16px;">{{ faq.answer }}</div>
-              <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div v-else class="faq-grid">
+            <div v-for="faq in faqList" :key="faq.id" class="anime-card faq-card">
+              <div class="faq-question">{{ faq.question }}</div>
+              <div class="faq-answer">{{ faq.answer }}</div>
+              <div class="faq-footer">
                 <span class="anime-badge green">命中 {{ faq.hitCount || 0 }}</span>
-                <button class="anime-btn ghost" style="padding: 6px 12px; border-color: var(--anime-pink); color: var(--anime-pink);" @click="deleteFaq(faq)">删除</button>
+                <button class="anime-btn ghost sm danger" @click="deleteFaq(faq)">删除</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="showCreateKb" class="anime-modal-overlay" @click.self="showCreateKb = false">
+      <!-- 创建分类弹窗 -->
+      <div v-if="showCreateCategory" class="anime-modal-overlay" @click.self="showCreateCategory = false">
         <div class="anime-modal">
           <div class="anime-modal-header">
-            <span class="anime-modal-title">✿ 新建知识库 ✿</span>
-            <button class="anime-modal-close" @click="showCreateKb = false">✕</button>
+            <span>{{ editingCategory ? '编辑分类' : '新建分类' }}</span>
+            <button class="anime-modal-close" @click="closeCategoryModal">✕</button>
           </div>
           <div class="anime-modal-body">
-            <div class="form-group">
-              <label class="form-label">名称</label>
-              <input v-model="formKb.name" class="anime-input" placeholder="知识库名称" />
+            <div class="anime-form-group">
+              <label>分类名称 *</label>
+              <input v-model="formCategory.name" class="anime-input" placeholder="如：医疗知识" />
             </div>
-            <div class="form-group">
-              <label class="form-label">描述</label>
-              <textarea v-model="formKb.description" class="anime-textarea" placeholder="知识库描述" />
+            <div class="anime-form-group">
+              <label>分类图标</label>
+              <input v-model="formCategory.icon" class="anime-input" placeholder="如：🏥、📚、💼" />
+            </div>
+            <div class="anime-form-group">
+              <label>父级分类</label>
+              <select v-model="formCategory.parentId" class="anime-input">
+                <option value="">无（顶级分类）</option>
+                <option v-for="cat in flatCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+              </select>
+            </div>
+            <div class="anime-form-group">
+              <label>排序号</label>
+              <input v-model.number="formCategory.sortOrder" class="anime-input" type="number" placeholder="数字越小越靠前" />
+            </div>
+            <div class="anime-form-group">
+              <label>描述</label>
+              <textarea v-model="formCategory.description" class="anime-input" rows="2" placeholder="分类描述"></textarea>
             </div>
           </div>
           <div class="anime-modal-footer">
-            <button class="anime-btn primary" @click="createKbSubmit">确定</button>
-            <button class="anime-btn ghost" @click="showCreateKb = false">取消</button>
+            <button class="anime-btn ghost" @click="closeCategoryModal">取消</button>
+            <button class="anime-btn primary" @click="saveCategory" :disabled="savingCategory">
+              <span v-if="savingCategory">保存中...</span>
+              <span v-else>{{ editingCategory ? '更新' : '创建' }}</span>
+            </button>
           </div>
         </div>
       </div>
 
+      <!-- 选择知识库添加到分类弹窗 -->
+      <div v-if="showAddKbToCategoryModal" class="anime-modal-overlay" @click.self="showAddKbToCategoryModal = false">
+        <div class="anime-modal" style="max-width: 600px;">
+          <div class="anime-modal-header">
+            <span>添加知识库到分类 - {{ selectedCategory?.name }}</span>
+            <button class="anime-modal-close" @click="showAddKbToCategoryModal = false">✕</button>
+          </div>
+          <div class="anime-modal-body">
+            <div class="add-kb-search">
+              <Search :size="16" />
+              <input v-model="addKbSearchKeyword" class="anime-input" placeholder="搜索知识库..." />
+            </div>
+            <div v-if="availableKbList.length === 0" class="anime-empty">
+              <div class="anime-empty-icon">📚</div>
+              <div class="anime-empty-text">暂无可添加的知识库</div>
+            </div>
+            <div v-else class="add-kb-list">
+              <div v-for="kb in filteredAvailableKbList" :key="kb.id" class="add-kb-item" :class="{ selected: selectedKbIds.includes(kb.id) }" @click="toggleKbSelection(kb.id)">
+                <div class="add-kb-info">
+                  <span class="add-kb-name">{{ kb.name }}</span>
+                  <span class="anime-badge blue">{{ kb.docCount || 0 }} 文档</span>
+                  <span v-if="kb.categoryId" class="anime-badge purple">当前: {{ getCategoryName(kb.categoryId) }}</span>
+                  <span v-else class="anime-badge muted">未分类</span>
+                </div>
+                <div class="add-kb-check">
+                  <span v-if="selectedKbIds.includes(kb.id)" class="check-icon">✓</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedKbIds.length > 0" class="selection-info">
+              已选择 {{ selectedKbIds.length }} 个知识库
+            </div>
+          </div>
+          <div class="anime-modal-footer">
+            <button class="anime-btn ghost" @click="showAddKbToCategoryModal = false">取消</button>
+            <button class="anime-btn primary" :disabled="selectedKbIds.length === 0 || addingKb" @click="confirmAddKbToCategory">
+              <span v-if="addingKb">添加中...</span>
+              <span v-else>添加到分类</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 创建知识库弹窗 -->
+      <div v-if="showCreateKb" class="anime-modal-overlay" @click.self="showCreateKb = false">
+        <div class="anime-modal">
+          <div class="anime-modal-header">
+            <span>{{ editingKb ? '编辑知识库' : '新建知识库' }}</span>
+            <button class="anime-modal-close" @click="closeKbModal">✕</button>
+          </div>
+          <div class="anime-modal-body">
+            <div class="anime-form-group">
+              <label>知识库名称 *</label>
+              <input v-model="formKb.name" class="anime-input" placeholder="知识库名称" />
+            </div>
+            <div class="anime-form-group">
+              <label>所属分类</label>
+              <select v-model="formKb.categoryId" class="anime-input">
+                <option value="">无分类</option>
+                <option v-for="cat in flatCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+              </select>
+            </div>
+            <div class="anime-form-group">
+              <label>描述</label>
+              <textarea v-model="formKb.description" class="anime-input" rows="2" placeholder="知识库描述"></textarea>
+            </div>
+          </div>
+          <div class="anime-modal-footer">
+            <button class="anime-btn ghost" @click="closeKbModal">取消</button>
+            <button class="anime-btn primary" @click="saveKb" :disabled="savingKb">
+              <span v-if="savingKb">保存中...</span>
+              <span v-else>{{ editingKb ? '更新' : '创建' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 创建文档弹窗 -->
       <div v-if="showCreateDoc" class="anime-modal-overlay" @click.self="showCreateDoc = false">
         <div class="anime-modal">
           <div class="anime-modal-header">
-            <span class="anime-modal-title">✿ 新增文档 ✿</span>
+            <span>新增文档</span>
             <button class="anime-modal-close" @click="showCreateDoc = false">✕</button>
           </div>
           <div class="anime-modal-body">
-            <div class="form-group">
-              <label class="form-label">标题</label>
+            <div class="anime-form-group">
+              <label>标题 *</label>
               <input v-model="formDoc.title" class="anime-input" placeholder="文档标题" />
             </div>
-            <div class="form-group">
-              <label class="form-label">内容</label>
-              <textarea v-model="formDoc.content" class="anime-textarea" placeholder="文档内容" />
+            <div class="anime-form-group">
+              <label>内容</label>
+              <textarea v-model="formDoc.content" class="anime-input" rows="4" placeholder="文档内容"></textarea>
             </div>
           </div>
           <div class="anime-modal-footer">
@@ -195,10 +385,11 @@
         </div>
       </div>
 
+      <!-- 批量上传弹窗 -->
       <div v-if="showUploadModal" class="anime-modal-overlay" @click.self="showUploadModal = false">
         <div class="anime-modal" style="max-width: 600px;">
           <div class="anime-modal-header">
-            <span class="anime-modal-title">✿ 批量上传文件到知识库 ✿</span>
+            <span>批量上传文件到知识库</span>
             <button class="anime-modal-close" @click="showUploadModal = false">✕</button>
           </div>
           <div class="anime-modal-body">
@@ -216,7 +407,7 @@
                 <div v-for="(f, i) in uploadFiles" :key="i" style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--anime-bg); border-radius: 6px;">
                   <span style="font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis;">{{ f.name }}</span>
                   <span class="anime-code" style="font-size: 12px;">{{ formatSize(f.size) }}</span>
-                  <button class="anime-btn ghost" style="padding: 2px 6px; font-size: 12px;" @click="removeUploadFile(i)">✕</button>
+                  <button class="anime-btn ghost sm" @click="removeUploadFile(i)">✕</button>
                 </div>
               </div>
             </div>
@@ -228,26 +419,12 @@
               <div class="anime-progress" style="margin-bottom: 12px;">
                 <div class="anime-progress-bar" :style="{ width: uploadProgress.progressPercent + '%' }"></div>
               </div>
-              <div v-if="uploadProgress.currentFile" style="color: var(--anime-text-muted); font-size: 13px; margin-bottom: 8px;">
+              <div v-if="uploadProgress.currentFile" style="color: var(--anime-text-muted); font-size: 13px;">
                 当前: {{ uploadProgress.currentFile }}
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto;">
-                <div v-for="(fp, i) in uploadProgress.fileProgresses" :key="i" style="display: flex; align-items: center; gap: 8px; padding: 4px 8px; background: var(--anime-bg); border-radius: 4px; font-size: 13px;">
-                  <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">{{ fp.fileName }}</span>
-                  <span :style="{ color: fp.status === 'success' ? 'var(--anime-green)' : 'var(--anime-pink)' }">
-                    {{ fp.status === 'success' ? '✓' : '✗' }}
-                  </span>
-                </div>
               </div>
             </div>
             <div v-if="uploadResult && !uploadLoading" style="padding: 12px; background: rgba(184, 233, 148, 0.1); border-radius: 8px;">
-              <div style="color: var(--anime-green); font-weight: 600; margin-bottom: 8px;">上传完成: 成功 {{ uploadResult.successCount }} / {{ uploadResult.totalCount }}</div>
-              <div style="display: flex; flex-direction: column; gap: 4px;">
-                <div v-for="(r, i) in uploadResult.results" :key="i" style="display: flex; justify-content: space-between;">
-                  <span>{{ r.fileName }}</span>
-                  <span :style="{ color: r.success ? 'var(--anime-green)' : 'var(--anime-pink)' }">{{ r.message }}</span>
-                </div>
-              </div>
+              <div style="color: var(--anime-green); font-weight: 600;">上传完成: 成功 {{ uploadResult.successCount }} / {{ uploadResult.totalCount }}</div>
             </div>
           </div>
           <div class="anime-modal-footer">
@@ -265,7 +442,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Plus, BookOpen, RefreshCw, Edit3, Trash2, Upload, Download, Search } from 'lucide-vue-next'
 import { api } from '../api/client'
 import { batchUploadToKb, syncFromDify } from '../api/kb'
@@ -277,12 +454,48 @@ import { getOrCreateUserId } from '../lib/user'
 
 const userId = getOrCreateUserId()
 
-const tabs = [{ key: 'kb' as const, label: '知识库' }, { key: 'doc' as const, label: '文档' }, { key: 'faq' as const, label: 'FAQ' }]
-const activeTab = ref<'kb' | 'doc' | 'faq'>('kb')
+interface KbCategory {
+  id: number
+  name: string
+  icon: string
+  parentId: number | null
+  sortOrder: number
+  description: string
+  kbCount?: number
+  children?: KbCategory[]
+}
+
+const tabs = [
+  { key: 'category' as const, label: '分类' },
+  { key: 'kb' as const, label: '知识库' },
+  { key: 'doc' as const, label: '文档' },
+  { key: 'faq' as const, label: 'FAQ' }
+]
+const activeTab = ref<'category' | 'kb' | 'doc' | 'faq'>('category')
 const loading = ref(false)
 const syncing = ref(false)
 const err = ref<string | null>(null)
+
+const categoryTree = ref<KbCategory[]>([])
+const flatCategories = computed(() => {
+  const flat: KbCategory[] = []
+  const flatten = (items: KbCategory[]) => {
+    items.forEach(item => {
+      flat.push(item)
+      if (item.children?.length) flatten(item.children)
+    })
+  }
+  flatten(categoryTree.value)
+  return flat
+})
+
 const kbList = ref<KbKnowledgeBase[]>([])
+const filterCategoryId = ref<string>('')
+const filteredKbList = computed(() => {
+  if (!filterCategoryId.value) return kbList.value
+  return kbList.value.filter(kb => kb.categoryId === Number(filterCategoryId.value))
+})
+
 const docList = ref<KbDocument[]>([])
 const faqList = ref<any[]>([])
 const selectedKb = ref<KbKnowledgeBase | null>(null)
@@ -290,11 +503,33 @@ const docLoading = ref(false)
 const docSearchKeyword = ref('')
 const docSearchTimer = ref<number | null>(null)
 
+const showCreateCategory = ref(false)
 const showCreateKb = ref(false)
 const showCreateDoc = ref(false)
 const showUploadModal = ref(false)
-const formKb = ref({ name: '', description: '' })
+const showAddKbToCategoryModal = ref(false)
+const selectedCategory = ref<KbCategory | null>(null)
+const addKbSearchKeyword = ref('')
+const selectedKbIds = ref<number[]>([])
+const addingKb = ref(false)
+const availableKbList = ref<KbKnowledgeBase[]>([])
+
+const filteredAvailableKbList = computed(() => {
+  const keyword = addKbSearchKeyword.value.toLowerCase().trim()
+  if (!keyword) return availableKbList.value
+  return availableKbList.value.filter(kb => kb.name.toLowerCase().includes(keyword))
+})
+
+const editingCategory = ref<KbCategory | null>(null)
+const editingKb = ref<KbKnowledgeBase | null>(null)
+
+const formCategory = ref({ name: '', icon: '', parentId: '', sortOrder: 0, description: '' })
+const formKb = ref({ name: '', categoryId: '', description: '' })
 const formDoc = ref({ title: '', content: '' })
+
+const savingCategory = ref(false)
+const savingKb = ref(false)
+
 const uploadFiles = ref<File[]>([])
 const uploadLoading = ref(false)
 const uploadResult = ref<BatchUploadResponse | null>(null)
@@ -302,6 +537,16 @@ const uploadKbId = ref<number | null>(null)
 const uploadInputRef = ref<HTMLInputElement | null>(null)
 const uploadProgress = ref<UploadProgress | null>(null)
 const uploadEventSource = ref<EventSource | null>(null)
+
+async function loadCategoryTree() {
+  try {
+    const res = await api.get('/kb/category/tree')
+    categoryTree.value = res.data || []
+  } catch (e) {
+    console.error('加载分类失败', e)
+    categoryTree.value = []
+  }
+}
 
 async function loadKbList() {
   loading.value = true
@@ -313,13 +558,25 @@ async function loadKbList() {
   finally { loading.value = false }
 }
 
+function filterKbList() {}
+
+function getCategoryName(id: number | null) {
+  if (!id) return '无分类'
+  const cat = flatCategories.value.find(c => c.id === id)
+  return cat?.name || '未知'
+}
+
+function getCategoryKbList(catId: number) {
+  return kbList.value.filter(kb => kb.categoryId === catId)
+}
+
 async function doSyncFromDify() {
   syncing.value = true
   err.value = null
   try {
     const result = await syncFromDify()
     if (result.success) {
-      await loadKbList()
+      await Promise.all([loadKbList(), loadCategoryTree()])
     } else {
       err.value = result.message
     }
@@ -335,32 +592,22 @@ async function loadDocList(kbId: number) {
   try {
     const keyword = docSearchKeyword.value.trim()
     const res = await api.get(`/kb/${kbId}/document/page`, { 
-      params: { 
-        pageNum: 1, 
-        pageSize: 100,
-        title: keyword || undefined
-      } 
+      params: { pageNum: 1, pageSize: 100, title: keyword || undefined } 
     })
     docList.value = res.data.records || []
   } finally { docLoading.value = false }
 }
 
 function handleDocSearch() {
-  if (docSearchTimer.value) {
-    clearTimeout(docSearchTimer.value)
-  }
+  if (docSearchTimer.value) clearTimeout(docSearchTimer.value)
   docSearchTimer.value = window.setTimeout(() => {
-    if (selectedKb.value) {
-      loadDocList(selectedKb.value.id)
-    }
+    if (selectedKb.value) loadDocList(selectedKb.value.id)
   }, 300)
 }
 
 function clearDocSearch() {
   docSearchKeyword.value = ''
-  if (selectedKb.value) {
-    loadDocList(selectedKb.value.id)
-  }
+  if (selectedKb.value) loadDocList(selectedKb.value.id)
 }
 
 async function loadFaqList() {
@@ -371,36 +618,167 @@ async function loadFaqList() {
 }
 
 function loadTabData() {
-  if (activeTab.value === 'kb' && kbList.value.length === 0) loadKbList()
+  if (activeTab.value === 'category') {
+    if (categoryTree.value.length === 0) loadCategoryTree()
+    if (kbList.value.length === 0) loadKbList()
+  }
+  else if (activeTab.value === 'kb' && kbList.value.length === 0) loadKbList()
   else if (activeTab.value === 'faq') loadFaqList()
 }
 
-async function createKbSubmit() {
+async function saveCategory() {
+  if (!formCategory.value.name) {
+    err.value = '请输入分类名称'
+    return
+  }
+  savingCategory.value = true
   try {
-    await api.post('/kb', formKb.value)
-    showCreateKb.value = false
-    formKb.value = { name: '', description: '' }
-    loadKbList()
-  } catch (e: any) { err.value = e?.message || '创建失败' }
+    const payload = {
+      name: formCategory.value.name,
+      icon: formCategory.value.icon,
+      parentId: formCategory.value.parentId ? Number(formCategory.value.parentId) : null,
+      sortOrder: formCategory.value.sortOrder || 0,
+      description: formCategory.value.description
+    }
+    if (editingCategory.value) {
+      await api.put('/kb/category', { ...payload, id: editingCategory.value.id })
+    } else {
+      await api.post('/kb/category', payload)
+    }
+    closeCategoryModal()
+    loadCategoryTree()
+  } catch (e: any) {
+    err.value = e.response?.data?.message || '保存失败'
+  } finally {
+    savingCategory.value = false
+  }
 }
 
-async function createDocSubmit() {
-  if (!selectedKb.value) return
+function editCategory(cat: KbCategory) {
+  editingCategory.value = cat
+  formCategory.value = {
+    name: cat.name,
+    icon: cat.icon || '',
+    parentId: cat.parentId ? String(cat.parentId) : '',
+    sortOrder: cat.sortOrder || 0,
+    description: cat.description || ''
+  }
+  showCreateCategory.value = true
+}
+
+async function deleteCategory(cat: KbCategory) {
+  if (cat.kbCount && cat.kbCount > 0) {
+    alert('该分类下有知识库，无法删除')
+    return
+  }
+  if (!confirm(`确定删除分类 "${cat.name}"？`)) return
   try {
-    await api.post('/kb/document', { ...formDoc.value, knowledgeBaseId: selectedKb.value.id })
-    showCreateDoc.value = false
-    formDoc.value = { title: '', content: '' }
-    loadDocList(selectedKb.value.id)
-  } catch (e: any) { err.value = e?.message || '创建失败' }
+    await api.delete(`/kb/category/${cat.id}`)
+    loadCategoryTree()
+  } catch (e: any) {
+    err.value = e.response?.data?.message || '删除失败'
+  }
+}
+
+function closeCategoryModal() {
+  showCreateCategory.value = false
+  editingCategory.value = null
+  formCategory.value = { name: '', icon: '', parentId: '', sortOrder: 0, description: '' }
+  err.value = ''
+}
+
+function viewCategoryKb(cat: KbCategory) {
+  filterCategoryId.value = String(cat.id)
+  activeTab.value = 'kb'
+}
+
+function addKbToCategory(cat: KbCategory) {
+  selectedCategory.value = cat
+  addKbSearchKeyword.value = ''
+  selectedKbIds.value = []
+  availableKbList.value = kbList.value
+  showAddKbToCategoryModal.value = true
+}
+
+function toggleKbSelection(kbId: number) {
+  const idx = selectedKbIds.value.indexOf(kbId)
+  if (idx >= 0) {
+    selectedKbIds.value.splice(idx, 1)
+  } else {
+    selectedKbIds.value.push(kbId)
+  }
+}
+
+async function confirmAddKbToCategory() {
+  if (selectedKbIds.value.length === 0 || !selectedCategory.value) return
+  addingKb.value = true
+  try {
+    for (const kbId of selectedKbIds.value) {
+      await api.put('/kb', { id: kbId, categoryId: selectedCategory.value.id })
+    }
+    showAddKbToCategoryModal.value = false
+    await Promise.all([loadKbList(), loadCategoryTree()])
+  } catch (e: any) {
+    err.value = e.response?.data?.message || '添加失败'
+  } finally {
+    addingKb.value = false
+  }
+}
+
+async function saveKb() {
+  if (!formKb.value.name) {
+    err.value = '请输入知识库名称'
+    return
+  }
+  savingKb.value = true
+  try {
+    const payload = {
+      name: formKb.value.name,
+      categoryId: formKb.value.categoryId ? Number(formKb.value.categoryId) : null,
+      description: formKb.value.description
+    }
+    if (editingKb.value) {
+      await api.put('/kb', { ...payload, id: editingKb.value.id })
+    } else {
+      await api.post('/kb', payload)
+    }
+    closeKbModal()
+    loadKbList()
+  } catch (e: any) {
+    err.value = e.response?.data?.message || '保存失败'
+  } finally {
+    savingKb.value = false
+  }
+}
+
+function editKb(kb: KbKnowledgeBase) {
+  editingKb.value = kb
+  formKb.value = {
+    name: kb.name,
+    categoryId: kb.categoryId ? String(kb.categoryId) : '',
+    description: kb.description || ''
+  }
+  showCreateKb.value = true
 }
 
 async function deleteKb(kb: KbKnowledgeBase) {
-  if (!confirm(`确定删除知识库 "${kb.name}" 吗？`)) return
-  try { await api.delete(`/kb/${kb.id}`); loadKbList() }
-  catch (e: any) { err.value = e?.message || '删除失败' }
+  if (!confirm(`确定删除知识库 "${kb.name}"？`)) return
+  try {
+    await api.delete(`/kb/${kb.id}`)
+    loadKbList()
+  } catch (e: any) {
+    err.value = e.response?.data?.message || '删除失败'
+  }
 }
 
-function viewDocs(kb: KbKnowledgeBase) { 
+function closeKbModal() {
+  showCreateKb.value = false
+  editingKb.value = null
+  formKb.value = { name: '', categoryId: '', description: '' }
+  err.value = ''
+}
+
+function viewDocs(kb: KbKnowledgeBase) {
   selectedKb.value = kb
   docSearchKeyword.value = ''
   activeTab.value = 'doc'
@@ -415,12 +793,26 @@ async function syncKb(kb: KbKnowledgeBase) {
   } catch { alert('同步失败') }
 }
 
-function editKb(kb: KbKnowledgeBase) { alert('编辑功能开发中') }
+async function createDocSubmit() {
+  if (!selectedKb.value || !formDoc.value.title) return
+  try {
+    await api.post('/kb/document', { ...formDoc.value, knowledgeBaseId: selectedKb.value.id })
+    showCreateDoc.value = false
+    formDoc.value = { title: '', content: '' }
+    loadDocList(selectedKb.value.id)
+  } catch (e: any) {
+    err.value = e?.message || '创建失败'
+  }
+}
 
 async function deleteDoc(doc: KbDocument) {
-  if (!confirm(`确定删除文档 "${doc.title}" 吗？`)) return
-  try { await api.delete(`/kb/document/${doc.id}`); if (selectedKb.value) loadDocList(selectedKb.value.id) }
-  catch (e: any) { err.value = e?.message || '删除失败' }
+  if (!confirm(`确定删除文档 "${doc.title}"？`)) return
+  try {
+    await api.delete(`/kb/document/${doc.id}`)
+    if (selectedKb.value) loadDocList(selectedKb.value.id)
+  } catch (e: any) {
+    err.value = e?.message || '删除失败'
+  }
 }
 
 async function syncDoc(doc: KbDocument) {
@@ -432,13 +824,26 @@ async function syncDoc(doc: KbDocument) {
 }
 
 async function deleteFaq(faq: any) {
-  if (!confirm('确定删除FAQ吗？')) return
-  try { await api.delete(`/kb/conversation/faq/${faq.id}`); loadFaqList() }
-  catch (e: any) { err.value = e?.message || '删除失败' }
+  if (!confirm('确定删除FAQ？')) return
+  try {
+    await api.delete(`/kb/conversation/faq/${faq.id}`)
+    loadFaqList()
+  } catch (e: any) {
+    err.value = e?.message || '删除失败'
+  }
 }
 
-function getSyncColor(status: number): string { if (status === 1) return 'green'; if (status === 2) return 'pink'; return 'muted' }
-function getSyncText(status: number): string { if (status === 1) return '已同步'; if (status === 2) return '失败'; return '未同步' }
+function getSyncColor(status: number): string {
+  if (status === 1) return 'green'
+  if (status === 2) return 'pink'
+  return 'muted'
+}
+
+function getSyncText(status: number): string {
+  if (status === 1) return '已同步'
+  if (status === 2) return '失败'
+  return '未同步'
+}
 
 function openUploadModal(kb: KbKnowledgeBase) {
   uploadKbId.value = kb.id
@@ -503,13 +908,10 @@ async function doBatchUpload() {
     
     uploadEventSource.value = subscribeUploadProgress(
       taskId,
-      (progress) => {
-        uploadProgress.value = progress
-      },
+      (progress) => { uploadProgress.value = progress },
       (progress) => {
         uploadProgress.value = progress
         uploadLoading.value = false
-        
         uploadResult.value = {
           totalCount: progress.totalCount,
           successCount: progress.successCount,
@@ -521,7 +923,6 @@ async function doBatchUpload() {
             difyFileId: fp.difyFileId || undefined
           }))
         }
-        
         uploadFiles.value = []
         if (selectedKb.value) loadDocList(selectedKb.value.id)
       },
@@ -543,63 +944,187 @@ function formatSize(bytes: number): string {
 }
 
 onMounted(async () => {
-  await loadKbList()
+  await Promise.all([loadCategoryTree(), loadKbList()])
 })
 
 onUnmounted(() => {
-  if (uploadEventSource.value) {
-    uploadEventSource.value.close()
-  }
+  if (uploadEventSource.value) uploadEventSource.value.close()
 })
 </script>
 
 <style scoped>
-.kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.faq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-.doc-section { min-height: 300px; }
+.category-section { min-height: 300px; }
+.category-tree { display: flex; flex-direction: column; gap: 16px; }
+.category-item { 
+  background: var(--anime-bg-card); 
+  border: 2px solid var(--anime-border); 
+  border-radius: var(--anime-radius-lg); 
+  padding: 16px; 
+}
+.category-item.child { 
+  margin-left: 24px; 
+  background: rgba(168, 216, 234, 0.05); 
+  border-color: var(--anime-blue); 
+}
+.category-header { display: flex; align-items: center; justify-content: space-between; }
+.category-info { display: flex; align-items: center; gap: 10px; }
+.category-icon { font-size: 20px; }
+.category-name { font-size: 16px; font-weight: 600; color: var(--anime-pink); }
+.category-actions { display: flex; gap: 6px; }
+.category-children { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.category-kb-list { 
+  margin-top: 12px; 
+  padding-top: 12px; 
+  border-top: 2px solid var(--anime-border); 
+  display: flex; flex-wrap: wrap; gap: 8px; 
+}
+.kb-mini-card { 
+  display: flex; align-items: center; gap: 8px; 
+  padding: 8px 12px; 
+  background: rgba(255, 183, 197, 0.05); 
+  border-radius: var(--anime-radius-lg); 
+  cursor: pointer; 
+  transition: all 0.2s; 
+}
+.kb-mini-card:hover { background: rgba(255, 183, 197, 0.1); }
+.kb-mini-name { font-size: 14px; color: var(--anime-text-primary); }
 
-.doc-search-wrapper {
+.category-kb-empty {
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 2px solid var(--anime-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.add-kb-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
   background: var(--anime-bg);
   border: 2px solid var(--anime-border);
   border-radius: var(--anime-radius-lg);
-  transition: all 0.3s ease;
 }
 
-.doc-search-wrapper:focus-within {
-  border-color: var(--anime-blue);
+.add-kb-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.doc-search-icon {
-  color: var(--anime-text-muted);
-}
-
-.doc-search-input {
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  color: var(--anime-text-primary);
-  outline: none;
-  width: 150px;
-}
-
-.doc-search-input::placeholder {
-  color: var(--anime-text-muted);
-}
-
-.doc-search-clear {
-  background: transparent;
-  border: none;
-  color: var(--anime-text-muted);
+.add-kb-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
   cursor: pointer;
-  padding: 2px 6px;
-  font-size: 12px;
+  transition: all 0.2s;
 }
 
-.doc-search-clear:hover {
-  color: var(--anime-pink);
+.add-kb-item:hover {
+  border-color: var(--anime-blue);
+  background: rgba(168, 216, 234, 0.05);
 }
+
+.add-kb-item.selected {
+  border-color: var(--anime-pink);
+  background: rgba(255, 183, 197, 0.1);
+}
+
+.add-kb-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-kb-name {
+  font-weight: 600;
+  color: var(--anime-text-primary);
+}
+
+.add-kb-check {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--anime-pink);
+  color: white;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
+.selection-info {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(255, 183, 197, 0.1);
+  border-radius: var(--anime-radius-lg);
+  font-size: 13px;
+  color: var(--anime-pink);
+  font-weight: 600;
+}
+
+.kb-filter-bar { 
+  display: flex; align-items: center; justify-content: space-between; 
+  margin-bottom: 16px; 
+  padding: 12px 16px; 
+  background: rgba(168, 216, 234, 0.05); 
+  border-radius: var(--anime-radius-lg); 
+}
+.filter-group { display: flex; align-items: center; gap: 10px; }
+.filter-select { 
+  padding: 6px 12px; 
+  background: var(--anime-bg); 
+  border: 2px solid var(--anime-border); 
+  border-radius: var(--anime-radius-lg); 
+  font-size: 14px; 
+  color: var(--anime-text-primary); 
+  outline: none; 
+}
+.filter-select:focus { border-color: var(--anime-pink); }
+.kb-count-info { font-size: 13px; color: var(--anime-text-muted); }
+
+.kb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.kb-card { padding: 20px; border: 2px solid var(--anime-border); }
+.kb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.kb-name { font-size: 18px; font-weight: 700; color: var(--anime-pink); }
+.kb-badges { display: flex; gap: 6px; }
+.kb-desc { font-size: 14px; color: var(--anime-text-muted); margin-bottom: 12px; }
+.kb-meta { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.kb-time { font-size: 13px; color: var(--anime-text-muted); }
+.kb-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.doc-section { min-height: 300px; }
+.doc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.doc-title-row { display: flex; align-items: center; gap: 10px; }
+.doc-actions { display: flex; gap: 12px; }
+
+.doc-search-wrapper {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--anime-bg);
+  border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg);
+}
+.doc-search-wrapper:focus-within { border-color: var(--anime-blue); }
+.doc-search-icon { color: var(--anime-text-muted); }
+.doc-search-input { border: none; background: transparent; font-size: 13px; color: var(--anime-text-primary); outline: none; width: 150px; }
+.doc-search-input::placeholder { color: var(--anime-text-muted); }
+.doc-search-clear { background: transparent; border: none; color: var(--anime-text-muted); cursor: pointer; padding: 2px 6px; font-size: 12px; }
+
+.faq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.faq-card { padding: 20px; }
+.faq-question { font-size: 16px; font-weight: 600; color: var(--anime-blue); margin-bottom: 12px; }
+.faq-answer { font-size: 14px; color: var(--anime-text-secondary); line-height: 1.6; margin-bottom: 16px; }
+.faq-footer { display: flex; justify-content: space-between; align-items: center; }
+
+.anime-btn.sm { padding: 4px 8px; font-size: 12px; }
+.anime-btn.xs { padding: 2px 6px; font-size: 11px; }
+.danger { border-color: var(--anime-pink); color: var(--anime-pink); }
 </style>

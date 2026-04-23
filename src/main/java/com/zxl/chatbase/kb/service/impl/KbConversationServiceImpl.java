@@ -86,6 +86,41 @@ public class KbConversationServiceImpl extends ServiceImpl<KbConversationMapper,
     }
 
     @Override
+    public void saveConversationWithCostAndApp(String conversationId, String userId, String channel, String groupId,
+                                           String query, String answer, Long appId, String appName,
+                                           Integer promptTokens, Integer completionTokens,
+                                           BigDecimal promptPrice, BigDecimal completionPrice, BigDecimal totalPrice,
+                                           Integer latencyMs, boolean success, String errorMessage) {
+        try {
+            KbConversation conversation = new KbConversation();
+            conversation.setConversationId(conversationId);
+            conversation.setUserId(userId);
+            conversation.setChannel(channel);
+            conversation.setGroupId(groupId);
+            conversation.setQuery(query);
+            conversation.setAnswer(answer);
+            conversation.setAppId(appId);
+            conversation.setAppName(appName);
+            conversation.setPromptTokens(promptTokens != null ? promptTokens : 0);
+            conversation.setCompletionTokens(completionTokens != null ? completionTokens : 0);
+            conversation.setTokens((promptTokens != null ? promptTokens : 0) + (completionTokens != null ? completionTokens : 0));
+            conversation.setPromptPrice(promptPrice != null ? promptPrice : BigDecimal.ZERO);
+            conversation.setCompletionPrice(completionPrice != null ? completionPrice : BigDecimal.ZERO);
+            conversation.setTotalPrice(totalPrice != null ? totalPrice : BigDecimal.ZERO);
+            conversation.setLatencyMs(latencyMs != null ? latencyMs : 0);
+            conversation.setStatus(success);
+            conversation.setErrorMessage(errorMessage);
+            conversation.setCreateTime(LocalDateTime.now());
+            
+            save(conversation);
+            log.info("会话记录保存成功(含费用和应用): conversationId={}, appId={}, appName={}, tokens={}, cost={}", 
+                    conversationId, appId, appName, conversation.getTokens(), conversation.getTotalPrice());
+        } catch (Exception e) {
+            log.error("保存会话记录失败", e);
+        }
+    }
+
+    @Override
     public Page<KbConversation> pageList(String userId, String channel, Integer pageNum, Integer pageSize) {
         Page<KbConversation> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<KbConversation> wrapper = new LambdaQueryWrapper<>();

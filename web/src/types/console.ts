@@ -21,11 +21,14 @@ export type ConsoleOverview = {
 }
 
 export type GroupSummary = {
+  id: number
   platform: string
   groupId: string
   groupName?: string | null
   messageCount: number
   lastMessageTime: string | null
+  appId?: number | null
+  appName?: string | null
 }
 
 export type GroupMessageItem = {

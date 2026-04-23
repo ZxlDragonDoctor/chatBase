@@ -45,4 +45,30 @@ public class ImGroupServiceImpl implements ImGroupService {
             imGroupMapper.updateById(group);
         }
     }
+
+    @Override
+    public void bindApp(Long id, Long appId, String appName) {
+        ImGroup group = imGroupMapper.selectById(id);
+        if (group == null) {
+            throw new RuntimeException("群组不存在");
+        }
+        group.setAppId(appId);
+        group.setAppName(appName);
+        group.setUpdateTime(LocalDateTime.now());
+        imGroupMapper.updateById(group);
+        log.info("群组绑定应用: groupId={}, appId={}, appName={}", id, appId, appName);
+    }
+
+    @Override
+    public void unbindApp(Long id) {
+        ImGroup group = imGroupMapper.selectById(id);
+        if (group == null) {
+            throw new RuntimeException("群组不存在");
+        }
+        group.setAppId(null);
+        group.setAppName(null);
+        group.setUpdateTime(LocalDateTime.now());
+        imGroupMapper.updateById(group);
+        log.info("群组解除应用绑定: groupId={}", id);
+    }
 }

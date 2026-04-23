@@ -9,6 +9,7 @@ import KnowledgePage from './pages/KnowledgePage.vue'
 import LoginPage from './pages/LoginPage.vue'
 import FeedbackPage from './pages/FeedbackPage.vue'
 import FaqPage from './pages/FaqPage.vue'
+import AppPage from './pages/AppPage.vue'
 import './styles/anime.css'
 
 const router = createRouter({
@@ -23,6 +24,7 @@ const router = createRouter({
     { path: '/console/statistics', component: StatisticsPage },
     { path: '/console/im', component: ImGroupsPage },
     { path: '/console/knowledge', component: KnowledgePage },
+    { path: '/console/app', component: AppPage },
     { path: '/console/faq', component: FaqPage },
   ],
 })

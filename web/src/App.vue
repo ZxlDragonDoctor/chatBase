@@ -37,6 +37,10 @@
           <BookOpen class="anime-nav-icon" :size="22" />
           <span>知识库</span>
         </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/app" active-class="active">
+          <Bot class="anime-nav-icon" :size="22" />
+          <span>应用</span>
+        </RouterLink>
         <RouterLink class="anime-nav-item" to="/console/faq" active-class="active">
           <HelpCircle class="anime-nav-icon" :size="22" />
           <span>FAQ</span>
@@ -74,7 +78,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut } from 'lucide-vue-next'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()

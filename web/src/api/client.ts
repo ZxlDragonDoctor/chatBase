@@ -5,6 +5,8 @@ export const api = axios.create({
   timeout: 120_000,
 })
 
+export const client = api
+
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('chatbase_token')
   if (token) {

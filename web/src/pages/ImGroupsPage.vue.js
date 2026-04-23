@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue';
 import { RefreshCw } from 'lucide-vue-next';
 import { fetchGroups, fetchGroupMessages } from '../api/console';
+import { api } from '../api/client';
 const platformTabs = [{ key: 'all', label: '全部' }, { key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }];
 const platform = ref('all');
 const groups = ref([]);
@@ -13,6 +14,18 @@ const msgLoading = ref(false);
 const msgTotal = ref(0);
 const page = ref(0);
 const pageSize = 40;
+const appList = ref([]);
+const bindAppId = ref('');
+const bindSaving = ref(false);
+async function loadApps() {
+    try {
+        const resp = await api.get('/kb/app/list');
+        appList.value = resp.data || [];
+    }
+    catch (e) {
+        console.error('加载应用列表失败', e);
+    }
+}
 async function reload() {
     loading.value = true;
     err.value = null;
@@ -24,6 +37,10 @@ async function reload() {
                 selected.value = null;
                 messages.value = [];
             }
+            else {
+                selected.value = still;
+                bindAppId.value = still.appId || '';
+            }
         }
     }
     catch (e) {
@@ -34,7 +51,12 @@ async function reload() {
         loading.value = false;
     }
 }
-function selectGroup(g) { selected.value = g; page.value = 0; loadMessages(); }
+function selectGroup(g) {
+    selected.value = g;
+    bindAppId.value = g.appId || '';
+    page.value = 0;
+    loadMessages();
+}
 async function loadMessages() {
     if (!selected.value)
         return;
@@ -57,6 +79,32 @@ async function loadMessages() {
     }
     finally {
         msgLoading.value = false;
+    }
+}
+async function saveBindApp() {
+    if (!selected.value)
+        return;
+    bindSaving.value = true;
+    try {
+        const appId = bindAppId.value ? Number(bindAppId.value) : null;
+        const appName = appId ? appList.value.find(a => a.id === appId)?.name : null;
+        if (appId) {
+            await api.put(`/console/groups/${selected.value.id}/app`, { appId, appName });
+            selected.value.appId = appId;
+            selected.value.appName = appName;
+        }
+        else {
+            await api.delete(`/console/groups/${selected.value.id}/app`);
+            selected.value.appId = null;
+            selected.value.appName = null;
+        }
+        reload();
+    }
+    catch (e) {
+        err.value = e?.response?.data?.message || '绑定失败';
+    }
+    finally {
+        bindSaving.value = false;
     }
 }
 function getPlatformColor(p) { if (p === 'qq')
@@ -86,7 +134,10 @@ function formatTime(t) {
     return String(t);
 }
 watch(platform, () => { selected.value = null; messages.value = []; reload(); });
-onMounted(reload);
+onMounted(() => {
+    reload();
+    loadApps();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -94,6 +145,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['im-split-view']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -206,6 +258,13 @@ for (const [g] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
         ...{ style: {} },
     });
     (__VLS_ctx.getGroupName(g));
+    if (g.appName) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "anime-badge blue" },
+            ...{ style: {} },
+        });
+        (g.appName);
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ style: {} },
     });
@@ -245,6 +304,54 @@ else {
         ...{ style: {} },
     });
     (__VLS_ctx.getGroupName(__VLS_ctx.selected));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+        value: (__VLS_ctx.bindAppId),
+        ...{ class: "anime-app-select" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+        value: "",
+    });
+    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            key: (app.id),
+            value: (app.id),
+        });
+        (app.icon || '🤖');
+        (app.name);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.saveBindApp) },
+        ...{ class: "anime-btn primary" },
+        disabled: (__VLS_ctx.bindSaving),
+    });
+    if (__VLS_ctx.bindSaving) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
+    if (__VLS_ctx.selected.appName) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ style: {} },
+        });
+        (__VLS_ctx.selected.appName);
+    }
     if (__VLS_ctx.msgLoading) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "anime-empty" },
@@ -344,11 +451,16 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['blue']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-detail-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-loader-spinner']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
@@ -377,9 +489,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             msgTotal: msgTotal,
             page: page,
             pageSize: pageSize,
+            appList: appList,
+            bindAppId: bindAppId,
+            bindSaving: bindSaving,
             reload: reload,
             selectGroup: selectGroup,
             loadMessages: loadMessages,
+            saveBindApp: saveBindApp,
             getPlatformColor: getPlatformColor,
             getPlatformLabel: getPlatformLabel,
             getGroupName: getGroupName,

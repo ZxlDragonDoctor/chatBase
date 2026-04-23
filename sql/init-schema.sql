@@ -421,6 +421,30 @@ CREATE TABLE IF NOT EXISTS `kb_keyword` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='关键词统计表';
 
 -- =============================================
+-- 应用模块：应用配置表
+-- =============================================
+CREATE TABLE IF NOT EXISTS `kb_app` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '应用ID',
+  `name` VARCHAR(100) NOT NULL COMMENT '应用名称',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '应用描述',
+  `icon` VARCHAR(50) DEFAULT NULL COMMENT '应用图标',
+  `dify_api_key` VARCHAR(100) NOT NULL COMMENT 'Dify应用API Key',
+  `dify_app_name` VARCHAR(100) DEFAULT NULL COMMENT 'Dify应用名称（从/v1/info获取）',
+  `dify_app_mode` VARCHAR(50) DEFAULT NULL COMMENT 'Dify应用模式：chatbot/agent/workflow/completion',
+  `category_id` BIGINT DEFAULT NULL COMMENT '关联的分类ID',
+  `is_default` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否为默认应用',
+  `is_public` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否公开：0-仅创建者可用，1-所有用户可用',
+  `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建者',
+  `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_category_id` (`category_id`),
+  KEY `idx_create_by` (`create_by`),
+  KEY `idx_status` (`status`),
+  KEY `idx_is_default` (`is_default`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='应用配置表';
+
 -- 初始化管理员账号
 -- 默认账号：admin / admin123
 -- 密码使用 BCrypt 加密（strength=10）
@@ -428,3 +452,28 @@ CREATE TABLE IF NOT EXISTS `kb_keyword` (
 INSERT INTO `sys_user` (`username`, `password`, `nickname`, `role`, `status`, `create_time`, `update_time`, `is_deleted`)
 VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7n92KIX.Hp4W3VpL3k7mK2S', '管理员', 'admin', 1, NOW(), NOW(), 0)
 ON DUPLICATE KEY UPDATE `update_time` = NOW();
+
+-- 初始化默认应用（使用配置文件中的默认API Key）
+-- 注意：实际部署时需要替换为真实的API Key
+INSERT INTO `kb_app` (`name`, `description`, `icon`, `dify_api_key`, `dify_app_name`, `dify_app_mode`, `is_default`, `is_public`, `create_by`, `status`, `create_time`, `update_time`)
+VALUES ('默认助手', '系统默认应用，使用配置文件中的API Key', 'robot', 'PLACEHOLDER_API_KEY', NULL, NULL, 1, 1, 'admin', 1, NOW(), NOW())
+ON DUPLICATE KEY UPDATE `update_time` = NOW();
+
+-- =============================================
+-- 已有数据库升级脚本（ALTER语句）
+-- 注意：新部署会自动创建完整表结构，以下仅用于已有数据库升级
+-- =============================================
+
+-- im_group表添加应用绑定字段
+ALTER TABLE `im_group` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '绑定的应用ID' AFTER `kb_id`;
+ALTER TABLE `im_group` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT '应用名称（冗余字段）' AFTER `app_id`;
+ALTER TABLE `im_group` ADD KEY `idx_app_id` (`app_id`);
+
+-- kb_conversation表添加应用关联字段
+ALTER TABLE `kb_conversation` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '使用的应用ID' AFTER `knowledge_base_id`;
+ALTER TABLE `kb_conversation` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT '应用名称' AFTER `app_id`;
+ALTER TABLE `kb_conversation` ADD KEY `idx_app_id` (`app_id`);
+
+-- kb_statistics表添加应用维度字段
+ALTER TABLE `kb_statistics` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '应用ID' AFTER `knowledge_base_id`;
+ALTER TABLE `kb_statistics` ADD KEY `idx_app_id` (`app_id`);cd

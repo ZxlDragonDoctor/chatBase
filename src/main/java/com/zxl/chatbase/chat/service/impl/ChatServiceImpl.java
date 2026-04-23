@@ -11,8 +11,10 @@ import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import com.zxl.chatbase.kb.entity.KbConversation;
 import com.zxl.chatbase.kb.entity.KbFaq;
+import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.service.IKbConversationService;
 import com.zxl.chatbase.kb.service.IKbFaqService;
+import com.zxl.chatbase.kb.service.IKbAppService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,6 +40,7 @@ public class ChatServiceImpl implements ChatService {
     private final IKbConversationService kbConversationService;
     private final ChatSessionService chatSessionService;
     private final IKbFaqService faqService;
+    private final IKbAppService appService;
     private final ThreadPoolExecutor threadPool;
 
     private static final String CONVERSATION_KEY_PREFIX = "chat:conversation:";
@@ -45,12 +48,38 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public DifyChatResponse chat(String channel, String userId, String groupId, String query) {
-        return chat(channel, userId, groupId, query, null);
+        return chat(null, channel, userId, groupId, query, null);
     }
 
     @Override
     public DifyChatResponse chat(String channel, String userId, String groupId, String query, List<FileInfo> files) {
+        return chat(null, channel, userId, groupId, query, files);
+    }
+
+    @Override
+    public DifyChatResponse chat(Long appId, String channel, String userId, String groupId, String query) {
+        return chat(appId, channel, userId, groupId, query, null);
+    }
+
+    @Override
+    public DifyChatResponse chat(Long appId, String channel, String userId, String groupId, String query, List<FileInfo> files) {
         String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
+        
+        String apiKey = null;
+        KbApp app = null;
+        if (appId != null) {
+            app = appService.getById(appId);
+            if (app != null && app.getStatus()) {
+                apiKey = app.getDifyApiKey();
+            }
+        }
+        if (apiKey == null) {
+            app = appService.getDefaultApp();
+            if (app != null) {
+                apiKey = app.getDifyApiKey();
+                appId = app.getId();
+            }
+        }
         
         try {
             KbFaq faq = faqService.findSimilar(query);
@@ -103,11 +132,11 @@ public class ChatServiceImpl implements ChatService {
         }
 
         long startTime = System.currentTimeMillis();
-        DifyChatResponse response = difyService.sendChatMessage(req);
+        DifyChatResponse response = apiKey != null 
+            ? difyService.sendChatMessage(req, apiKey) 
+            : difyService.sendChatMessage(req);
         int latencyMs = (int) (System.currentTimeMillis() - startTime);
 
-        // 保存会话记录到 kb_conversation
-        // 优先使用 conversationId，其次使用 response.getId()，最后生成 UUID
         String convIdFromResponse = response != null ? response.getConversationId() : null;
         String responseId = response != null ? response.getId() : null;
         String finalConversationId = selectConversationId(convIdFromResponse, responseId, conversationId);
@@ -139,21 +168,23 @@ public class ChatServiceImpl implements ChatService {
             }
         }
         
-        log.info("chat方法对话完成: success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
-                success, promptTokens, completionTokens, totalPrice, latencyMs);
+        log.info("chat方法对话完成: appId={}, success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
+                appId, success, promptTokens, completionTokens, totalPrice, latencyMs);
         
         String errorMessage = null;
         if (!success && response != null && response.getAnswer() != null) {
             errorMessage = response.getAnswer();
         }
 
-        kbConversationService.saveConversationWithCost(
+        kbConversationService.saveConversationWithCostAndApp(
                 finalConversationId,
                 safeUserId,
                 channel,
                 groupId,
                 query,
                 answer,
+                appId,
+                app != null ? app.getName() : null,
                 promptTokens,
                 completionTokens,
                 promptPrice,
@@ -238,7 +269,28 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public DifyChatResponse chatWithSession(String sessionId, String channel, String userId, String query, List<FileInfo> files) {
+        return chatWithSession(sessionId, null, channel, userId, query, files);
+    }
+
+    @Override
+    public DifyChatResponse chatWithSession(String sessionId, Long appId, String channel, String userId, String query, List<FileInfo> files) {
         String safeUserId = StringUtils.hasText(userId) ? userId : "abc-123";
+        
+        String apiKey = null;
+        KbApp app = null;
+        if (appId != null) {
+            app = appService.getById(appId);
+            if (app != null && app.getStatus()) {
+                apiKey = app.getDifyApiKey();
+            }
+        }
+        if (apiKey == null) {
+            app = appService.getDefaultApp();
+            if (app != null) {
+                apiKey = app.getDifyApiKey();
+                appId = app.getId();
+            }
+        }
         
         try {
             KbFaq faq = faqService.findSimilar(query);
@@ -295,7 +347,9 @@ public class ChatServiceImpl implements ChatService {
         req.setFiles(files);
 
         long startTime = System.currentTimeMillis();
-        DifyChatResponse response = difyService.sendChatMessage(req);
+        DifyChatResponse response = apiKey != null 
+            ? difyService.sendChatMessage(req, apiKey) 
+            : difyService.sendChatMessage(req);
         int latencyMs = (int) (System.currentTimeMillis() - startTime);
 
         boolean success = response != null && response.getAnswer() != null && !response.getAnswer().isEmpty();
@@ -325,8 +379,8 @@ public class ChatServiceImpl implements ChatService {
             }
         }
         
-        log.info("chatWithSession对话完成: sessionId={}, success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
-                sessionId, success, promptTokens, completionTokens, totalPrice, latencyMs);
+        log.info("chatWithSession对话完成: sessionId={}, appId={}, success={}, promptTokens={}, completionTokens={}, totalPrice={}, latencyMs={}", 
+                sessionId, appId, success, promptTokens, completionTokens, totalPrice, latencyMs);
         
         String errorMessage = null;
         if (!success && response != null && response.getAnswer() != null) {
@@ -344,6 +398,8 @@ public class ChatServiceImpl implements ChatService {
         message.setChannel(channel);
         message.setQuery(query);
         message.setAnswer(answer);
+        message.setAppId(appId);
+        message.setAppName(app != null ? app.getName() : null);
         message.setPromptTokens(promptTokens);
         message.setCompletionTokens(completionTokens);
         message.setPromptPrice(promptPrice);
