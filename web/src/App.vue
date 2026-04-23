@@ -53,6 +53,10 @@
           <Mail class="anime-nav-icon" :size="22" />
           <span>反馈</span>
         </RouterLink>
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/feedback-manage" active-class="active">
+          <ClipboardList class="anime-nav-icon" :size="22" />
+          <span>反馈管理</span>
+        </RouterLink>
       </nav>
       <div class="anime-nav-footer">
         <div class="anime-user-info" v-if="currentUser">
@@ -78,17 +82,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot } from 'lucide-vue-next'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
 
 const isLoginPage = computed(() => route.path === '/login')
 const currentUser = computed(() => localStorage.getItem('chatbase_user'))
+const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin')
 
 function handleLogout() {
   localStorage.removeItem('chatbase_token')
   localStorage.removeItem('chatbase_user')
+  localStorage.removeItem('chatbase_role')
+  localStorage.removeItem('chatbase_admin_id')
   router.push('/login')
 }
 </script>

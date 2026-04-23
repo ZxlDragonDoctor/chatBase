@@ -1,14 +1,17 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { computed } from 'vue';
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router';
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot } from 'lucide-vue-next';
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList } from 'lucide-vue-next';
 const router = useRouter();
 const route = useRoute();
 const isLoginPage = computed(() => route.path === '/login');
 const currentUser = computed(() => localStorage.getItem('chatbase_user'));
+const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin');
 function handleLogout() {
     localStorage.removeItem('chatbase_token');
     localStorage.removeItem('chatbase_user');
+    localStorage.removeItem('chatbase_role');
+    localStorage.removeItem('chatbase_admin_id');
     router.push('/login');
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -285,6 +288,35 @@ else {
     }, ...__VLS_functionalComponentArgsRest(__VLS_65));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     var __VLS_63;
+    if (__VLS_ctx.isAdmin) {
+        const __VLS_68 = {}.RouterLink;
+        /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+        // @ts-ignore
+        const __VLS_69 = __VLS_asFunctionalComponent(__VLS_68, new __VLS_68({
+            ...{ class: "anime-nav-item" },
+            to: "/console/feedback-manage",
+            activeClass: "active",
+        }));
+        const __VLS_70 = __VLS_69({
+            ...{ class: "anime-nav-item" },
+            to: "/console/feedback-manage",
+            activeClass: "active",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_69));
+        __VLS_71.slots.default;
+        const __VLS_72 = {}.ClipboardList;
+        /** @type {[typeof __VLS_components.ClipboardList, ]} */ ;
+        // @ts-ignore
+        const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }));
+        const __VLS_74 = __VLS_73({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        var __VLS_71;
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-nav-footer" },
     });
@@ -292,17 +324,17 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "anime-user-info" },
         });
-        const __VLS_68 = {}.User;
+        const __VLS_76 = {}.User;
         /** @type {[typeof __VLS_components.User, ]} */ ;
         // @ts-ignore
-        const __VLS_69 = __VLS_asFunctionalComponent(__VLS_68, new __VLS_68({
+        const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
             ...{ class: "anime-nav-icon" },
             size: (16),
         }));
-        const __VLS_70 = __VLS_69({
+        const __VLS_78 = __VLS_77({
             ...{ class: "anime-nav-icon" },
             size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_69));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_77));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "anime-user-name" },
         });
@@ -313,15 +345,15 @@ else {
             ...{ onClick: (__VLS_ctx.handleLogout) },
             ...{ class: "anime-btn ghost sm" },
         });
-        const __VLS_72 = {}.LogOut;
+        const __VLS_80 = {}.LogOut;
         /** @type {[typeof __VLS_components.LogOut, ]} */ ;
         // @ts-ignore
-        const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
+        const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
             size: (16),
         }));
-        const __VLS_74 = __VLS_73({
+        const __VLS_82 = __VLS_81({
             size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_81));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -334,11 +366,11 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.main)({
         ...{ class: "anime-main" },
     });
-    const __VLS_76 = {}.RouterView;
+    const __VLS_84 = {}.RouterView;
     /** @type {[typeof __VLS_components.RouterView, ]} */ ;
     // @ts-ignore
-    const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({}));
-    const __VLS_78 = __VLS_77({}, ...__VLS_functionalComponentArgsRest(__VLS_77));
+    const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({}));
+    const __VLS_86 = __VLS_85({}, ...__VLS_functionalComponentArgsRest(__VLS_85));
 }
 /** @type {__VLS_StyleScopedClasses['anime-bg-decor']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-floating-stars']} */ ;
@@ -353,6 +385,8 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-brand-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-brand-sub']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
@@ -395,8 +429,10 @@ const __VLS_self = (await import('vue')).defineComponent({
             User: User,
             LogOut: LogOut,
             Bot: Bot,
+            ClipboardList: ClipboardList,
             isLoginPage: isLoginPage,
             currentUser: currentUser,
+            isAdmin: isAdmin,
             handleLogout: handleLogout,
         };
     },

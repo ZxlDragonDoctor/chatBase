@@ -24,6 +24,12 @@ async function handleLogin() {
         if (resp.success && resp.token) {
             localStorage.setItem('chatbase_token', resp.token);
             localStorage.setItem('chatbase_user', resp.user?.username || username.value.trim());
+            if (resp.user?.role) {
+                localStorage.setItem('chatbase_role', resp.user.role);
+            }
+            if (resp.user?.id) {
+                localStorage.setItem('chatbase_admin_id', resp.user.id.toString());
+            }
             router.push('/console/dashboard');
         }
         else {

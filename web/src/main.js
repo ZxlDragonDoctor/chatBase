@@ -8,6 +8,7 @@ import ImGroupsPage from './pages/ImGroupsPage.vue';
 import KnowledgePage from './pages/KnowledgePage.vue';
 import LoginPage from './pages/LoginPage.vue';
 import FeedbackPage from './pages/FeedbackPage.vue';
+import FeedbackManagePage from './pages/FeedbackManagePage.vue';
 import FaqPage from './pages/FaqPage.vue';
 import AppPage from './pages/AppPage.vue';
 import './styles/anime.css';
@@ -25,15 +26,21 @@ const router = createRouter({
         { path: '/console/knowledge', component: KnowledgePage },
         { path: '/console/app', component: AppPage },
         { path: '/console/faq', component: FaqPage },
+        { path: '/console/feedback-manage', component: FeedbackManagePage, meta: { requiresAdmin: true } },
     ],
 });
 router.beforeEach((to, _from, next) => {
     const token = localStorage.getItem('chatbase_token');
+    const userRole = localStorage.getItem('chatbase_role');
     const isPublic = to.meta?.public;
+    const requiresAdmin = to.meta?.requiresAdmin;
     if (!token && !isPublic) {
         next('/login');
     }
     else if (token && to.path === '/login') {
+        next('/console/dashboard');
+    }
+    else if (requiresAdmin && userRole !== 'admin') {
         next('/console/dashboard');
     }
     else {

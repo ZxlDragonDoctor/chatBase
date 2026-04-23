@@ -11,6 +11,8 @@ public interface IFeedbackFormService {
 
     Page<KbFeedback> getFeedbackPage(Integer status, Integer pageNum, Integer pageSize);
 
+    Page<KbFeedback> getUserFeedbackPage(String userId, Integer pageNum, Integer pageSize);
+
     KbFeedback getFeedbackById(Long id);
 
     boolean replyFeedback(Long id, Long adminId, String reply);

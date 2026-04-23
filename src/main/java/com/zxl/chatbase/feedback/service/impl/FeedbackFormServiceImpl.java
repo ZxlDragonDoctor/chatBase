@@ -56,6 +56,15 @@ public class FeedbackFormServiceImpl implements IFeedbackFormService {
     }
 
     @Override
+    public Page<KbFeedback> getUserFeedbackPage(String userId, Integer pageNum, Integer pageSize) {
+        LambdaQueryWrapper<KbFeedback> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KbFeedback::getUserId, userId);
+        wrapper.orderByDesc(KbFeedback::getCreateTime);
+        
+        return feedbackMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+    }
+
+    @Override
     public KbFeedback getFeedbackById(Long id) {
         return feedbackMapper.selectById(id);
     }

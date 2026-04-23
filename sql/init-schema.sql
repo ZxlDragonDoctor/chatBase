@@ -445,13 +445,6 @@ CREATE TABLE IF NOT EXISTS `kb_app` (
   KEY `idx_is_default` (`is_default`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='应用配置表';
 
--- 初始化管理员账号
--- 默认账号：admin / admin123
--- 密码使用 BCrypt 加密（strength=10）
--- =============================================
-INSERT INTO `sys_user` (`username`, `password`, `nickname`, `role`, `status`, `create_time`, `update_time`, `is_deleted`)
-VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7n92KIX.Hp4W3VpL3k7mK2S', '管理员', 'admin', 1, NOW(), NOW(), 0)
-ON DUPLICATE KEY UPDATE `update_time` = NOW();
 
 -- 初始化默认应用（使用配置文件中的默认API Key）
 -- 注意：实际部署时需要替换为真实的API Key

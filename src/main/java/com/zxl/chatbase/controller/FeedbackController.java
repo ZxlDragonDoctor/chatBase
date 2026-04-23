@@ -66,6 +66,14 @@ public class FeedbackController {
         return feedbackFormService.getFeedbackPage(status, pageNum, pageSize);
     }
 
+    @GetMapping("/user/{userId}")
+    public Page<KbFeedback> getUserFeedbackPage(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
+        return feedbackFormService.getUserFeedbackPage(userId, pageNum, pageSize);
+    }
+
     @GetMapping("/{id}")
     public KbFeedback getFeedbackById(@PathVariable Long id) {
         return feedbackFormService.getFeedbackById(id);

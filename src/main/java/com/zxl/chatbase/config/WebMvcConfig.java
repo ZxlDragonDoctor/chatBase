@@ -13,6 +13,7 @@ import java.util.List;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
+    private final AdminInterceptor adminInterceptor;
 
     private static final List<String> EXCLUDE_PATHS = Arrays.asList(
             "/api/user/login",
@@ -22,9 +23,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/console/**",
             "/api/kb/**",
             "/api/upload/**",
+            "/api/feedback/submit",
+            "/api/feedback/user/**",
             "/qq/**",
             "/intellrobot/**",
             "/error"
+    );
+
+    private static final List<String> ADMIN_PATHS = Arrays.asList(
+            "/api/feedback/page",
+            "/api/feedback/*/reply",
+            "/api/feedback/*/status",
+            "/api/feedback/stats"
     );
 
     @Override
@@ -32,5 +42,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(EXCLUDE_PATHS);
+        
+        registry.addInterceptor(adminInterceptor)
+                .addPathPatterns(ADMIN_PATHS);
     }
 }
