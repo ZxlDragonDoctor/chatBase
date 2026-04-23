@@ -1,7 +1,7 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle } from 'lucide-vue-next';
+import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-vue-next';
 import { api } from '../api/client';
 const difyConsoleUrl = 'https://cloud.dify.ai';
 const appList = ref([]);
@@ -762,20 +762,35 @@ if (__VLS_ctx.showCreateModal) {
         (__VLS_ctx.verifiedInfo.difyAppName);
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
         (__VLS_ctx.verifiedInfo.difyAppMode);
+        if (__VLS_ctx.verifiedInfo.difyAppMode === 'workflow' || __VLS_ctx.verifiedInfo.difyAppMode === 'agent') {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "verified-warning" },
+            });
+            const __VLS_48 = {}.AlertCircle;
+            /** @type {[typeof __VLS_components.AlertCircle, ]} */ ;
+            // @ts-ignore
+            const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
+                size: (14),
+            }));
+            const __VLS_50 = __VLS_49({
+                size: (14),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_49));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        }
     }
     if (__VLS_ctx.verifyError) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "verified-error" },
         });
-        const __VLS_48 = {}.XCircle;
+        const __VLS_52 = {}.XCircle;
         /** @type {[typeof __VLS_components.XCircle, ]} */ ;
         // @ts-ignore
-        const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
+        const __VLS_53 = __VLS_asFunctionalComponent(__VLS_52, new __VLS_52({
             size: (16),
         }));
-        const __VLS_50 = __VLS_49({
+        const __VLS_54 = __VLS_53({
             size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_49));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_53));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         (__VLS_ctx.verifyError);
     }
@@ -913,19 +928,19 @@ if (__VLS_ctx.showGroupsModal) {
                     ...{ class: "group-members" },
                 });
                 (g.memberCount || 0);
-                const __VLS_52 = {}.RouterLink;
+                const __VLS_56 = {}.RouterLink;
                 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
                 // @ts-ignore
-                const __VLS_53 = __VLS_asFunctionalComponent(__VLS_52, new __VLS_52({
+                const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
                 }));
-                const __VLS_54 = __VLS_53({
+                const __VLS_58 = __VLS_57({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
-                }, ...__VLS_functionalComponentArgsRest(__VLS_53));
-                __VLS_55.slots.default;
-                var __VLS_55;
+                }, ...__VLS_functionalComponentArgsRest(__VLS_57));
+                __VLS_59.slots.default;
+                var __VLS_59;
             }
         }
     }
@@ -959,19 +974,19 @@ if (__VLS_ctx.showGroupsModal) {
                     ...{ class: "group-members" },
                 });
                 (g.memberCount || 0);
-                const __VLS_56 = {}.RouterLink;
+                const __VLS_60 = {}.RouterLink;
                 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
                 // @ts-ignore
-                const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
+                const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
                 }));
-                const __VLS_58 = __VLS_57({
+                const __VLS_62 = __VLS_61({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
-                }, ...__VLS_functionalComponentArgsRest(__VLS_57));
-                __VLS_59.slots.default;
-                var __VLS_59;
+                }, ...__VLS_functionalComponentArgsRest(__VLS_61));
+                __VLS_63.slots.default;
+                var __VLS_63;
             }
         }
     }
@@ -1145,6 +1160,7 @@ if (__VLS_ctx.showKbModal) {
 /** @type {__VLS_StyleScopedClasses['blue']} */ ;
 /** @type {__VLS_StyleScopedClasses['verified-info']} */ ;
 /** @type {__VLS_StyleScopedClasses['verified-success']} */ ;
+/** @type {__VLS_StyleScopedClasses['verified-warning']} */ ;
 /** @type {__VLS_StyleScopedClasses['verified-error']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
@@ -1213,6 +1229,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             ExternalLink: ExternalLink,
             CheckCircle: CheckCircle,
             XCircle: XCircle,
+            AlertCircle: AlertCircle,
             difyConsoleUrl: difyConsoleUrl,
             appList: appList,
             categoryList: categoryList,

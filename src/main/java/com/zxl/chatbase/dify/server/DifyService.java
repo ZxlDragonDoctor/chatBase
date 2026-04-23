@@ -93,6 +93,15 @@ public interface DifyService {
      */
     String createDatasetDocument(String title, String content);
 
+    /**
+     * 将一段纯文本作为文档写入指定的 Dify 知识库
+     *
+     * @param datasetId 知识库ID
+     * @param title     文档标题
+     * @param content   文本内容
+     * @return Dify 返回的文档ID（如果失败返回 null）
+     */
+    String createDatasetDocument(String datasetId, String title, String content);
 
     /**
      * 用文本更新 Dify 知识库中的已有文档
@@ -103,6 +112,17 @@ public interface DifyService {
      * @return 是否更新成功
      */
     boolean updateDatasetDocument(String documentId, String name, String content);
+
+    /**
+     * 用文本更新指定知识库中的已有文档
+     *
+     * @param datasetId  知识库ID
+     * @param documentId 文档ID
+     * @param name       文档名称
+     * @param content    文本内容
+     * @return 是否更新成功
+     */
+    boolean updateDatasetDocument(String datasetId, String documentId, String name, String content);
 
     /**
      * 创建一个新的空知识库（Dataset）

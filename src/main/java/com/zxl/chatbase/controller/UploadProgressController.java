@@ -25,7 +25,9 @@ public class UploadProgressController {
     }
 
     @GetMapping("/progress/{taskId}/sse")
-    public SseEmitter subscribeProgress(@PathVariable String taskId) {
+    public SseEmitter subscribeProgress(
+            @PathVariable String taskId,
+            @RequestParam(required = false) String token) {
         SseEmitter emitter = new SseEmitter(180000L);
         
         emitter.onCompletion(() -> {});

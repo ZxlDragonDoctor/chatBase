@@ -25,22 +25,28 @@ public class UploadProgressService {
         UploadProgress progress = progressMap.get(taskId);
         if (progress == null) return;
 
-        progress.setCompletedCount(progress.getCompletedCount() + 1);
-        progress.setCurrentFile(fileName);
         progress.setUpdateTime(java.time.LocalDateTime.now());
 
-        if (success) {
-            progress.setSuccessCount(progress.getSuccessCount() + 1);
-        } else {
-            progress.setFailedCount(progress.getFailedCount() + 1);
-        }
+        if (fileName != null) {
+            progress.setCompletedCount(progress.getCompletedCount() + 1);
+            progress.setCurrentFile(fileName);
 
-        UploadProgress.FileProgress fileProgress = new UploadProgress.FileProgress();
-        fileProgress.setFileName(fileName);
-        fileProgress.setStatus(success ? "success" : "failed");
-        fileProgress.setMessage(message);
-        fileProgress.setDifyFileId(difyFileId);
-        progress.getFileProgresses().add(fileProgress);
+            if (success) {
+                progress.setSuccessCount(progress.getSuccessCount() + 1);
+            } else {
+                progress.setFailedCount(progress.getFailedCount() + 1);
+            }
+
+            UploadProgress.FileProgress fileProgress = new UploadProgress.FileProgress();
+            fileProgress.setFileName(fileName);
+            fileProgress.setStatus(success ? "success" : "failed");
+            fileProgress.setMessage(message);
+            fileProgress.setDifyFileId(difyFileId);
+            progress.getFileProgresses().add(fileProgress);
+        } else {
+            progress.setCurrentFile(message);
+            progress.setStatus("uploading");
+        }
 
         if (progress.getCompletedCount() >= progress.getTotalCount()) {
             progress.setStatus("completed");

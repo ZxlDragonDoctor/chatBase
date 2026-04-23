@@ -27,6 +27,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
         }
+        
+        if (token == null) {
+            token = request.getParameter("token");
+        }
 
         if (token == null || !tokenService.validateToken(token)) {
             response.setStatus(401);

@@ -51,7 +51,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
         String difyDocId = null;
         if (kb != null && kb.getDifyDatasetId() != null && document.getContent() != null) {
-            difyDocId = difyService.createDatasetDocument(document.getTitle(), document.getContent());
+            difyDocId = difyService.createDatasetDocument(kb.getDifyDatasetId(), document.getTitle(), document.getContent());
             if (difyDocId != null) {
                 log.info("文档同步到Dify成功, documentId={}", difyDocId);
             } else {
@@ -154,10 +154,10 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
             boolean success;
 
             if (difyDocId != null && !difyDocId.isEmpty()) {
-                success = difyService.updateDatasetDocument(difyDocId, doc.getTitle(), doc.getContent());
+                success = difyService.updateDatasetDocument(kb.getDifyDatasetId(), difyDocId, doc.getTitle(), doc.getContent());
                 log.info("更新Dify文档: documentId={}, success={}", difyDocId, success);
             } else {
-                difyDocId = difyService.createDatasetDocument(doc.getTitle(), doc.getContent());
+                difyDocId = difyService.createDatasetDocument(kb.getDifyDatasetId(), doc.getTitle(), doc.getContent());
                 success = difyDocId != null;
                 if (success) {
                     doc.setDifyDocumentId(difyDocId);

@@ -46,6 +46,18 @@ const showCreateCategory = ref(false);
 const showCreateKb = ref(false);
 const showCreateDoc = ref(false);
 const showUploadModal = ref(false);
+const showAddKbToCategoryModal = ref(false);
+const selectedCategory = ref(null);
+const addKbSearchKeyword = ref('');
+const selectedKbIds = ref([]);
+const addingKb = ref(false);
+const availableKbList = ref([]);
+const filteredAvailableKbList = computed(() => {
+    const keyword = addKbSearchKeyword.value.toLowerCase().trim();
+    if (!keyword)
+        return availableKbList.value;
+    return availableKbList.value.filter(kb => kb.name.toLowerCase().includes(keyword));
+});
 const editingCategory = ref(null);
 const editingKb = ref(null);
 const formCategory = ref({ name: '', icon: '', parentId: '', sortOrder: 0, description: '' });
@@ -227,13 +239,38 @@ function viewCategoryKb(cat) {
     activeTab.value = 'kb';
 }
 function addKbToCategory(cat) {
-    editingKb.value = null;
-    formKb.value = {
-        name: '',
-        categoryId: String(cat.id),
-        description: ''
-    };
-    showCreateKb.value = true;
+    selectedCategory.value = cat;
+    addKbSearchKeyword.value = '';
+    selectedKbIds.value = [];
+    availableKbList.value = kbList.value;
+    showAddKbToCategoryModal.value = true;
+}
+function toggleKbSelection(kbId) {
+    const idx = selectedKbIds.value.indexOf(kbId);
+    if (idx >= 0) {
+        selectedKbIds.value.splice(idx, 1);
+    }
+    else {
+        selectedKbIds.value.push(kbId);
+    }
+}
+async function confirmAddKbToCategory() {
+    if (selectedKbIds.value.length === 0 || !selectedCategory.value)
+        return;
+    addingKb.value = true;
+    try {
+        for (const kbId of selectedKbIds.value) {
+            await api.put('/kb', { id: kbId, categoryId: selectedCategory.value.id });
+        }
+        showAddKbToCategoryModal.value = false;
+        await Promise.all([loadKbList(), loadCategoryTree()]);
+    }
+    catch (e) {
+        err.value = e.response?.data?.message || '添加失败';
+    }
+    finally {
+        addingKb.value = false;
+    }
 }
 async function saveKb() {
     if (!formKb.value.name) {
@@ -469,6 +506,8 @@ let __VLS_components;
 let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['category-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-mini-card']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['doc-search-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['doc-search-input']} */ ;
@@ -1496,6 +1535,141 @@ if (__VLS_ctx.showCreateCategory) {
         (__VLS_ctx.editingCategory ? '更新' : '创建');
     }
 }
+if (__VLS_ctx.showAddKbToCategoryModal) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showAddKbToCategoryModal))
+                    return;
+                __VLS_ctx.showAddKbToCategoryModal = false;
+            } },
+        ...{ class: "anime-modal-overlay" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-modal" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-modal-header" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.selectedCategory?.name);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showAddKbToCategoryModal))
+                    return;
+                __VLS_ctx.showAddKbToCategoryModal = false;
+            } },
+        ...{ class: "anime-modal-close" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-modal-body" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "add-kb-search" },
+    });
+    const __VLS_72 = {}.Search;
+    /** @type {[typeof __VLS_components.Search, ]} */ ;
+    // @ts-ignore
+    const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
+        size: (16),
+    }));
+    const __VLS_74 = __VLS_73({
+        size: (16),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ class: "anime-input" },
+        placeholder: "搜索知识库...",
+    });
+    (__VLS_ctx.addKbSearchKeyword);
+    if (__VLS_ctx.availableKbList.length === 0) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty-icon" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty-text" },
+        });
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "add-kb-list" },
+        });
+        for (const [kb] of __VLS_getVForSourceType((__VLS_ctx.filteredAvailableKbList))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ onClick: (...[$event]) => {
+                        if (!(__VLS_ctx.showAddKbToCategoryModal))
+                            return;
+                        if (!!(__VLS_ctx.availableKbList.length === 0))
+                            return;
+                        __VLS_ctx.toggleKbSelection(kb.id);
+                    } },
+                key: (kb.id),
+                ...{ class: "add-kb-item" },
+                ...{ class: ({ selected: __VLS_ctx.selectedKbIds.includes(kb.id) }) },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "add-kb-info" },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "add-kb-name" },
+            });
+            (kb.name);
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "anime-badge blue" },
+            });
+            (kb.docCount || 0);
+            if (kb.categoryId) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "anime-badge purple" },
+                });
+                (__VLS_ctx.getCategoryName(kb.categoryId));
+            }
+            else {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "anime-badge muted" },
+                });
+            }
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ class: "add-kb-check" },
+            });
+            if (__VLS_ctx.selectedKbIds.includes(kb.id)) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "check-icon" },
+                });
+            }
+        }
+    }
+    if (__VLS_ctx.selectedKbIds.length > 0) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "selection-info" },
+        });
+        (__VLS_ctx.selectedKbIds.length);
+    }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-modal-footer" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.showAddKbToCategoryModal))
+                    return;
+                __VLS_ctx.showAddKbToCategoryModal = false;
+            } },
+        ...{ class: "anime-btn ghost" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.confirmAddKbToCategory) },
+        ...{ class: "anime-btn primary" },
+        disabled: (__VLS_ctx.selectedKbIds.length === 0 || __VLS_ctx.addingKb),
+    });
+    if (__VLS_ctx.addingKb) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
+}
 if (__VLS_ctx.showCreateKb) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ onClick: (...[$event]) => {
@@ -1683,15 +1857,15 @@ if (__VLS_ctx.showUploadModal) {
         ...{ onClick: (__VLS_ctx.triggerUploadInput) },
         ...{ class: "anime-btn primary" },
     });
-    const __VLS_72 = {}.Upload;
+    const __VLS_76 = {}.Upload;
     /** @type {[typeof __VLS_components.Upload, ]} */ ;
     // @ts-ignore
-    const __VLS_73 = __VLS_asFunctionalComponent(__VLS_72, new __VLS_72({
+    const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
         size: (18),
     }));
-    const __VLS_74 = __VLS_73({
+    const __VLS_78 = __VLS_77({
         size: (18),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_73));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_77));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
         ...{ style: {} },
@@ -1782,15 +1956,15 @@ if (__VLS_ctx.showUploadModal) {
         ...{ class: "anime-btn primary" },
         disabled: (__VLS_ctx.uploadLoading || __VLS_ctx.uploadFiles.length === 0),
     });
-    const __VLS_76 = {}.Upload;
+    const __VLS_80 = {}.Upload;
     /** @type {[typeof __VLS_components.Upload, ]} */ ;
     // @ts-ignore
-    const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
+    const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
         size: (18),
     }));
-    const __VLS_78 = __VLS_77({
+    const __VLS_82 = __VLS_81({
         size: (18),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_77));
+    }, ...__VLS_functionalComponentArgsRest(__VLS_81));
     if (__VLS_ctx.uploadLoading) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     }
@@ -1995,6 +2169,34 @@ if (__VLS_ctx.showUploadModal) {
 /** @type {__VLS_StyleScopedClasses['anime-modal-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-modal-close']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-modal-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-search']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-info']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['blue']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['purple']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['muted']} */ ;
+/** @type {__VLS_StyleScopedClasses['add-kb-check']} */ ;
+/** @type {__VLS_StyleScopedClasses['check-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['selection-info']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal-footer']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal-overlay']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal-header']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal-close']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-modal-body']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
@@ -2070,6 +2272,13 @@ const __VLS_self = (await import('vue')).defineComponent({
             showCreateKb: showCreateKb,
             showCreateDoc: showCreateDoc,
             showUploadModal: showUploadModal,
+            showAddKbToCategoryModal: showAddKbToCategoryModal,
+            selectedCategory: selectedCategory,
+            addKbSearchKeyword: addKbSearchKeyword,
+            selectedKbIds: selectedKbIds,
+            addingKb: addingKb,
+            availableKbList: availableKbList,
+            filteredAvailableKbList: filteredAvailableKbList,
             editingCategory: editingCategory,
             editingKb: editingKb,
             formCategory: formCategory,
@@ -2094,6 +2303,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             deleteCategory: deleteCategory,
             closeCategoryModal: closeCategoryModal,
             addKbToCategory: addKbToCategory,
+            toggleKbSelection: toggleKbSelection,
+            confirmAddKbToCategory: confirmAddKbToCategory,
             saveKb: saveKb,
             editKb: editKb,
             deleteKb: deleteKb,

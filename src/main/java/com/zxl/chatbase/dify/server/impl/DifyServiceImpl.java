@@ -646,20 +646,22 @@ public class DifyServiceImpl implements DifyService {
     @Override
     public String createDatasetDocument(String title, String content) {
         String datasetId = difyConfig.getDatasetId();
+        return createDatasetDocument(datasetId, title, content);
+    }
+
+    @Override
+    public String createDatasetDocument(String datasetId, String title, String content) {
         if (datasetId == null || datasetId.trim().isEmpty()) {
-            log.warn("未配置 difyApp.datasetId，跳过同步到知识库");
+            log.warn("Dataset ID为空，跳过同步到知识库");
             return null;
         }
 
-        // 按 Dify 知识库接口文档，纯文本创建文档的路径为：
-        // POST /datasets/{dataset_id}/document/create-by-text
         String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-text";
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
         httpPost.setHeader("Content-Type", "application/json");
 
         try {
-            // 参考 Dify 数据集文档接口结构，构造一个简单的手动文本文档
             HashMap<String, Object> body = new HashMap<>();
             body.put("name", title);
             body.put("indexing_technique", "high_quality");
@@ -671,17 +673,16 @@ public class DifyServiceImpl implements DifyService {
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 int statusCode = response.getStatusLine().getStatusCode();
-                log.info("Dify 数据集文档创建响应: status={}, body={}", statusCode, resp);
+                log.info("Dify 文档创建响应: datasetId={}, status={}, body={}", datasetId, statusCode, resp);
                 if (statusCode == 200 || statusCode == 201) {
-                    // 文档创建成功，解析出 id
                     return objectMapper.readTree(resp).path("document").path("id").asText(null);
                 } else {
-                    log.error("创建 Dify 知识库文档失败: status={}, body={}", statusCode, resp);
+                    log.error("创建 Dify 知识库文档失败: datasetId={}, status={}, body={}", datasetId, statusCode, resp);
                     return null;
                 }
             }
         } catch (Exception e) {
-            log.error("调用 Dify 知识库文档接口异常", e);
+            log.error("调用 Dify 知识库文档接口异常: datasetId={}", datasetId, e);
             return null;
         }
     }
@@ -689,8 +690,13 @@ public class DifyServiceImpl implements DifyService {
     @Override
     public boolean updateDatasetDocument(String documentId, String name, String content) {
         String datasetId = difyConfig.getDatasetId();
+        return updateDatasetDocument(datasetId, documentId, name, content);
+    }
+
+    @Override
+    public boolean updateDatasetDocument(String datasetId, String documentId, String name, String content) {
         if (datasetId == null || datasetId.trim().isEmpty()) {
-            log.warn("未配置 difyApp.datasetId，无法更新文档");
+            log.warn("Dataset ID为空，无法更新文档");
             return false;
         }
         if (documentId == null || documentId.trim().isEmpty()) {
@@ -698,7 +704,6 @@ public class DifyServiceImpl implements DifyService {
             return false;
         }
 
-        // POST /datasets/{dataset_id}/documents/{document_id}/update-by-text
         String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId + "/update-by-text";
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
@@ -715,7 +720,7 @@ public class DifyServiceImpl implements DifyService {
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 int statusCode = response.getStatusLine().getStatusCode();
-                log.info("Dify 文档更新响应: status={}, body={}", statusCode, resp);
+                log.info("Dify 文档更新响应: datasetId={}, documentId={}, status={}, body={}", datasetId, documentId, statusCode, resp);
                 if (statusCode == 200 || statusCode == 201) {
                     log.info("Dify 文档更新成功: documentId={}", documentId);
                     return true;

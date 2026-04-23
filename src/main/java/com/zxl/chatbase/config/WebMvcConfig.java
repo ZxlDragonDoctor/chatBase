@@ -21,6 +21,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/statistics/**",
             "/api/console/**",
             "/api/kb/**",
+            "/api/upload/**",
             "/qq/**",
             "/intellrobot/**",
             "/error"

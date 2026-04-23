@@ -32,7 +32,11 @@ export function subscribeUploadProgress(
   onComplete: (progress: UploadProgress) => void,
   onError: (error: string) => void
 ): EventSource {
-  const url = `${api.defaults.baseURL}/upload/progress/${taskId}/sse`
+  const token = localStorage.getItem('chatbase_token')
+  let url = `${api.defaults.baseURL}/upload/progress/${taskId}/sse`
+  if (token) {
+    url += `?token=${encodeURIComponent(token)}`
+  }
   const eventSource = new EventSource(url)
   
   eventSource.addEventListener('progress', (event) => {

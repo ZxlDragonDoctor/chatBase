@@ -121,15 +121,24 @@ public class KnowledgeBaseController {
             @RequestPart("files") List<MultipartFile> files,
             @RequestPart(value = "user", required = false) String user
     ) {
+        log.info("批量上传请求: kbId={}, filesCount={}", id, files.size());
+        
         KbKnowledgeBase kb = knowledgeBaseService.getById(id);
         if (kb == null) {
+            log.warn("知识库不存在: {}", id);
             return Map.of("success", false, "message", "知识库不存在", "taskId", "");
+        }
+        
+        String datasetId = kb.getDifyDatasetId();
+        if (datasetId == null || datasetId.isBlank()) {
+            log.warn("知识库未关联Dify Dataset: kbId={}, difyDatasetId={}", id, datasetId);
+            return Map.of("success", false, "message", "知识库未关联Dify Dataset，请先同步到Dify", "taskId", "");
         }
         
         String taskId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         progressService.createProgress(taskId, files.size());
+        log.info("创建上传任务: taskId={}, totalCount={}, datasetId={}", taskId, files.size(), datasetId);
         
-        String datasetId = kb.getDifyDatasetId();
         String uploadUser = (user != null && !user.isBlank()) ? user : "kb-upload";
         
         List<Map<String, Object>> fileDataList = new ArrayList<>();
@@ -146,6 +155,7 @@ public class KnowledgeBaseController {
         }
         
         uploadExecutor.submit(() -> {
+            log.info("上传任务开始执行: taskId={}, filesCount={}", taskId, fileDataList.size());
             try {
                 progressService.updateProgress(taskId, null, false, "开始上传", null);
                 
@@ -157,18 +167,21 @@ public class KnowledgeBaseController {
                     String contentType = (String) fileData.get("contentType");
                     byte[] bytes = (byte[]) fileData.get("bytes");
                     
+                    log.info("开始上传文件: taskId={}, fileName={}", taskId, fileName);
                     try {
                         boolean success = uploadSingleFile(fileName, contentType, bytes, uploadUser, datasetId);
                         if (success) {
                             successCount++;
                             progressService.updateProgress(taskId, fileName, true, "上传成功", null);
+                            log.info("文件上传成功: taskId={}, fileName={}", taskId, fileName);
                         } else {
                             failedCount++;
                             progressService.updateProgress(taskId, fileName, false, "上传失败", null);
+                            log.warn("文件上传失败: taskId={}, fileName={}", taskId, fileName);
                         }
                     } catch (Exception e) {
                         failedCount++;
-                        log.error("上传文件异常: {}", fileName, e);
+                        log.error("上传文件异常: taskId={}, fileName={}", taskId, fileName, e);
                         progressService.updateProgress(taskId, fileName, false, "上传异常: " + e.getMessage(), null);
                     }
                 }
@@ -185,6 +198,8 @@ public class KnowledgeBaseController {
     
 private boolean uploadSingleFile(String fileName, String contentType, byte[] bytes, String user, String datasetId) {
         try {
+            log.info("上传文件到Dify: fileName={}, size={}bytes, user={}", fileName, bytes.length, user);
+            
             HttpPost httpPost = new HttpPost(difyConfig.getApiUrl() + "/files/upload");
             httpPost.setHeader("Authorization", "Bearer " + difyConfig.getApiKey());
             
@@ -202,19 +217,25 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                log.info("Dify文件上传响应: fileName={}, statusCode={}, body={}", fileName, statusCode, jsonResponse);
                 
                 if (statusCode == 200 || statusCode == 201) {
                     JsonNode jsonNode = objectMapper.readTree(jsonResponse);
                     String difyFileId = jsonNode.path("id").asText(null);
                     
                     if (difyFileId != null) {
+                        log.info("Dify文件ID获取成功: fileName={}, difyFileId={}", fileName, difyFileId);
                         return syncFileToDataset(fileName, contentType, bytes, datasetId, difyFileId);
+                    } else {
+                        log.warn("Dify响应缺少id字段: fileName={}, response={}", fileName, jsonResponse);
                     }
+                } else {
+                    log.warn("Dify文件上传失败: fileName={}, statusCode={}, body={}", fileName, statusCode, jsonResponse);
                 }
                 return false;
             }
         } catch (Exception e) {
-            log.error("上传文件到Dify失败: {}", fileName, e);
+            log.error("上传文件到Dify异常: fileName={}", fileName, e);
             return false;
         }
     }
@@ -222,6 +243,8 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
     private boolean syncFileToDataset(String fileName, String contentType, byte[] bytes, String datasetId, String difyFileId) {
         try {
             String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-file";
+            log.info("同步文件到Dataset: fileName={}, url={}, datasetId={}, difyFileId={}", fileName, url, datasetId, difyFileId);
+            
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
             
@@ -241,10 +264,19 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
             CloseableHttpClient httpClient = HttpClients.createDefault();
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
-                return statusCode == 200 || statusCode == 201;
+                String respBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                log.info("同步文件响应: fileName={}, statusCode={}, body={}", fileName, statusCode, respBody);
+                
+                if (statusCode == 200 || statusCode == 201) {
+                    log.info("文件同步成功: fileName={}, datasetId={}", fileName, datasetId);
+                    return true;
+                } else {
+                    log.warn("文件同步失败: fileName={}, statusCode={}, body={}", fileName, statusCode, respBody);
+                    return false;
+                }
             }
         } catch (Exception e) {
-            log.error("同步文件到知识库失败: {}", fileName, e);
+            log.error("同步文件到知识库异常: fileName={}", fileName, e);
             return false;
         }
     }

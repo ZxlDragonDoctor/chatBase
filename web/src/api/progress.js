@@ -4,7 +4,11 @@ export async function getUploadProgress(taskId) {
     return resp.data;
 }
 export function subscribeUploadProgress(taskId, onProgress, onComplete, onError) {
-    const url = `${api.defaults.baseURL}/upload/progress/${taskId}/sse`;
+    const token = localStorage.getItem('chatbase_token');
+    let url = `${api.defaults.baseURL}/upload/progress/${taskId}/sse`;
+    if (token) {
+        url += `?token=${encodeURIComponent(token)}`;
+    }
     const eventSource = new EventSource(url);
     eventSource.addEventListener('progress', (event) => {
         try {
