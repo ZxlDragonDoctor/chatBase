@@ -59,7 +59,7 @@ public class ImConsoleServiceImpl implements ImConsoleService {
     }
 
     @Override
-    public GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size) {
+    public GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword) {
         if (!StringUtils.hasText(groupId)) {
             return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
         }
@@ -82,6 +82,13 @@ public class ImConsoleServiceImpl implements ImConsoleService {
             } else {
                 w.eq(GroupMessage::getPlatform, platform);
             }
+        }
+        if (StringUtils.hasText(keyword)) {
+            w.and(wrapper -> wrapper
+                    .like(GroupMessage::getRawMessage, keyword)
+                    .or()
+                    .like(GroupMessage::getUserId, keyword)
+            );
         }
         w.orderByDesc(GroupMessage::getMessageTime);
 

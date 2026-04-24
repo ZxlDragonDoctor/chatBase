@@ -231,6 +231,9 @@ CREATE TABLE IF NOT EXISTS group_message (
   create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
   synced TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已同步到知识库',
   kb_document_id VARCHAR(128) DEFAULT NULL COMMENT '知识库文档ID',
+  file_url VARCHAR(500) DEFAULT NULL COMMENT '文件URL（图片/文件链接）',
+  dify_file_id VARCHAR(128) DEFAULT NULL COMMENT 'Dify文件ID',
+  file_name VARCHAR(255) DEFAULT NULL COMMENT '文件名',
   PRIMARY KEY (id),
   KEY idx_group_time (group_id, message_time),
   KEY idx_synced (synced)
@@ -240,19 +243,20 @@ CREATE TABLE IF NOT EXISTS group_message (
 ALTER TABLE group_message
     MODIFY COLUMN message_id VARCHAR(100) DEFAULT '' NOT NULL;
 
+-- 添加文件同步字段
+ALTER TABLE group_message
+    ADD COLUMN file_url VARCHAR(500) DEFAULT NULL COMMENT '文件URL（图片/文件的下载链接）',
+    ADD COLUMN dify_file_id VARCHAR(100) DEFAULT NULL COMMENT '上传到Dify后的文件ID',
+    ADD COLUMN file_name VARCHAR(200) DEFAULT NULL COMMENT '文件名（如果有）';
+
+-- 添加唯一索引防止重复消息（数据库兜底）
+ALTER TABLE group_message
+    ADD UNIQUE INDEX uk_platform_msgid (platform, message_id);
 
 
--- group_kb_mapping：群聊和知识库文档映射表
-CREATE TABLE IF NOT EXISTS group_kb_mapping (
-  id BIGINT NOT NULL AUTO_INCREMENT,
-  group_id VARCHAR(64) NOT NULL COMMENT '群ID',
-  kb_document_id VARCHAR(128) NOT NULL COMMENT '知识库文档ID',
-  create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-  update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
-  PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS t_duty_chat_group(
+
  `rec_id` INT NOT NULL AUTO_INCREMENT COMMENT '记录ID',
  `chat_group_url_id` VARCHAR(255) DEFAULT NULL COMMENT '值班群chatId',
  `chat_group_name` VARCHAR(20) NOT NULL COMMENT '值班群群名',
@@ -469,4 +473,9 @@ ALTER TABLE `kb_conversation` ADD KEY `idx_app_id` (`app_id`);
 
 -- kb_statistics表添加应用维度字段
 ALTER TABLE `kb_statistics` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '应用ID' AFTER `knowledge_base_id`;
-ALTER TABLE `kb_statistics` ADD KEY `idx_app_id` (`app_id`);cd
+ALTER TABLE `kb_statistics` ADD KEY `idx_app_id` (`app_id`);
+
+-- group_message表添加文件相关字段
+ALTER TABLE `group_message` ADD COLUMN `file_url` VARCHAR(500) DEFAULT NULL COMMENT '文件URL' AFTER `kb_document_id`;
+ALTER TABLE `group_message` ADD COLUMN `dify_file_id` VARCHAR(128) DEFAULT NULL COMMENT 'Dify文件ID' AFTER `file_url`;
+ALTER TABLE `group_message` ADD COLUMN `file_name` VARCHAR(255) DEFAULT NULL COMMENT '文件名' AFTER `dify_file_id`;

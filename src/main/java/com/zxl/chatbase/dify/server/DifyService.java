@@ -85,15 +85,6 @@ public interface DifyService {
     }
 
     /**
-     * 将一段纯文本作为文档写入 Dify 知识库（Dataset）
-     *
-     * @param title   文档标题
-     * @param content 文本内容
-     * @return Dify 返回的文档ID（如果失败返回 null）
-     */
-    String createDatasetDocument(String title, String content);
-
-    /**
      * 将一段纯文本作为文档写入指定的 Dify 知识库
      *
      * @param datasetId 知识库ID
@@ -102,16 +93,6 @@ public interface DifyService {
      * @return Dify 返回的文档ID（如果失败返回 null）
      */
     String createDatasetDocument(String datasetId, String title, String content);
-
-    /**
-     * 用文本更新 Dify 知识库中的已有文档
-     *
-     * @param documentId 文档ID
-     * @param name       文档名称
-     * @param content    文本内容
-     * @return 是否更新成功
-     */
-    boolean updateDatasetDocument(String documentId, String name, String content);
 
     /**
      * 用文本更新指定知识库中的已有文档
@@ -158,5 +139,36 @@ public interface DifyService {
     boolean deleteDatasetDocument(String datasetId, String documentId);
 
     boolean deleteDataset(String datasetId);
+
+    /**
+     * 上传文件到Dify文件存储（通过URL）
+     *
+     * @param fileUrl  文件URL
+     * @param fileName 文件名
+     * @param user     用户标识
+     * @return Dify返回的文件ID
+     */
+    String uploadFileByUrl(String fileUrl, String fileName, String user);
+
+    /**
+     * 使用已上传的文件创建知识库文档
+     *
+     * @param datasetId 知识库ID
+     * @param fileId    Dify文件ID
+     * @param name      文档名称
+     * @return 文档ID
+     */
+    String createDatasetDocumentByFile(String datasetId, String fileId, String name);
+
+    /**
+     * 从URL下载文件并直接创建知识库文档（一步完成）
+     *
+     * @param datasetId 知识库ID
+     * @param fileUrl   文件URL
+     * @param fileName  文件名
+     * @param user      用户标识
+     * @return 文档ID
+     */
+    String createDocumentByUrl(String datasetId, String fileUrl, String fileName, String user);
 
 }

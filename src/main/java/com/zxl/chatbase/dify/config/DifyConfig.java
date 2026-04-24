@@ -18,14 +18,10 @@ public class DifyConfig {
     @Value("${difyApp.datasetApiKey}")
     private String datasetApiKey;
 
-    @Value("${difyApp.datasetId:}")
-    private String datasetId;
-
     // Getters
     public String getApiUrl() { return apiUrl; }
     public String getApiKey() { return apiKey; }
     public int getTimeout() { return timeout; }
-    public String getDatasetId() { return datasetId; }
 
     public String getDatasetApiKey() {
         return datasetApiKey;

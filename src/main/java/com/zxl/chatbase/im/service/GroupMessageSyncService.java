@@ -27,6 +27,14 @@ public interface GroupMessageSyncService  extends IService<GroupMessage> {
                           String rawMessage, String messageType, long time);
 
     /**
+     * 保存群聊消息（包含文件信息）
+     * @param platform 平台标识：qq / wecom
+     */
+    void saveGroupMessage(String platform, String messageId, String groupId, String userId,
+                          String rawMessage, String messageType, long time,
+                          String fileUrl, String fileName);
+
+    /**
      * 保存web消息，无具体群聊id
      * @param userId
      * @param rawMessage

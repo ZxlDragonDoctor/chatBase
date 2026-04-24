@@ -60,7 +60,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
         }
 
         document.setDifyDocumentId(difyDocId);
-        document.setSyncStatus(difyDocId != null);
+        document.setSyncStatus(difyDocId != null ? 1 : 0);
         if (difyDocId != null) {
             document.setDifyStatus("completed");
             document.setSyncTime(LocalDateTime.now());
@@ -141,7 +141,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
             LambdaUpdateWrapper<KbDocument> errorWrapper = new LambdaUpdateWrapper<>();
             errorWrapper.eq(KbDocument::getId, documentId)
-                    .set(KbDocument::getSyncStatus, false)
+                    .set(KbDocument::getSyncStatus, 2)
                     .set(KbDocument::getSyncError, "知识库未关联Dify Dataset")
                     .set(KbDocument::getDifyStatus, "failed")
                     .set(KbDocument::getUpdateTime, LocalDateTime.now());
@@ -167,7 +167,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
             LambdaUpdateWrapper<KbDocument> updateWrapper = new LambdaUpdateWrapper<>();
             updateWrapper.eq(KbDocument::getId, documentId)
-                    .set(KbDocument::getSyncStatus, success)
+                    .set(KbDocument::getSyncStatus, success ? 1 : 2)
                     .set(KbDocument::getSyncTime, LocalDateTime.now())
                     .set(KbDocument::getDifyStatus, success ? "completed" : "failed")
                     .set(KbDocument::getDifyDocumentId, difyDocId)
@@ -179,7 +179,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
             update(updateWrapper);
 
-            if (success && doc.getSyncStatus() == null || !doc.getSyncStatus()) {
+            if (success && (doc.getSyncStatus() == null || doc.getSyncStatus() == 0)) {
                 kb.setDocCount(kb.getDocCount() != null ? kb.getDocCount() + 1 : 1);
                 kb.setUpdateTime(LocalDateTime.now());
                 knowledgeBaseService.updateById(kb);
@@ -192,7 +192,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
 
             LambdaUpdateWrapper<KbDocument> errorWrapper = new LambdaUpdateWrapper<>();
             errorWrapper.eq(KbDocument::getId, documentId)
-                    .set(KbDocument::getSyncStatus, false)
+                    .set(KbDocument::getSyncStatus, 2)
                     .set(KbDocument::getSyncError, e.getMessage())
                     .set(KbDocument::getDifyStatus, "failed")
                     .set(KbDocument::getUpdateTime, LocalDateTime.now());
@@ -206,7 +206,7 @@ public class KbDocumentServiceImpl extends ServiceImpl<KbDocumentMapper, KbDocum
     public boolean batchSyncToDify(Long knowledgeBaseId) {
         LambdaQueryWrapper<KbDocument> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(KbDocument::getKnowledgeBaseId, knowledgeBaseId)
-                .eq(KbDocument::getSyncStatus, false);
+                .eq(KbDocument::getSyncStatus, 0);
         var documents = list(wrapper);
 
         for (KbDocument doc : documents) {

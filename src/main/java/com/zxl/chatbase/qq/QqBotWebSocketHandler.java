@@ -85,17 +85,44 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String messageId = root.path("message_id").asText();
+        String messageId = root.path("messageId").asText();
         long time = root.path("time").asLong(0L);
         String groupId = root.path("group_id").asText();
         String userId = root.path("user_id").asText();
-        String rawMessage = root.path("raw_message").asText(root.path("message").asText("")); //解码UniCode内容
+        String rawMessage = root.path("raw_message").asText(root.path("message").asText(""));
 
-        // TODO: 判断消息类型
+        String msgType = "text";
+        String fileUrl = null;
+        String fileName = null;
+
+        JsonNode messageNode = root.path("message");
+        if (messageNode.isArray()) {
+            for (JsonNode seg : messageNode) {
+                String segType = seg.path("type").asText();
+                if ("image".equals(segType)) {
+                    msgType = "image";
+                    fileUrl = seg.path("data").path("url").asText(null);
+                    fileName = seg.path("data").path("file").asText(null);
+                    log.info("解析到图片消息: groupId={}, url={}", groupId, fileUrl);
+                    break;
+                } else if ("file".equals(segType)) {
+                    msgType = "file";
+                    fileUrl = seg.path("data").path("url").asText(null);
+                    fileName = seg.path("data").path("file").asText(null);
+                    log.info("解析到文件消息: groupId={}, url={}, name={}", groupId, fileUrl, fileName);
+                    break;
+                }
+            }
+        }
+
+        final String finalMsgType = msgType;
+        final String finalFileUrl = fileUrl;
+        final String finalFileName = fileName;
+
         // 1. 无论是否 @ 机器人，先采集消息到数据库（异步写入，避免阻塞消息处理）
         CompletableFuture.runAsync(
                 () -> {
-                    groupMessageSyncService.saveGroupMessage(messageId, groupId, userId, rawMessage, "text", time);
+                    groupMessageSyncService.saveGroupMessage("qq", messageId, groupId, userId, rawMessage, finalMsgType, time, finalFileUrl, finalFileName);
                     syncGroupAndUser(groupId, userId, root);
                 },
                 threadPool

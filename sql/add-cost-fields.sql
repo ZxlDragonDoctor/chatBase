@@ -16,3 +16,16 @@ ADD COLUMN `avg_cost` DECIMAL(10,6) DEFAULT 0 COMMENT '平均费用(RMB)' AFTER 
 -- 3. 验证字段添加成功
 SHOW COLUMNS FROM `kb_conversation` LIKE '%price%';
 SHOW COLUMNS FROM `kb_statistics` LIKE '%cost%';
+
+
+
+
+-- 清除group_message中失效的kb_document_id
+UPDATE group_message
+SET kb_document_id = NULL, synced = 0;
+UPDATE group_message
+SET kb_document_id = NULL, synced = 0
+WHERE platform = 'qq' AND synced = 0;
+-- 清除kb_document中失效的记录
+DELETE FROM kb_document
+WHERE dify_document_id = '633e780a-d169-4a9a-b38f-2eb42d3aa419';

@@ -78,13 +78,28 @@
                 </div>
               </div>
               
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <input v-model="searchKeyword" type="text" placeholder="搜索消息内容或用户ID..." class="anime-search-input" @keyup.enter="searchMessages" style="flex: 1;" />
+                <button class="anime-btn ghost" @click="searchMessages" :disabled="msgLoading">
+                  <span>搜索</span>
+                </button>
+                <button v-if="searchKeyword" class="anime-btn ghost" @click="clearSearch">
+                  <span>清除</span>
+                </button>
+              </div>
+              
               <div v-if="msgLoading" class="anime-empty">
                 <span class="anime-loader-spinner"></span>
                 <span class="anime-empty-text">消息加载中...</span>
               </div>
+              <div v-else-if="messages.length === 0" class="anime-empty">
+                <div class="anime-empty-icon">📭</div>
+                <div class="anime-empty-text">{{ searchKeyword ? '未找到匹配消息' : '暂无消息记录' }}</div>
+              </div>
               <div v-else class="message-list">
                 <div v-for="m in messages" :key="m.id" style="padding: 14px; background: rgba(255, 183, 197, 0.05); border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg); margin-bottom: 12px;">
                   <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px;">
+                    <span class="anime-badge blue">用户: {{ m.userId || '未知' }}</span>
                     <span class="anime-badge muted">{{ m.messageType || '文本' }}</span>
                     <span class="anime-badge" :class="m.synced ? 'green' : 'pink'">{{ m.synced ? '已同步' : '未同步' }}</span>
                     <span style="font-size: 13px; color: var(--anime-text-muted);">{{ formatTime(m.messageTime) }}</span>
@@ -134,6 +149,7 @@ const pageSize = 40
 const appList = ref<KbApp[]>([])
 const bindAppId = ref<number | string>('')
 const bindSaving = ref(false)
+const searchKeyword = ref('')
 
 async function loadApps() {
   try {
@@ -172,11 +188,28 @@ async function loadMessages() {
   msgLoading.value = true
   try {
     const apiPlat = selected.value.platform === 'qq' ? 'qq' : selected.value.platform === 'wx' ? 'wx' : 'all'
-    const res = await fetchGroupMessages({ groupId: gid, platform: apiPlat, page: page.value, size: pageSize })
+    const res = await fetchGroupMessages({ 
+      groupId: gid, 
+      platform: apiPlat, 
+      page: page.value, 
+      size: pageSize,
+      keyword: searchKeyword.value || undefined
+    })
     messages.value = res.records
     msgTotal.value = res.total
   } catch { messages.value = []; msgTotal.value = 0 }
   finally { msgLoading.value = false }
+}
+
+function searchMessages() {
+  page.value = 0
+  loadMessages()
+}
+
+function clearSearch() {
+  searchKeyword.value = ''
+  page.value = 0
+  loadMessages()
 }
 
 async function saveBindApp() {
@@ -249,5 +282,18 @@ onMounted(() => {
 }
 .anime-app-select:focus {
   border-color: var(--anime-pink);
+}
+.anime-search-input {
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--anime-text-primary);
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+.anime-search-input:focus {
+  border-color: var(--anime-blue);
 }
 </style>

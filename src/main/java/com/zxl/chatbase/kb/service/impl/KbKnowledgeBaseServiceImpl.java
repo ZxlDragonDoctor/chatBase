@@ -236,7 +236,7 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
                 newDoc.setTitle(difyDoc.getName());
                 newDoc.setDifyDocumentId(difyDoc.getId());
                 newDoc.setSource("dify_sync");
-                newDoc.setSyncStatus(true);
+                newDoc.setSyncStatus(1);
                 newDoc.setDifyStatus(difyDoc.getIndexingStatus() != null ? difyDoc.getIndexingStatus() : "completed");
                 newDoc.setDifyChunkCount(difyDoc.getWordCount() != null ? difyDoc.getWordCount() : 0);
                 newDoc.setStatus(difyDoc.getEnabled() != null ? difyDoc.getEnabled() : true);

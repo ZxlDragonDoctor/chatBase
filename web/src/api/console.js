@@ -18,6 +18,7 @@ export async function fetchGroupMessages(params) {
             platform: params.platform ?? 'all',
             page: params.page ?? 0,
             size: params.size ?? 30,
+            keyword: params.keyword || undefined,
         },
     });
     return resp.data;

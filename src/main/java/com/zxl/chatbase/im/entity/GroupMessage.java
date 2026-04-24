@@ -67,5 +67,20 @@ public class GroupMessage {
      */
     private String kbDocumentId;
 
+    /**
+     * 文件URL（图片/文件的下载链接）
+     */
+    private String fileUrl;
+
+    /**
+     * 上传到Dify后的文件ID
+     */
+    private String difyFileId;
+
+    /**
+     * 文件名（如果有）
+     */
+    private String fileName;
+
 }
 

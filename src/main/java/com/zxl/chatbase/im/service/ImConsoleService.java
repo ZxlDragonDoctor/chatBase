@@ -15,5 +15,5 @@ public interface ImConsoleService {
 
     List<GroupSummaryVO> listGroups(String platform);
 
-    GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size);
+    GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword);
 }

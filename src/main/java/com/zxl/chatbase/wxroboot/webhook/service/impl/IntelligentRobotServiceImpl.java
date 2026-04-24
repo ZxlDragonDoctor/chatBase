@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.MonitorException;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
+import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
@@ -19,6 +20,7 @@ import com.zxl.chatbase.wxroboot.webhook.mapper.IntelligentRobotMapper;
 import com.zxl.chatbase.wxroboot.webhook.util.WeChatUtil;
 import com.zxl.chatbase.wxroboot.webhook.util.aes.WXBizJsonMsgCrypt;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -57,6 +59,10 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     private ImGroupMapper imGroupMapper;
     @Resource
     private KbAppMapper kbAppMapper;
+    @Resource
+    private DifyService difyService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
@@ -72,104 +78,127 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
 
     /**
-     *  TODO: 核心方法，接收企微消息
-     * @param msgSignature
-     * @param timestamp
-     * @param nonce
-     * @param postData
-     * @return
+     * 核心方法，接收企微消息
+     * 使用 Redis 分布式锁实现幂等处理，快速返回空响应，异步发送回复
      */
     @Override
     public String handleMessage(String msgSignature, String timestamp, String nonce, String postData) {
         if (msgSignature == null || timestamp == null || nonce == null || postData == null) {
             log.error("缺少必要参数");
+            return buildNullReturnString(timestamp, nonce);
         }
         log.info("-->收到消息解密前，msg_signature={}, timestamp={}, nonce={}, data={}", msgSignature, timestamp, nonce, postData);
 
         try {
-            // 解密消息
             String msgStr = decryptData(msgSignature, timestamp, nonce, postData);
             log.info("-->收到消息解密后，msg{}", msgStr);
             IntelligentBotMsg msg = objectMapper.readValue(msgStr, IntelligentBotMsg.class);
 
-            String reply_content = "";
-
-            // 只开放群聊使用
             if (!msg.isFromGroup()) {
                 log.info("-->该功能仅限于群聊中使用!");
-                reply_content = "该功能仅限于群聊中使用";
-                return buildReturnString(reply_content, timestamp, nonce);
+                return buildNullReturnString(timestamp, nonce);
             }
 
             if (!msg.isValidMessage()) {
                 log.info("-->msg无效");
-                reply_content = "msg无效";
-                return buildReturnString(reply_content, timestamp, nonce);
+                return buildNullReturnString(timestamp, nonce);
             }
-            GroupMessage groupMessage = new GroupMessage();
-           // TODO:
-            groupMessage.setPlatform("wecom");
-            // TODO: 可能是混合消息内容
-            groupMessage.setMessageType(msg.getMsgtype());
-            groupMessage.setUserId(msg.getFrom().getUserid());
-            groupMessage.setGroupId(msg.getChatid());//
-            // // TODO： 图片等其他文件内容需要oss存储并记录其URL
-            groupMessage.setRawMessage(msg.getText().getContent());
-            groupMessage.setMessageTime(LocalDateTime.now());
-            // 保存微信群聊消息内容 + 同步群组/用户信息
-            CompletableFuture.runAsync(()->{
-                groupMessageSyncService.save(groupMessage);
-                // 同步群组信息
-                imGroupService.getOrCreateGroup("wecom", msg.getChatid(), null);
-                // 同步用户信息
-                imUserService.getOrCreateUser("wecom", msg.getFrom().getUserid(), msg.getChatid(), msg.getFrom().getUserid());
-            },threadPool)
-            .exceptionally(e -> {
-                log.error("保存群消息失败，platform={},groupId={}, userId={}","wecom", msg.getChatid(), msg.getFrom().getUserid(), e);
-                return null;
-            });
+
+            String msgId = msg.getMsgid();
+            String lockKey = "wecom:msg:" + msgId;
+
+            Boolean locked = stringRedisTemplate.opsForValue()
+                    .setIfAbsent(lockKey, "1", 5, TimeUnit.MINUTES);
+
+            if (locked == null || !locked) {
+                log.info("企微消息已处理或正在处理，跳过: msgId={}", msgId);
+                return buildNullReturnString(timestamp, nonce);
+            }
+
+            log.info("企微消息开始处理: msgId={}, groupId={}", msgId, msg.getChatid());
+
+            final String msgType = msg.getMsgtype();
+            final String fileUrl;
+            final String fileName;
+            final String rawMessage;
+            String tempDifyFileId = null;
+
+            if ("image".equals(msgType) && msg.getImage() != null) {
+                fileUrl = msg.getImage().getUrl();
+                fileName = "image_" + System.currentTimeMillis();
+                rawMessage = "[图片消息]";
+                if (fileUrl != null && !fileUrl.isEmpty()) {
+                    try {
+                        tempDifyFileId = difyService.uploadFileByUrl(fileUrl, fileName, msg.getFrom().getUserid());
+                        log.info("企微图片上传Dify成功: groupId={}, fileId={}", msg.getChatid(), tempDifyFileId);
+                    } catch (Exception e) {
+                        log.error("企微图片上传Dify失败: groupId={}, url={}", msg.getChatid(), fileUrl, e);
+                    }
+                }
+            } else if ("text".equals(msgType) && msg.getText() != null) {
+                fileUrl = null;
+                fileName = null;
+                rawMessage = msg.getText().getContent();
+            } else if ("mixed".equals(msgType) || "stream".equals(msgType)) {
+                fileUrl = null;
+                fileName = null;
+                rawMessage = msg.getText() != null ? msg.getText().getContent() : "[混合消息]";
+            } else {
+                fileUrl = null;
+                fileName = null;
+                rawMessage = "";
+            }
+            final String difyFileId = tempDifyFileId;
 
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
-                String query = msg.getText().getContent();
-                
-                // 获取群组绑定的应用
-                Long appId = getAppIdForGroup(msg.getChatid());
-                log.info("企微群组应用绑定: groupId={}, appId={}", msg.getChatid(), appId);
-                
-                // 异步回答，避免阻塞 WebSocket 消息线程
-                CompletableFuture<DifyChatResponse> completableFuture = CompletableFuture.supplyAsync(() -> chatService.chat(
-                                appId,
-                                "wecom",
-                                msg.getFrom().getUserid(),
-                                msg.getChatid(),
-                                query
-                        ), threadPool)
-                        .orTimeout(160, TimeUnit.SECONDS)
-                        .exceptionally(e -> {
-                            log.error("聊天任务执行失败，groupId={}, userId={}", msg.getChatid(), msg.getFrom().getUserid(), e);
-                            DifyChatResponse fallBack = new DifyChatResponse();
-                            fallBack.setAnswer("[系统超时，请稍后重试]");
-                            return  fallBack;
-                        });
-                DifyChatResponse difyChatResponse = completableFuture.get();
-                // TODO; 发送消息
-                reply_content  = decodeUnicode(difyChatResponse.getAnswer());
-                String sendMessage = reply_content;
-                // 群聊机器人链接
-                CompletableFuture.runAsync(()->
-                        WeChatUtil.sendMarkdown(msg.getResponse_url(),sendMessage)
-                        ,threadPool).exceptionally(e -> {
-                    log.error("发送消息失败，groupId={}, userId={}", msg.getChatid(), msg.getFrom().getUserid(), e);
-                    return null;
-                });
-                return buildReturnString(reply_content,timestamp, nonce);
-            } else {
-                reply_content = "未知的消息类型";
-                return buildReturnString(reply_content, timestamp, nonce);
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        groupMessageSyncService.saveGroupMessage(
+                                "wecom", msgId, msg.getChatid(), msg.getFrom().getUserid(),
+                                rawMessage, msgType, System.currentTimeMillis() / 1000,
+                                fileUrl, fileName
+                        );
+
+                        if (difyFileId != null) {
+                            LambdaQueryWrapper<GroupMessage> wrapper = new LambdaQueryWrapper<>();
+                            wrapper.eq(GroupMessage::getPlatform, "wecom")
+                                   .eq(GroupMessage::getMessageId, msgId);
+                            GroupMessage gm = groupMessageSyncService.getOne(wrapper);
+                            if (gm != null) {
+                                gm.setDifyFileId(difyFileId);
+                                groupMessageSyncService.updateById(gm);
+                            }
+                        }
+
+                        imGroupService.getOrCreateGroup("wecom", msg.getChatid(), null);
+                        imUserService.getOrCreateUser("wecom", msg.getFrom().getUserid(), msg.getChatid(), msg.getFrom().getUserid());
+
+                        Long appId = getAppIdForGroup(msg.getChatid());
+                        log.info("企微群组应用绑定: groupId={}, appId={}", msg.getChatid(), appId);
+
+                        String query = rawMessage;
+                        DifyChatResponse difyChatResponse = chatService.chat(
+                                appId, "wecom", msg.getFrom().getUserid(), msg.getChatid(), query
+                        );
+
+                        String replyContent = decodeUnicode(difyChatResponse.getAnswer());
+                        log.info("企微回复生成完成: groupId={}, reply={}", msg.getChatid(), replyContent);
+
+                        if (msg.getResponse_url() != null && !msg.getResponse_url().isEmpty()) {
+                            WeChatUtil.sendMarkdown(msg.getResponse_url(), replyContent);
+                            log.info("企微回复发送成功: groupId={}", msg.getChatid());
+                        }
+                    } catch (Exception e) {
+                        log.error("企微消息处理失败: msgId={}, groupId={}", msgId, msg.getChatid(), e);
+                    }
+                }, threadPool);
             }
+
+            return buildNullReturnString(timestamp, nonce);
+
         } catch (Exception e) {
-            log.info("-->" + e.getMessage());
-            throw MonitorException.build(e.getMessage());
+            log.error("-->企微消息处理异常: {}", e.getMessage(), e);
+            return buildNullReturnString(timestamp, nonce);
         }
     }
 

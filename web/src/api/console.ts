@@ -16,6 +16,7 @@ export async function fetchGroupMessages(params: {
   platform?: string
   page?: number
   size?: number
+  keyword?: string
 }): Promise<GroupMessagePage> {
   const gid = params.groupId != null && String(params.groupId).trim() !== '' ? String(params.groupId) : ''
   if (!gid) {
@@ -27,6 +28,7 @@ export async function fetchGroupMessages(params: {
       platform: params.platform ?? 'all',
       page: params.page ?? 0,
       size: params.size ?? 30,
+      keyword: params.keyword || undefined,
     },
   })
   return resp.data

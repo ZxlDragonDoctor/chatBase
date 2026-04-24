@@ -38,6 +38,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 
@@ -385,7 +386,6 @@ public class DifyServiceImpl implements DifyService {
 
             if (difyResp != null && difyResp.getId() != null) {
                 saveToKbFile(file, user, difyResp.getId().toString());
-                syncFileToDataset(file, user);
             }
 
             return difyResp;
@@ -569,43 +569,6 @@ public class DifyServiceImpl implements DifyService {
         }
     }
 
-    private void syncFileToDataset(MultipartFile file, String user) {
-        String datasetId = difyConfig.getDatasetId();
-        if (datasetId == null || datasetId.trim().isEmpty()) {
-            log.warn("未配置 datasetId，跳过自动同步到知识库");
-            return;
-        }
-
-        try {
-            String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-file";
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
-
-            String jsonData = "{\"indexing_technique\":\"high_quality\",\"process_rule\":{\"mode\":\"automatic\"}}";
-
-            HttpEntity multipartEntity = MultipartEntityBuilder.create()
-                    .setCharset(StandardCharsets.UTF_8)
-                    .addBinaryBody("file", file.getBytes(), ContentType.parse(Objects.requireNonNull(file.getContentType())), file.getOriginalFilename())
-                    .addTextBody("data", jsonData, ContentType.TEXT_PLAIN.withCharset(StandardCharsets.UTF_8))
-                    .build();
-
-            httpPost.setEntity(multipartEntity);
-
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-                if (statusCode == 200 || statusCode == 201) {
-                    String docId = objectMapper.readTree(resp).path("document").path("id").asText(null);
-                    log.info("文件同步到知识库成功: fileName={}, datasetId={}, documentId={}", file.getOriginalFilename(), datasetId, docId);
-                } else {
-                    log.warn("同步文件到知识库失败: status={}, body={}", statusCode, resp);
-                }
-            }
-        } catch (Exception e) {
-            log.warn("同步文件到知识库异常: fileName={}", file.getOriginalFilename(), e);
-        }
-    }
-
     @Override
     public String createDataset(String name, String description) {
         String url = difyConfig.getApiUrl() + "/datasets";
@@ -659,12 +622,6 @@ public class DifyServiceImpl implements DifyService {
     }
 
     @Override
-    public String createDatasetDocument(String title, String content) {
-        String datasetId = difyConfig.getDatasetId();
-        return createDatasetDocument(datasetId, title, content);
-    }
-
-    @Override
     public String createDatasetDocument(String datasetId, String title, String content) {
         if (datasetId == null || datasetId.trim().isEmpty()) {
             log.warn("Dataset ID为空，跳过同步到知识库");
@@ -691,6 +648,9 @@ public class DifyServiceImpl implements DifyService {
                 log.info("Dify 文档创建响应: datasetId={}, status={}, body={}", datasetId, statusCode, resp);
                 if (statusCode == 200 || statusCode == 201) {
                     return objectMapper.readTree(resp).path("document").path("id").asText(null);
+                } else if (statusCode == 403 && resp.contains("capacity")) {
+                    log.warn("Dify向量空间容量已满，请升级订阅或清理知识库: datasetId={}", datasetId);
+                    return null;
                 } else {
                     log.error("创建 Dify 知识库文档失败: datasetId={}, status={}, body={}", datasetId, statusCode, resp);
                     return null;
@@ -700,12 +660,6 @@ public class DifyServiceImpl implements DifyService {
             log.error("调用 Dify 知识库文档接口异常: datasetId={}", datasetId, e);
             return null;
         }
-    }
-
-    @Override
-    public boolean updateDatasetDocument(String documentId, String name, String content) {
-        String datasetId = difyConfig.getDatasetId();
-        return updateDatasetDocument(datasetId, documentId, name, content);
     }
 
     @Override
@@ -728,6 +682,7 @@ public class DifyServiceImpl implements DifyService {
             HashMap<String, Object> body = new HashMap<>();
             body.put("name", name);
             body.put("text", content);
+            body.put("process_rule", Map.of("mode", "automatic"));
 
             String json = objectMapper.writeValueAsString(body);
             httpPost.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
@@ -739,6 +694,9 @@ public class DifyServiceImpl implements DifyService {
                 if (statusCode == 200 || statusCode == 201) {
                     log.info("Dify 文档更新成功: documentId={}", documentId);
                     return true;
+                } else if (statusCode == 403 && resp.contains("capacity")) {
+                    log.warn("Dify向量空间容量已满，请升级订阅或清理知识库: documentId={}", documentId);
+                    return false;
                 } else {
                     log.error("更新 Dify 文档失败: documentId={}, status={}, body={}", documentId, statusCode, resp);
                     return false;
@@ -888,5 +846,205 @@ public class DifyServiceImpl implements DifyService {
             log.error("删除Dify知识库异常: datasetId={}", datasetId, e);
             return false;
         }
+    }
+
+    @Override
+    public String uploadFileByUrl(String fileUrl, String fileName, String user) {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            log.warn("文件URL为空，跳过上传");
+            return null;
+        }
+
+        log.info("开始通过URL上传文件到Dify: fileUrl={}, fileName={}", fileUrl, fileName);
+
+        String url = difyConfig.getApiUrl() + "/files/upload";
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+        try {
+            HashMap<String, Object> body = new HashMap<>();
+            body.put("url", fileUrl);
+            if (fileName != null && !fileName.trim().isEmpty()) {
+                body.put("name", fileName);
+            }
+            body.put("user", user);
+
+            String json = objectMapper.writeValueAsString(body);
+            httpPost.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
+            httpPost.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                log.info("Dify URL文件上传响应: status={}, body={}", statusCode, jsonResponse);
+
+                if (statusCode == 200 || statusCode == 201) {
+                    String fileId = objectMapper.readTree(jsonResponse).path("id").asText(null);
+                    if (fileId != null && !fileId.isEmpty()) {
+                        log.info("文件上传成功: fileName={}, fileId={}", fileName, fileId);
+                        return fileId;
+                    } else {
+                        log.warn("Dify响应缺少id字段: {}", jsonResponse);
+                        return null;
+                    }
+                } else {
+                    log.error("Dify URL文件上传失败: status={}, body={}", statusCode, jsonResponse);
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            log.error("通过URL上传文件异常: fileUrl={}", fileUrl, e);
+            return null;
+        }
+    }
+
+    @Override
+    public String createDatasetDocumentByFile(String datasetId, String fileId, String name) {
+        if (datasetId == null || datasetId.trim().isEmpty()) {
+            log.warn("Dataset ID为空，无法创建文件文档");
+            return null;
+        }
+        if (fileId == null || fileId.trim().isEmpty()) {
+            log.warn("File ID为空，无法创建文件文档");
+            return null;
+        }
+
+        log.info("使用file_id创建文档: datasetId={}, fileId={}, name={}", datasetId, fileId, name);
+
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-file";
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+        try {
+            HashMap<String, Object> body = new HashMap<>();
+            body.put("data", Map.of(
+                    "indexing_technique", "high_quality",
+                    "process_rule", Map.of("mode", "automatic")
+            ));
+            body.put("file", Map.of("file_id", fileId));
+            if (name != null && !name.trim().isEmpty()) {
+                body.put("name", name);
+            }
+
+            String json = objectMapper.writeValueAsString(body);
+            httpPost.setEntity(new StringEntity(json, StandardCharsets.UTF_8));
+            httpPost.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                log.info("Dify create-by-file响应: status={}, body={}", statusCode, jsonResponse);
+
+                if (statusCode == 200 || statusCode == 201) {
+                    String documentId = objectMapper.readTree(jsonResponse).path("document").path("id").asText(null);
+                    if (documentId != null && !documentId.isEmpty()) {
+                        log.info("文件文档创建成功: fileId={}, documentId={}", fileId, documentId);
+                        return documentId;
+                    } else {
+                        log.warn("Dify响应缺少document.id字段: {}", jsonResponse);
+                        return null;
+                    }
+                } else {
+                    log.error("创建文件文档失败: status={}, body={}", statusCode, jsonResponse);
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            log.error("创建文件文档异常: datasetId={}, fileId={}", datasetId, fileId, e);
+            return null;
+        }
+    }
+
+    @Override
+    public String createDocumentByUrl(String datasetId, String fileUrl, String fileName, String user) {
+        if (datasetId == null || datasetId.trim().isEmpty()) {
+            log.warn("Dataset ID为空，无法创建文档");
+            return null;
+        }
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            log.warn("文件URL为空，无法创建文档");
+            return null;
+        }
+
+        log.info("开始从URL下载文件并创建知识库文档: datasetId={}, fileUrl={}, fileName={}", datasetId, fileUrl, fileName);
+
+        try {
+            byte[] fileBytes = downloadFileFromUrl(fileUrl);
+            if (fileBytes == null || fileBytes.length == 0) {
+                log.error("从URL下载文件失败: fileUrl={}", fileUrl);
+                return null;
+            }
+
+            String actualFileName = fileName;
+            if (actualFileName == null || actualFileName.trim().isEmpty()) {
+                actualFileName = "file_" + System.currentTimeMillis();
+            }
+
+            String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-file";
+            HttpPost httpPost = new HttpPost(url);
+            httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+            String jsonData = "{\"indexing_technique\":\"high_quality\",\"process_rule\":{\"mode\":\"automatic\"}}";
+
+            ContentType contentType = ContentType.APPLICATION_OCTET_STREAM.withCharset(StandardCharsets.UTF_8);
+
+            HttpEntity multipartEntity = MultipartEntityBuilder.create()
+                    .setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
+                    .setCharset(StandardCharsets.UTF_8)
+                    .addBinaryBody("file", fileBytes, contentType, actualFileName)
+                    .addTextBody("data", jsonData, ContentType.TEXT_PLAIN.withCharset(StandardCharsets.UTF_8))
+                    .build();
+
+            httpPost.setEntity(multipartEntity);
+
+            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+                log.info("Dify创建文档响应: status={}, body={}", statusCode, jsonResponse);
+
+                if (statusCode == 200 || statusCode == 201) {
+                    String documentId = objectMapper.readTree(jsonResponse).path("document").path("id").asText(null);
+                    if (documentId != null && !documentId.isEmpty()) {
+                        log.info("从URL创建文档成功: fileName={}, documentId={}", actualFileName, documentId);
+                        return documentId;
+                    } else {
+                        log.warn("Dify响应缺少document.id字段: {}", jsonResponse);
+                        return null;
+                    }
+                } else {
+                    log.error("创建文档失败: status={}, body={}", statusCode, jsonResponse);
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            log.error("从URL创建文档异常: datasetId={}, fileUrl={}", datasetId, fileUrl, e);
+            return null;
+        }
+    }
+
+    private byte[] downloadFileFromUrl(String fileUrl) {
+        try {
+            HttpGet httpGet = new HttpGet(fileUrl);
+            httpGet.setConfig(RequestConfig.custom()
+                    .setConnectTimeout(30000)
+                    .setSocketTimeout(60000)
+                    .setCookieSpec(CookieSpecs.STANDARD)
+                    .build());
+
+            try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                if (statusCode == 200) {
+                    HttpEntity entity = response.getEntity();
+                    if (entity != null) {
+                        return EntityUtils.toByteArray(entity);
+                    }
+                } else {
+                    log.warn("下载文件失败: status={}, url={}", statusCode, fileUrl);
+                }
+            }
+        } catch (Exception e) {
+            log.error("下载文件异常: url={}", fileUrl, e);
+        }
+        return null;
     }
 }

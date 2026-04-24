@@ -38,7 +38,7 @@ public class KbDocument {
 
     private String sourceMessageId;
 
-    private Boolean syncStatus;
+    private Integer syncStatus;
 
     private LocalDateTime syncTime;
 

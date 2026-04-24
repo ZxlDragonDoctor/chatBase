@@ -17,6 +17,7 @@ const pageSize = 40;
 const appList = ref([]);
 const bindAppId = ref('');
 const bindSaving = ref(false);
+const searchKeyword = ref('');
 async function loadApps() {
     try {
         const resp = await api.get('/kb/app/list');
@@ -69,7 +70,13 @@ async function loadMessages() {
     msgLoading.value = true;
     try {
         const apiPlat = selected.value.platform === 'qq' ? 'qq' : selected.value.platform === 'wx' ? 'wx' : 'all';
-        const res = await fetchGroupMessages({ groupId: gid, platform: apiPlat, page: page.value, size: pageSize });
+        const res = await fetchGroupMessages({
+            groupId: gid,
+            platform: apiPlat,
+            page: page.value,
+            size: pageSize,
+            keyword: searchKeyword.value || undefined
+        });
         messages.value = res.records;
         msgTotal.value = res.total;
     }
@@ -80,6 +87,15 @@ async function loadMessages() {
     finally {
         msgLoading.value = false;
     }
+}
+function searchMessages() {
+    page.value = 0;
+    loadMessages();
+}
+function clearSearch() {
+    searchKeyword.value = '';
+    page.value = 0;
+    loadMessages();
 }
 async function saveBindApp() {
     if (!selected.value)
@@ -146,6 +162,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-search-input']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -352,6 +369,30 @@ else {
         });
         (__VLS_ctx.selected.appName);
     }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        ...{ onKeyup: (__VLS_ctx.searchMessages) },
+        value: (__VLS_ctx.searchKeyword),
+        type: "text",
+        placeholder: "搜索消息内容或用户ID...",
+        ...{ class: "anime-search-input" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.searchMessages) },
+        ...{ class: "anime-btn ghost" },
+        disabled: (__VLS_ctx.msgLoading),
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    if (__VLS_ctx.searchKeyword) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.clearSearch) },
+            ...{ class: "anime-btn ghost" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
     if (__VLS_ctx.msgLoading) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "anime-empty" },
@@ -362,6 +403,18 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ class: "anime-empty-text" },
         });
+    }
+    else if (__VLS_ctx.messages.length === 0) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty-icon" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "anime-empty-text" },
+        });
+        (__VLS_ctx.searchKeyword ? '未找到匹配消息' : '暂无消息记录');
     }
     else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -375,6 +428,10 @@ else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ style: {} },
             });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "anime-badge blue" },
+            });
+            (m.userId || '未知');
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "anime-badge muted" },
             });
@@ -461,10 +518,20 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-search-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-loader-spinner']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
 /** @type {__VLS_StyleScopedClasses['message-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['blue']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
@@ -492,9 +559,12 @@ const __VLS_self = (await import('vue')).defineComponent({
             appList: appList,
             bindAppId: bindAppId,
             bindSaving: bindSaving,
+            searchKeyword: searchKeyword,
             reload: reload,
             selectGroup: selectGroup,
             loadMessages: loadMessages,
+            searchMessages: searchMessages,
+            clearSearch: clearSearch,
             saveBindApp: saveBindApp,
             getPlatformColor: getPlatformColor,
             getPlatformLabel: getPlatformLabel,

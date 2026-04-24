@@ -47,8 +47,9 @@ public class ImConsoleController {
             @RequestParam(required = false) String groupId,
             @RequestParam(defaultValue = "all") String platform,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "30") int size) {
-        return imConsoleService.pageMessages(platform, groupId, page, size);
+            @RequestParam(defaultValue = "30") int size,
+            @RequestParam(required = false) String keyword) {
+        return imConsoleService.pageMessages(platform, groupId, page, size, keyword);
     }
 
     @PutMapping("/groups/{id}/app")

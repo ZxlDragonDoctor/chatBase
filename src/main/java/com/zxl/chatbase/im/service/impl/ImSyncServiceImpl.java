@@ -42,7 +42,7 @@ public class ImSyncServiceImpl implements ImSyncService {
     private static final int BATCH_SIZE = 200;
 
     @Override
-    @Scheduled(fixedDelayString = "60000")
+    // @Scheduled(fixedDelayString = "60000") // 已禁用：使用 GroupMessageSyncServiceImpl 统一同步
     public void syncGroupMessagesToKnowledgeBase() {
         List<KbKnowledgeBase> syncableKbs = getSyncableKnowledgeBases();
         if (syncableKbs.isEmpty()) {
@@ -162,11 +162,11 @@ public class ImSyncServiceImpl implements ImSyncService {
 
         if (existingDocId != null) {
             log.info("群[{}]已有文档[{}]，更新内容", groupId, existingDocId);
-            success = difyService.updateDatasetDocument(existingDocId, title, content);
+            success = difyService.updateDatasetDocument(kb.getDifyDatasetId(), existingDocId, title, content);
             documentId = existingDocId;
         } else {
             log.info("群[{}]无文档，创建新文档", groupId);
-            documentId = difyService.createDatasetDocument(title, content);
+            documentId = difyService.createDatasetDocument(kb.getDifyDatasetId(), title, content);
             success = (documentId != null);
         }
 
@@ -217,7 +217,7 @@ public class ImSyncServiceImpl implements ImSyncService {
         doc.setDifyDocumentId(difyDocumentId);
         doc.setDifyStatus("completed");
         doc.setSource("im_sync");
-        doc.setSyncStatus(true);
+        doc.setSyncStatus(1);
         doc.setSyncTime(LocalDateTime.now());
         doc.setStatus(true);
         doc.setCreateTime(LocalDateTime.now());

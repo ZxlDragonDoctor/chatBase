@@ -28,7 +28,6 @@ difyApp:
   url: https://api.dify.ai/v1
   apiKey: ${DIFYAPP_API_KEY}
   datasetApiKey: ${DIFYAPP_DATASET_API_KEY}
-  datasetId: ${DIFYAPP_DATASET_ID:}
   timeOut: 90
 
 qq:
