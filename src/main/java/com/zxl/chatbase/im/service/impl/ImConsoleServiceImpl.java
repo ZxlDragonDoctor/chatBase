@@ -78,7 +78,7 @@ public class ImConsoleServiceImpl implements ImConsoleService {
                 .eq(GroupMessage::getGroupId, groupId);
         if (StringUtils.hasText(platform) && !"all".equalsIgnoreCase(platform)) {
             if ("wecom".equalsIgnoreCase(platform) || "wx".equalsIgnoreCase(platform)) {
-                w.eq(GroupMessage::getPlatform, "wx");
+                w.eq(GroupMessage::getPlatform, "wecom");
             } else {
                 w.eq(GroupMessage::getPlatform, platform);
             }
@@ -100,7 +100,7 @@ public class ImConsoleServiceImpl implements ImConsoleService {
         if (filter.equalsIgnoreCase(a)) {
             return true;
         }
-        return ("wecom".equalsIgnoreCase(filter) || "wx".equalsIgnoreCase(filter)) && "wx".equalsIgnoreCase(a);
+        return ("wecom".equalsIgnoreCase(filter) || "wx".equalsIgnoreCase(filter)) && "wecom".equalsIgnoreCase(a);
     }
 
     private GroupMessageItemVO toItem(GroupMessage m) {

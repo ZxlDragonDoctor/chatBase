@@ -619,7 +619,6 @@ public class DifyServiceImpl implements DifyService {
             if (description != null && !description.trim().isEmpty()) {
                 body.put("description", description);
             }
-            // 使用高质量索引，权限仅自己可见
             body.put("indexing_technique", "high_quality");
             body.put("permission", "only_me");
 
@@ -630,8 +629,12 @@ public class DifyServiceImpl implements DifyService {
                 String resp = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 int statusCode = response.getStatusLine().getStatusCode();
                 log.info("Dify 创建知识库响应: status={}, body={}", statusCode, resp);
+                
                 if (statusCode == 200 || statusCode == 201) {
                     return objectMapper.readTree(resp).path("id").asText(null);
+                } else if (statusCode == 409) {
+                    log.warn("知识库名称已存在，尝试查找已有知识库: name={}", name);
+                    return findExistingDatasetByName(name);
                 } else {
                     log.error("创建 Dify 知识库失败: status={}, body={}", statusCode, resp);
                     return null;
@@ -641,6 +644,18 @@ public class DifyServiceImpl implements DifyService {
             log.error("调用 Dify 创建知识库接口异常", e);
             return null;
         }
+    }
+    
+    private String findExistingDatasetByName(String name) {
+        List<DifyDatasetResponse> datasets = listDatasets();
+        for (DifyDatasetResponse ds : datasets) {
+            if (ds.getName() != null && ds.getName().equals(name)) {
+                log.info("找到已存在的知识库: name={}, id={}", name, ds.getId());
+                return ds.getId();
+            }
+        }
+        log.warn("未找到已存在的知识库: name={}", name);
+        return null;
     }
 
     @Override

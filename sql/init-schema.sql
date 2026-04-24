@@ -382,7 +382,7 @@ PRIMARY KEY (`id`),
 -- =============================================
 -- 聊天会话管理表
 -- =============================================
-CREATE TABLE IF NOT EXISTS `chat_session` (
+CREATE TABLE IF NOT EXISTS ` ` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话ID',
   `session_id` VARCHAR(64) NOT NULL COMMENT '会话唯一标识',
   `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',

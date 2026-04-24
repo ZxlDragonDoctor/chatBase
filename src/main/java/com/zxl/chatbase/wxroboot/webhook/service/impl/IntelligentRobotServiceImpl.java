@@ -107,11 +107,12 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 return buildReturnString(reply_content, timestamp, nonce);
             }
             GroupMessage groupMessage = new GroupMessage();
-            groupMessage.setPlatform("wx");
+           // TODO:
+            groupMessage.setPlatform("wecom");
             // TODO: 可能是混合消息内容
             groupMessage.setMessageType(msg.getMsgtype());
             groupMessage.setUserId(msg.getFrom().getUserid());
-            groupMessage.setGroupId(msg.getChatid());
+            groupMessage.setGroupId(msg.getChatid());//
             // // TODO： 图片等其他文件内容需要oss存储并记录其URL
             groupMessage.setRawMessage(msg.getText().getContent());
             groupMessage.setMessageTime(LocalDateTime.now());
@@ -124,7 +125,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 imUserService.getOrCreateUser("wecom", msg.getFrom().getUserid(), msg.getChatid(), msg.getFrom().getUserid());
             },threadPool)
             .exceptionally(e -> {
-                log.error("保存群消息失败，platform={},groupId={}, userId={}","wx", msg.getChatid(), msg.getFrom().getUserid(), e);
+                log.error("保存群消息失败，platform={},groupId={}, userId={}","wecom", msg.getChatid(), msg.getFrom().getUserid(), e);
                 return null;
             });
 
@@ -138,7 +139,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 // 异步回答，避免阻塞 WebSocket 消息线程
                 CompletableFuture<DifyChatResponse> completableFuture = CompletableFuture.supplyAsync(() -> chatService.chat(
                                 appId,
-                                "wx",
+                                "wecom",
                                 msg.getFrom().getUserid(),
                                 msg.getChatid(),
                                 query

@@ -3,12 +3,10 @@ package com.zxl.chatbase.im.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zxl.chatbase.dify.server.DifyService;
-import com.zxl.chatbase.im.entity.GroupKbMapping;
 import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
-import com.zxl.chatbase.im.service.GroupKbMappingService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import com.zxl.chatbase.kb.entity.KbCategory;
 import com.zxl.chatbase.kb.entity.KbDocument;
@@ -41,7 +39,6 @@ import java.util.stream.Collectors;
 public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper, GroupMessage> implements GroupMessageSyncService {
 
     private final GroupMessageMapper groupMessageMapper;
-    private final GroupKbMappingService groupKbMappingService;
     private final DifyService difyService;
     private final IKbKnowledgeBaseService knowledgeBaseService;
     private final IKbDocumentService documentService;
@@ -144,7 +141,6 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
                 } else {
                     log.info("群[{}]创建新文档（共{}条消息）", groupName, allMessages.size());
                     documentId = difyService.createDatasetDocument(imKb.getDifyDatasetId(), title, content);
-                    groupKbMappingService.save(new GroupKbMapping(documentId, groupId));
                     success = (documentId != null);
                 }
 
@@ -241,7 +237,20 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             kb.setDifyDatasetId(difyDatasetId);
 
             knowledgeBaseService.save(kb);
-            log.info("创建群聊助手知识库: id={}, name={}, categoryId={}", kb.getId(), kb.getName(), category.getId());
+            log.info("创建群聊助手知识库: id={}, name={}, difyDatasetId={}", kb.getId(), kb.getName(), difyDatasetId);
+        }
+
+        if (kb.getDifyDatasetId() == null || kb.getDifyDatasetId().trim().isEmpty()) {
+            log.warn("知识库缺少Dify Dataset ID，尝试从Dify查询: name={}", kb.getName());
+            String difyDatasetId = difyService.createDataset(kb.getName(), kb.getDescription());
+            if (difyDatasetId != null && !difyDatasetId.trim().isEmpty()) {
+                kb.setDifyDatasetId(difyDatasetId);
+                kb.setUpdateTime(LocalDateTime.now());
+                knowledgeBaseService.updateById(kb);
+                log.info("更新知识库Dify Dataset ID: id={}, difyDatasetId={}", kb.getId(), difyDatasetId);
+            } else {
+                log.error("无法获取Dify Dataset ID，同步将失败: name={}", kb.getName());
+            }
         }
 
         return kb;

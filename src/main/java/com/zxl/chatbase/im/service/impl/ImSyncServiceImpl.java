@@ -5,10 +5,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zxl.chatbase.dify.server.DifyService;
-import com.zxl.chatbase.im.entity.GroupKbMapping;
 import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
-import com.zxl.chatbase.im.service.GroupKbMappingService;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
 import com.zxl.chatbase.im.service.ImSyncService;
 import com.zxl.chatbase.kb.entity.KbDocument;
@@ -35,7 +33,6 @@ import java.util.stream.Collectors;
 public class ImSyncServiceImpl implements ImSyncService {
 
     private final GroupMessageMapper groupMessageMapper;
-    private final GroupKbMappingService groupKbMappingService;
     private final KbKnowledgeBaseMapper kbKnowledgeBaseMapper;
     private final KbDocumentMapper kbDocumentMapper;
     private final DifyService difyService;
@@ -171,10 +168,6 @@ public class ImSyncServiceImpl implements ImSyncService {
             log.info("群[{}]无文档，创建新文档", groupId);
             documentId = difyService.createDatasetDocument(title, content);
             success = (documentId != null);
-
-            if (success) {
-                saveGroupKbMapping(groupId, documentId);
-            }
         }
 
         if (success) {
@@ -213,11 +206,6 @@ public class ImSyncServiceImpl implements ImSyncService {
             log.warn("解析 syncGroupIds 失败: {}", syncGroupIds);
             return new ArrayList<>();
         }
-    }
-
-    private void saveGroupKbMapping(String groupId, String documentId) {
-        GroupKbMapping mapping = new GroupKbMapping(groupId, documentId);
-        groupKbMappingService.save(mapping);
     }
 
     private void saveKbDocument(Long knowledgeBaseId, String title, String content,

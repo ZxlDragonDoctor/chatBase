@@ -3,6 +3,8 @@ services:
     image: mysql:8.0
     container_name: chatbase-mysql
     restart: unless-stopped
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: chat_base
@@ -27,6 +29,8 @@ services:
     image: redis:7
     container_name: chatbase-redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: >
@@ -54,6 +58,8 @@ services:
     image: chatbase-backend:latest
     container_name: chatbase-backend
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     depends_on:
       mysql:
         condition: service_healthy
