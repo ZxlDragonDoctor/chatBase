@@ -121,20 +121,12 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             final String fileUrl;
             final String fileName;
             final String rawMessage;
-            String tempDifyFileId = null;
 
             if ("image".equals(msgType) && msg.getImage() != null) {
                 fileUrl = msg.getImage().getUrl();
                 fileName = "image_" + System.currentTimeMillis();
                 rawMessage = "[图片消息]";
-                if (fileUrl != null && !fileUrl.isEmpty()) {
-                    try {
-                        tempDifyFileId = difyService.uploadFileByUrl(fileUrl, fileName, msg.getFrom().getUserid());
-                        log.info("企微图片上传Dify成功: groupId={}, fileId={}", msg.getChatid(), tempDifyFileId);
-                    } catch (Exception e) {
-                        log.error("企微图片上传Dify失败: groupId={}, url={}", msg.getChatid(), fileUrl, e);
-                    }
-                }
+                log.info("企微图片消息: groupId={}, fileUrl={}", msg.getChatid(), fileUrl);
             } else if ("text".equals(msgType) && msg.getText() != null) {
                 fileUrl = null;
                 fileName = null;
@@ -148,7 +140,6 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 fileName = null;
                 rawMessage = "";
             }
-            final String difyFileId = tempDifyFileId;
 
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
                 CompletableFuture.runAsync(() -> {
@@ -158,17 +149,6 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                                 rawMessage, msgType, System.currentTimeMillis() / 1000,
                                 fileUrl, fileName
                         );
-
-                        if (difyFileId != null) {
-                            LambdaQueryWrapper<GroupMessage> wrapper = new LambdaQueryWrapper<>();
-                            wrapper.eq(GroupMessage::getPlatform, "wecom")
-                                   .eq(GroupMessage::getMessageId, msgId);
-                            GroupMessage gm = groupMessageSyncService.getOne(wrapper);
-                            if (gm != null) {
-                                gm.setDifyFileId(difyFileId);
-                                groupMessageSyncService.updateById(gm);
-                            }
-                        }
 
                         imGroupService.getOrCreateGroup("wecom", msg.getChatid(), null);
                         imUserService.getOrCreateUser("wecom", msg.getFrom().getUserid(), msg.getChatid(), msg.getFrom().getUserid());
