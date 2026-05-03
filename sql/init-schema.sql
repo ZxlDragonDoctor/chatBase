@@ -243,12 +243,6 @@ CREATE TABLE IF NOT EXISTS group_message (
 ALTER TABLE group_message
     MODIFY COLUMN message_id VARCHAR(100) DEFAULT '' NOT NULL;
 
--- 添加文件同步字段
-ALTER TABLE group_message
-    ADD COLUMN file_url VARCHAR(500) DEFAULT NULL COMMENT '文件URL（图片/文件的下载链接）',
-    ADD COLUMN dify_file_id VARCHAR(100) DEFAULT NULL COMMENT '上传到Dify后的文件ID',
-    ADD COLUMN file_name VARCHAR(200) DEFAULT NULL COMMENT '文件名（如果有）';
-
 -- 添加唯一索引防止重复消息（数据库兜底）
 ALTER TABLE group_message
     ADD UNIQUE INDEX uk_platform_msgid (platform, message_id);
@@ -386,7 +380,7 @@ PRIMARY KEY (`id`),
 -- =============================================
 -- 聊天会话管理表
 -- =============================================
-CREATE TABLE IF NOT EXISTS ` ` (
+CREATE TABLE IF NOT EXISTS `chat_session` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话ID',
   `session_id` VARCHAR(64) NOT NULL COMMENT '会话唯一标识',
   `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',
@@ -475,7 +469,4 @@ ALTER TABLE `kb_conversation` ADD KEY `idx_app_id` (`app_id`);
 ALTER TABLE `kb_statistics` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '应用ID' AFTER `knowledge_base_id`;
 ALTER TABLE `kb_statistics` ADD KEY `idx_app_id` (`app_id`);
 
--- group_message表添加文件相关字段
-ALTER TABLE `group_message` ADD COLUMN `file_url` VARCHAR(500) DEFAULT NULL COMMENT '文件URL' AFTER `kb_document_id`;
-ALTER TABLE `group_message` ADD COLUMN `dify_file_id` VARCHAR(128) DEFAULT NULL COMMENT 'Dify文件ID' AFTER `file_url`;
-ALTER TABLE `group_message` ADD COLUMN `file_name` VARCHAR(255) DEFAULT NULL COMMENT '文件名' AFTER `dify_file_id`;
+
