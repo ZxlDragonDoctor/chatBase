@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ChatBaseApplication {
 
+
     public static void main(String[] args) {
         SpringApplication.run(ChatBaseApplication.class, args);
     }

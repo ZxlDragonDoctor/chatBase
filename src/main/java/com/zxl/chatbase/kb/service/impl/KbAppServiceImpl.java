@@ -31,15 +31,14 @@ public class KbAppServiceImpl implements IKbAppService {
 
     @Autowired
     private KbAppMapper appMapper;
-
-    @Autowired
-    private ImGroupMapper imGroupMapper;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
     @Autowired
     private DifyConfig difyConfig;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private ImGroupMapper imGroupMapper;
+    @javax.annotation.Resource
+    private CloseableHttpClient httpClient;
 
     @Override
     public List<KbApp> listAll(String userId) {
@@ -145,7 +144,6 @@ public class KbAppServiceImpl implements IKbAppService {
     @Override
     public KbApp verifyApiKey(String apiKey) {
         try {
-            CloseableHttpClient httpClient = HttpClients.createDefault();
             HttpGet httpGet = new HttpGet(difyConfig.getApiUrl() + "/info");
             httpGet.setHeader("Authorization", "Bearer " + apiKey);
             httpGet.setHeader("Content-Type", "application/json");

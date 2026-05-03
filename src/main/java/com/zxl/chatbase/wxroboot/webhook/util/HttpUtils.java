@@ -54,6 +54,12 @@ public class HttpUtils {
             } catch (IOException e) {
                 log.error("GET 连接关闭失败：{}",e.getMessage());
             }
+            try {
+                if (httpclient != null)
+                    httpclient.close();
+            } catch (IOException e) {
+                log.error("GET HttpClient 关闭失败：{}",e.getMessage());
+            }
         }
        return result;
     }
@@ -101,6 +107,12 @@ public class HttpUtils {
             } catch (IOException e) {
                 log.error("POST 连接关闭失败：{}", e.getMessage());
             }
+            try {
+                if (httpClient != null)
+                    httpClient.close();
+            } catch (IOException e) {
+                log.error("POST HttpClient 关闭失败：{}", e.getMessage());
+            }
         }
         return result;
     }
@@ -131,7 +143,13 @@ public class HttpUtils {
             } catch (IOException var13) {
                 log.error("POST 连接关闭失败：{}", var13.getMessage());
             }
-
+            try {
+                if (httpClient != null) {
+                    httpClient.close();
+                }
+            } catch (IOException var13) {
+                log.error("POST HttpClient 关闭失败：{}", var13.getMessage());
+            }
         }
 
         return result;

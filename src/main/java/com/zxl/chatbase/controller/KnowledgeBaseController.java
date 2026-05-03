@@ -51,6 +51,8 @@ public class KnowledgeBaseController {
     private final DifyConfig difyConfig;
     private final ObjectMapper objectMapper;
     private final ExecutorService uploadExecutor = Executors.newFixedThreadPool(5);
+    @javax.annotation.Resource
+    private CloseableHttpClient httpClient;
 
     @GetMapping("/category/tree")
     public List<KbCategory> categoryTree() {
@@ -213,7 +215,6 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
             
             httpPost.setEntity(multipartEntity);
             
-            CloseableHttpClient httpClient = HttpClients.createDefault();
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
@@ -261,7 +262,6 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
             
             httpPost.setEntity(multipartEntity);
             
-            CloseableHttpClient httpClient = HttpClients.createDefault();
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String respBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);

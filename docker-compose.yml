@@ -89,7 +89,7 @@ services:
       WECHAT_CORP_BOT_ID: ${WECHAT_CORP_BOT_ID}
       WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
 
-      JAVA_OPTS: ${JAVA_OPTS:-Xms256m -Xmx512m}
+      JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx1024m -XX:+UseG1GC}
     volumes:
       - qq_files:/data/qq_files/
     networks:
