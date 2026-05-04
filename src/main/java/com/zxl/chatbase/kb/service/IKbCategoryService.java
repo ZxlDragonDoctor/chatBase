@@ -16,5 +16,5 @@ public interface IKbCategoryService extends IService<KbCategory> {
     
     boolean updateCategory(KbCategory category);
     
-    boolean deleteCategory(Long id);
+    String deleteCategory(Long id);
 }

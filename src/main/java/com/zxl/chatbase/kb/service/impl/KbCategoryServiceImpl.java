@@ -80,13 +80,22 @@ public class KbCategoryServiceImpl extends ServiceImpl<KbCategoryMapper, KbCateg
     }
 
     @Override
-    public boolean deleteCategory(Long id) {
+    public String deleteCategory(Long id) {
         LambdaQueryWrapper<KbCategory> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(KbCategory::getParentId, id);
         long childCount = count(wrapper);
         if (childCount > 0) {
-            return false;
+            return "该分类下有子分类，无法删除";
         }
-        return removeById(id);
+        
+        LambdaQueryWrapper<KbKnowledgeBase> kbWrapper = new LambdaQueryWrapper<>();
+        kbWrapper.eq(KbKnowledgeBase::getCategoryId, id);
+        long kbCount = kbMapper.selectCount(kbWrapper);
+        if (kbCount > 0) {
+            return "该分类下有知识库，无法删除";
+        }
+        
+        boolean success = removeById(id);
+        return success ? null : "删除失败，请稍后重试";
     }
 }

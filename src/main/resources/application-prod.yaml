@@ -24,6 +24,14 @@ spring:
     # 允许为空：为空时 Redis 按空密码校验（取决于 Redis 是否设置 requirepass）
     password: ${SPRING_REDIS_PASSWORD:}
 
+logging:
+  level:
+    root: WARN
+    com.zxl.chatbase: WARN
+    com.zxl.chatbase.dify: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
 difyApp:
   url: https://api.dify.ai/v1
   apiKey: ${DIFYAPP_API_KEY}

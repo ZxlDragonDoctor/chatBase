@@ -78,8 +78,17 @@ public class KnowledgeBaseController {
     }
 
     @DeleteMapping("/category/{id}")
-    public boolean deleteCategory(@PathVariable Long id) {
-        return categoryService.deleteCategory(id);
+    public Map<String, Object> deleteCategory(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        String errorMsg = categoryService.deleteCategory(id);
+        if (errorMsg != null) {
+            result.put("success", false);
+            result.put("message", errorMsg);
+        } else {
+            result.put("success", true);
+            result.put("message", "删除成功");
+        }
+        return result;
     }
 
     @GetMapping("/page")

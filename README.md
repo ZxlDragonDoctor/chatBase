@@ -243,10 +243,228 @@ QQ群消息 → NapCat → WebSocket(/qq/ws)
 → kb_conversation 表 → 返回答案
 ```
 
+## 定时任务
+
+系统中的定时任务汇总如下：
+
+| 序号 | 类名 | 方法名 | 执行频率 | 功能说明 |
+|:----:|------|--------|----------|----------|
+| 1 | GroupMessageSyncServiceImpl | syncToKnowledgeBase() | 每60秒 | 同步群消息到Dify知识库，批量查询未同步的消息并创建文档 |
+| 2 | StatisticsAggregateServiceImpl | aggregateYesterdayStatistics() | 每天 00:05 | 聚合昨日统计数据，包括会话数、Token消耗、费用等 |
+| 3 | KeywordSyncServiceImpl | syncKeywordsFromMessages() | 每天 05:00 | 从群聊消息和Web对话中批量提取关键词，更新关键词统计数据 |
+| 4 | KeywordSyncServiceImpl | cleanOldKeywords() | 每天 06:00 | 清理超过保留期限的关键词，默认保留90天 |
+| 5 | CleanupServiceImpl | cleanupExpiredConversations() | 每天 03:00 | 清理Redis和数据库中过期的会话数据 |
+| 6 | CleanupServiceImpl | cleanupOldMessages() | 每天 04:30 | 清理超过保留期限的消息数据 |
+
+### 定时任务详情
+
+#### 1. 群消息同步 (GroupMessageSyncServiceImpl)
+- **文件位置**: `src/main/java/com/zxl/chatbase/im/service/impl/GroupMessageSyncServiceImpl.java`
+- **执行频率**: 每60秒（fixedDelayString = "60000"）
+- **功能**:
+  - 查询 `synced = false` 的群消息（每次最多200条）
+  - 按群ID分组，每群一个文档
+  - **自动创建默认"群聊消息"分类**：如果不存在则创建
+  - **自动创建默认"群聊助手知识库"**：如果不存在则创建，并调用Dify API创建Dataset
+  - 创建/更新知识库和文档
+
+#### 2. 每日统计聚合 (StatisticsAggregateServiceImpl)
+- **文件位置**: `src/main/java/com/zxl/chatbase/statistics/service/impl/StatisticsAggregateServiceImpl.java`
+- **执行频率**: 每天 00:05 (cron = "0 5 0 * * ?")
+- **功能**:
+  - 聚合昨日的会话统计数据
+  - 统计会话数、消息数、Token消耗、费用等
+
+#### 3. 关键词同步 (KeywordSyncServiceImpl)
+- **文件位置**: `src/main/java/com/zxl\chatbase/kb/service/impl/KeywordSyncServiceImpl.java`
+- **执行频率**: 每天 05:00 和 06:00
+- **功能**:
+  - `syncKeywordsFromMessages()`: 从最近7天的群聊消息和对话中提取关键词
+  - `cleanOldKeywords()`: 清理超过90天的关键词
+
+#### 4. 数据清理 (CleanupServiceImpl)
+- **文件位置**: `src/main/java/com/zxl\chatbase/chat/service/impl/CleanupServiceImpl.java`
+- **执行频率**: 每天 03:00 和 04:30
+- **功能**:
+  - `cleanupExpiredConversations()`: 清理Redis和数据库中的过期会话
+  - `cleanupOldMessages()`: 清理超过90天的消息
+
+### 注意事项
+
+⚠️ **定时任务与手动删除的冲突**：
+- 群消息同步任务会检查"群聊消息"分类是否存在，不存在则自动创建
+- 群消息同步任务会检查"群聊助手知识库"是否存在，不存在则自动创建
+- 如果手动删除该分类或知识库，定时任务会在60秒内重新创建
+
+⚠️ **定时任务触发的默认知识库创建**：
+- 当首次有群消息需要同步时，定时任务会自动创建：
+  - **"群聊消息"分类**（分类名称，parent_id=0）
+  - **"群聊助手知识库"**（知识库名称，source_type=im_sync）
+- 这是隐式创建，没有独立的定时任务，但在 GroupMessageSyncServiceImpl.syncToKnowledgeBase() 中通过 findOrCreateImSyncCategory() 和 findOrCreateImSyncKnowledgeBase() 方法实现
+
+⚠️ **统计数据延迟**：
+- 统计聚合任务每天0:05执行，聚合的是昨日数据
+- 当天的统计数据需要在次日才会显示
+
 ## 常见问题
 
 1. **QQ消息收到但不回答**：确认 @机器人 而不是只发消息
 2. **知识库删除失败**：检查 Dify API Key 配置是否正确
 3. **统计数据为空**：调用 `/api/statistics/aggregate` 聚合统计
 4. **Token费用显示为0**：历史数据无费用信息，新对话正常记录
+
+## 默认数据创建
+
+### 1. 默认应用（kb_app 表）
+
+#### 创建时机
+- 数据库初始化时（init-schema.sql）
+
+#### 初始化数据
+```sql
+-- init-schema.sql 中的初始化语句
+INSERT INTO `kb_app` 
+  (`name`, `description`, `icon`, `dify_api_key`, `dify_app_name`, `dify_app_mode`, `is_default`, `is_public`, `create_by`, `status`)
+VALUES 
+  ('默认助手', '系统默认应用，使用配置文件中的API Key', 'robot', 'PLACEHOLDER_API_KEY', NULL, NULL, 1, 1, 'admin', 1)
+ON DUPLICATE KEY UPDATE `update_time` = NOW();
+```
+
+#### 获取默认应用的逻辑（KbAppServiceImpl.getDefaultApp()）
+```java
+public KbApp getDefaultApp() {
+    // 1. 首先查询 is_default = true 且 status = 1 的应用
+    LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(KbApp::getStatus, true)
+            .eq(KbApp::getIsDefault, true)
+            .last("LIMIT 1");
+    KbApp app = appMapper.selectOne(wrapper);
+    
+    // 2. 如果没有默认应用，则返回任意一个启用的应用
+    if (app == null) {
+        wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KbApp::getStatus, true).last("LIMIT 1");
+        app = appMapper.selectOne(wrapper);
+    }
+    return app;
+}
+```
+
+#### 应用获取优先级
+1. 群组绑定的应用（优先）
+2. 默认应用（is_default = true）
+3. 任意启用的应用
+
+### 2. 默认知识库（群聊助手知识库）
+
+#### 创建时机
+- 首次同步群消息时，由 `GroupMessageSyncServiceImpl` 定时任务触发
+
+#### 创建流程
+```
+定时任务触发（每60秒） 
+    ↓
+findOrCreateImSyncCategory() 检查"群聊消息"分类
+    ├── 存在 → 直接使用
+    └── 不存在 → 创建新分类
+        ↓
+findOrCreateImSyncKnowledgeBase() 检查"群聊助手知识库"
+    ├── 存在 → 直接使用
+    └── 不存在 → 创建知识库 + 调用 Dify API 创建 Dataset
+        ↓
+保存到数据库
+```
+
+#### 关键代码位置
+- **文件**：`src/main/java/com/zxl/chatbase/im/service/impl/GroupMessageSyncServiceImpl.java`
+
+- **findOrCreateImSyncCategory()** - 第262-283行
+  ```java
+  private KbCategory findOrCreateImSyncCategory() {
+      // 检查 name='群聊消息' AND status=true 的分类
+      LambdaQueryWrapper<KbCategory> wrapper = new LambdaQueryWrapper<>();
+      wrapper.eq(KbCategory::getName, "群聊消息")
+              .eq(KbCategory::getStatus, true)
+              .last("LIMIT 1");
+      KbCategory category = kbCategoryMapper.selectOne(wrapper);
+      
+      // 不存在则创建
+      if (category == null) {
+          category = new KbCategory();
+          category.setName("群聊消息");
+          category.setDescription("群聊消息同步分类");
+          category.setParentId(0L);
+          category.setStatus(true);
+          kbCategoryMapper.insert(category);
+      }
+      return category;
+  }
+  ```
+
+- **findOrCreateImSyncKnowledgeBase()** - 第285-328行
+  ```java
+  private KbKnowledgeBase findOrCreateImSyncKnowledgeBase() {
+      // 1. 获取或创建"群聊消息"分类
+      KbCategory category = findOrCreateImSyncCategory();
+      
+      // 2. 检查"群聊助手知识库"是否存在
+      LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
+      wrapper.eq(KbKnowledgeBase::getSourceType, "im_sync")
+              .eq(KbKnowledgeBase::getName, "群聊助手知识库")
+              .eq(KbKnowledgeBase::getStatus, true)
+              .last("LIMIT 1");
+      
+      // 3. 不存在则创建
+      if (kb == null) {
+          kb = new KbKnowledgeBase();
+          kb.setName("群聊助手知识库");
+          kb.setDescription("所有群聊消息同步知识库");
+          kb.setCategoryId(category.getId());
+          kb.setSourceType("im_sync");
+          // 调用 Dify API 创建 Dataset
+          String difyDatasetId = difyService.createDataset(kb.getName(), kb.getDescription());
+          kb.setDifyDatasetId(difyDatasetId);
+          knowledgeBaseService.save(kb);
+      }
+      return kb;
+  }
+  ```
+
+#### 相关配置常量
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `IM_SYNC_KB_NAME` | 群聊助手知识库 | 知识库名称 |
+| `IM_SYNC_CATEGORY_NAME` | 群聊消息 | 分类名称 |
+| `IM_SYNC_SOURCE_TYPE` | im_sync | 来源类型 |
+
+### 3. 配置说明
+
+#### Dify API Key 来源
+1. **数据库 kb_app 表**：`dify_api_key` 字段存储应用级 API Key
+2. **配置文件**：`application-prod.yaml` 中的 `difyApp.apiKey` 环境变量
+3. **优先级**：配置文件 > 数据库
+
+#### 环境变量配置
+```yaml
+# application-prod.yaml
+difyApp:
+  url: https://api.dify.ai/v1
+  apiKey: ${DIFYAPP_API_KEY}        # 来自 .env 文件
+  datasetApiKey: ${DIFYAPP_DATASET_API_KEY}
+```
+
+### 4. 注意事项
+
+⚠️ **删除"群聊消息"分类的问题**：
+- 该分类由定时任务自动创建（每60秒检查）
+- 删除后会在下一次同步时自动重建
+- 如需删除该分类，需先禁用 IM 同步功能
+
+⚠️ **默认应用 API Key**：
+- 数据库初始化时使用占位符 `PLACEHOLDER_API_KEY`
+- 部署时需在 `.env` 文件中配置真实的 `DIFYAPP_API_KEY`
+
+⚠️ **定时任务配置**：
+- `GroupMessageSyncServiceImpl.syncToKnowledgeBase()` 每60秒执行一次
+- 定时任务会在启动后立即执行一次
 

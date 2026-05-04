@@ -1,4 +1,4 @@
-package com.zxl.chatbase.chat.controller;
+package com.zxl.chatbase.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zxl.chatbase.chat.entity.ChatSession;

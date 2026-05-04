@@ -89,7 +89,7 @@ services:
       WECHAT_CORP_BOT_ID: ${WECHAT_CORP_BOT_ID}
       WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
 
-      JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx1024m -XX:+UseG1GC}
+      JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx2048m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
     volumes:
       - qq_files:/data/qq_files/
     networks:
