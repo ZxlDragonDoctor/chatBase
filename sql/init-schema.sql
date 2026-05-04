@@ -247,6 +247,10 @@ ALTER TABLE group_message
 ALTER TABLE group_message
     ADD UNIQUE INDEX uk_platform_msgid (platform, message_id);
 
+-- 添加更新时间字段
+ALTER TABLE group_message
+    ADD COLUMN update_time DATETIME DEFAULT NULL COMMENT '更新时间' AFTER create_time;
+
 
 
 CREATE TABLE IF NOT EXISTS t_duty_chat_group(

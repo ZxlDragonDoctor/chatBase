@@ -58,6 +58,11 @@ public class GroupMessage {
     private LocalDateTime createTime;
 
     /**
+     * 更新时间
+     */
+    private LocalDateTime updateTime;
+
+    /**
      * 是否已同步到知识库
      */
     private Boolean synced;

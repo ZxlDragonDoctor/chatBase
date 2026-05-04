@@ -38,4 +38,12 @@ chat:
     window-seconds: 5
     max-requests: 1
 
+# IM消息同步配置
+im:
+  sync:
+    stream:
+      enabled: true
+    polling:
+      enabled: false
+
 

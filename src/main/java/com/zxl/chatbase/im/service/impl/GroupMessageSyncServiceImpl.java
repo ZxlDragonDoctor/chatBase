@@ -8,7 +8,9 @@ import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.im.consumer.GroupMessageConsumer;
 import com.zxl.chatbase.kb.entity.KbCategory;
+import org.springframework.context.annotation.Lazy;
 import com.zxl.chatbase.kb.entity.KbDocument;
 import com.zxl.chatbase.kb.entity.KbKnowledgeBase;
 import com.zxl.chatbase.kb.mapper.KbCategoryMapper;
@@ -16,6 +18,7 @@ import com.zxl.chatbase.kb.service.IKbDocumentService;
 import com.zxl.chatbase.kb.service.IKbKnowledgeBaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -44,6 +47,10 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
     private final IKbDocumentService documentService;
     private final ImGroupMapper imGroupMapper;
     private final KbCategoryMapper kbCategoryMapper;
+    
+    @Lazy
+    @Autowired
+    private GroupMessageConsumer groupMessageConsumer;
 
     private static final DateTimeFormatter CONTENT_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd/HH/mm/ss");
     private static final DateTimeFormatter TITLE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -54,6 +61,16 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
     private static final String IM_SYNC_CATEGORY_NAME = "群聊消息";
     private static final String IM_SYNC_SOURCE_TYPE = "im_sync";
 
+    /**
+     * 同步群消息到Dify知识库
+     * @deprecated 建议使用 Redis Stream 消息队列方案（GroupMessageConsumer），避免无消息时仍轮询检查
+     * 定时轮询方案问题：
+     * 1. 无消息时仍执行数据库查询，浪费资源
+     * 2. 最大延迟60秒才能处理新消息
+     * 3. 数据库频繁查询增加压力
+     * @see com.zxl.chatbase.im.consumer.GroupMessageConsumer 推荐使用
+     */
+    @Deprecated(since = "2026-05-04")
     @Override
     @Scheduled(fixedDelayString = "60000")
     public void syncToKnowledgeBase() {
@@ -405,8 +422,92 @@ public void saveGroupMessage(String messageId, String groupId, String userId,
             gm.setCreateTime(LocalDateTime.now());
             groupMessageMapper.insert(gm);
             log.info("群消息写库成功: platform={}, groupId={}, userId={}, type={}", platform, groupId, userId, messageType);
+            
+            // 发布消息到 Redis Stream，实现实时同步（如果 Stream 方案启用）
+            if (groupMessageConsumer != null && groupId != null) {
+                try {
+                    groupMessageConsumer.publishMessage(gm.getId(), groupId, rawMessage);
+                } catch (Exception e) {
+                    log.warn("发布消息到Redis Stream失败: messageId={}, error={}", gm.getId(), e.getMessage());
+                }
+            }
         } catch (Exception e) {
             log.error("保存群消息失败: platform={}, messageId={}", platform, messageId, e);
+        }
+    }
+
+    /**
+     * 同步单条消息到知识库
+     * 供 Redis Stream 消费者调用，实现实时同步
+     * 
+     * 注意：由于文本消息同步涉及与历史消息合并，单条处理时会触发批量同步逻辑
+     * 这样可以保证数据完整性，同时实现实时处理
+     * 
+     * @param messageId 消息ID
+     */
+    @Override
+    public void syncSingleMessage(Long messageId) {
+        if (messageId == null) {
+            log.warn("messageId为空，跳过处理");
+            return;
+        }
+
+        GroupMessage message = groupMessageMapper.selectById(messageId);
+        if (message == null) {
+            log.warn("消息不存在: messageId={}", messageId);
+            return;
+        }
+
+        if (message.getSynced()) {
+            log.debug("消息已同步，跳过: messageId={}", messageId);
+            return;
+        }
+
+        if (message.getGroupId() == null) {
+            log.debug("无群组ID，跳过同步: messageId={}", messageId);
+            return;
+        }
+
+        try {
+            KbKnowledgeBase imKb = findOrCreateImSyncKnowledgeBase();
+            if (imKb == null || imKb.getDifyDatasetId() == null || imKb.getDifyDatasetId().isEmpty()) {
+                log.error("无法获取有效的群聊助手知识库，同步终止: messageId={}", messageId);
+                return;
+            }
+
+            // 获取群组信息
+            ImGroup groupInfo = getGroupInfo(message.getGroupId());
+            String groupName = groupInfo != null && StringUtils.hasText(groupInfo.getGroupName())
+                    ? groupInfo.getGroupName() : message.getGroupId();
+
+            // 根据消息类型分别处理
+            if ("image".equalsIgnoreCase(message.getMessageType()) || "file".equalsIgnoreCase(message.getMessageType())) {
+                // 图片/文件消息单独处理
+                boolean success = syncFileMessage(imKb, message, message.getGroupId(), groupName);
+                if (success) {
+                    message.setSynced(true);
+                    message.setUpdateTime(LocalDateTime.now());
+                    groupMessageMapper.updateById(message);
+                    log.info("单条文件消息同步成功: messageId={}, groupId={}", messageId, message.getGroupId());
+                }
+            } else {
+                // 文本消息：触发该群的所有文本消息批量同步
+                // 这样可以保证与历史消息正确合并
+                LambdaQueryWrapper<GroupMessage> textWrapper = new LambdaQueryWrapper<GroupMessage>()
+                        .eq(GroupMessage::getGroupId, message.getGroupId())
+                        .ne(GroupMessage::getMessageType, "image")
+                        .ne(GroupMessage::getMessageType, "file")
+                        .orderByAsc(GroupMessage::getMessageTime);
+                List<GroupMessage> textMessages = groupMessageMapper.selectList(textWrapper);
+                
+                if (!textMessages.isEmpty()) {
+                    syncTextMessages(imKb, textMessages, message.getGroupId(), groupName);
+                    log.info("触发文本消息批量同步: messageId={}, groupId={}, total={}", messageId, message.getGroupId(), textMessages.size());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("单条消息同步失败: messageId={}, error={}", messageId, e.getMessage(), e);
         }
     }
 }

@@ -60,3 +60,18 @@ chat:
   rate-limit:
     window-seconds: 5
     max-requests: 1
+
+# IM消息同步配置
+im:
+  sync:
+    # 是否启用Redis Stream消息队列方案（推荐启用）
+    # true: 使用Stream方案，消息驱动实时处理
+    # false: 使用定时轮询方案（已过时，不推荐）
+    stream:
+      enabled: true
+    # 定时轮询配置（仅当stream.enabled=false时生效）
+    # 已标记为过时，仅作为降级方案保留
+    polling:
+      enabled: false
+      interval: 60000
+      batch-size: 200

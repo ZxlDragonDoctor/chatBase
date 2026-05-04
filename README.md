@@ -247,18 +247,20 @@ QQ群消息 → NapCat → WebSocket(/qq/ws)
 
 系统中的定时任务汇总如下：
 
-| 序号 | 类名 | 方法名 | 执行频率 | 功能说明 |
-|:----:|------|--------|----------|----------|
-| 1 | GroupMessageSyncServiceImpl | syncToKnowledgeBase() | 每60秒 | 同步群消息到Dify知识库，批量查询未同步的消息并创建文档 |
-| 2 | StatisticsAggregateServiceImpl | aggregateYesterdayStatistics() | 每天 00:05 | 聚合昨日统计数据，包括会话数、Token消耗、费用等 |
-| 3 | KeywordSyncServiceImpl | syncKeywordsFromMessages() | 每天 05:00 | 从群聊消息和Web对话中批量提取关键词，更新关键词统计数据 |
-| 4 | KeywordSyncServiceImpl | cleanOldKeywords() | 每天 06:00 | 清理超过保留期限的关键词，默认保留90天 |
-| 5 | CleanupServiceImpl | cleanupExpiredConversations() | 每天 03:00 | 清理Redis和数据库中过期的会话数据 |
-| 6 | CleanupServiceImpl | cleanupOldMessages() | 每天 04:30 | 清理超过保留期限的消息数据 |
+| 序号 | 类名 | 方法名 | 执行频率 | 功能说明 | 状态 |
+|:----:|------|--------|----------|----------|:----:|
+| 1 | GroupMessageSyncServiceImpl | syncToKnowledgeBase() | 每60秒 | 同步群消息到Dify知识库，批量查询未同步的消息并创建文档 | ⚠️ 已过时 |
+| 2 | GroupMessageConsumer | consumeMessages() | 每5秒 | Redis Stream消息消费者，实时处理新消息 | ✅ 推荐 |
+| 3 | StatisticsAggregateServiceImpl | aggregateYesterdayStatistics() | 每天 00:05 | 聚合昨日统计数据，包括会话数、Token消耗、费用等 | ✅ |
+| 4 | KeywordSyncServiceImpl | syncKeywordsFromMessages() | 每天 05:00 | 从群聊消息和Web对话中批量提取关键词，更新关键词统计数据 | ✅ |
+| 5 | KeywordSyncServiceImpl | cleanOldKeywords() | 每天 06:00 | 清理超过保留期限的关键词，默认保留90天 | ✅ |
+| 6 | CleanupServiceImpl | cleanupExpiredConversations() | 每天 03:00 | 清理Redis和数据库中过期的会话数据 | ✅ |
+| 7 | CleanupServiceImpl | cleanupOldMessages() | 每天 04:30 | 清理超过保留期限的消息数据 | ✅ |
 
 ### 定时任务详情
 
-#### 1. 群消息同步 (GroupMessageSyncServiceImpl)
+#### 1. 群消息同步 (GroupMessageSyncServiceImpl) ⚠️ 已过时
+- **状态**: ⚠️ 已过时，推荐使用 Redis Stream 消息队列方案
 - **文件位置**: `src/main/java/com/zxl/chatbase/im/service/impl/GroupMessageSyncServiceImpl.java`
 - **执行频率**: 每60秒（fixedDelayString = "60000"）
 - **功能**:
@@ -267,6 +269,64 @@ QQ群消息 → NapCat → WebSocket(/qq/ws)
   - **自动创建默认"群聊消息"分类**：如果不存在则创建
   - **自动创建默认"群聊助手知识库"**：如果不存在则创建，并调用Dify API创建Dataset
   - 创建/更新知识库和文档
+- **问题**:
+  - 无消息时仍执行数据库查询，浪费资源
+  - 最大延迟60秒才能处理新消息
+  - 数据库频繁查询增加压力
+
+#### 1.1 群消息同步 (GroupMessageConsumer) ✅ 推荐方案
+- **状态**: ✅ 推荐使用
+- **文件位置**: `src/main/java/com/zxl/chatbase/im/consumer/GroupMessageConsumer.java`
+- **执行频率**: 每5秒（阻塞读取，有消息立即处理）
+- **方案**: Redis Stream 消息队列
+- **功能**:
+  - 从 Redis Stream 消费新消息
+  - 消息驱动实时处理，无需轮询
+  - 支持消息确认机制
+  - 调用 `syncSingleMessage()` 处理单条消息
+- **优势**:
+  - 消息驱动：新消息到达立即处理，无需定时轮询
+  - 低延迟：秒级处理，无需等待60秒
+  - 低资源：仅处理新消息，不频繁查询数据库
+  - 高可靠：支持消息确认和失败重试
+
+### Redis Stream 消息队列方案
+
+#### 方案说明
+- **触发方式**: 消息驱动（消息到达立即处理）
+- **响应延迟**: 实时或秒级
+- **资源消耗**: 仅处理新消息，无需轮询
+- **配置项**: `im.sync.stream.enabled`（默认true）
+
+#### 消息流程
+```
+QQ/企微消息到达 → WebSocket处理器 → Redis Stream → 消费者处理 → Dify知识库
+                     ↓                                    ↓
+                保存到数据库                          更新synced状态
+```
+
+#### 核心组件
+
+| 组件 | 说明 |
+|------|------|
+| Stream Key | `chatbase:group:message:stream` |
+| Consumer Group | `chatbase-sync-group` |
+| 消费者 | `consumer-1` |
+
+#### 配置说明
+```yaml
+im:
+  sync:
+    stream:
+      enabled: true  # 启用Stream方案
+    polling:
+      enabled: false  # 禁用定时轮询
+```
+
+#### 待实现功能（可选）
+- 消息失败重试机制
+- 批量处理优化
+- 多个消费者并行处理
 
 #### 2. 每日统计聚合 (StatisticsAggregateServiceImpl)
 - **文件位置**: `src/main/java/com/zxl/chatbase/statistics/service/impl/StatisticsAggregateServiceImpl.java`
@@ -290,6 +350,11 @@ QQ群消息 → NapCat → WebSocket(/qq/ws)
   - `cleanupOldMessages()`: 清理超过90天的消息
 
 ### 注意事项
+
+⚠️ **定时同步方案已过时**：
+- 当前每60秒轮询方案（GroupMessageSyncServiceImpl.syncToKnowledgeBase）会造成资源浪费
+- 建议改用 Redis Stream 消息队列方案（GroupMessageConsumer）
+- 原定时任务保留作为降级方案（可通过 `im.sync.polling.enabled` 控制）
 
 ⚠️ **定时任务与手动删除的冲突**：
 - 群消息同步任务会检查"群聊消息"分类是否存在，不存在则自动创建

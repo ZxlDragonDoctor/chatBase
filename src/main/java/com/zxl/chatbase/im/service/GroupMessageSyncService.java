@@ -11,8 +11,17 @@ public interface GroupMessageSyncService  extends IService<GroupMessage> {
 
     /**
      * 将未同步的群消息增量同步到知识库（例如 Dify 知识库）
+     * @deprecated 建议使用 Redis Stream 消息队列方案（GroupMessageConsumer）
      */
+    @Deprecated(since = "2026-05-04")
     void syncToKnowledgeBase();
+
+    /**
+     * 同步单条消息到知识库
+     * 供 Redis Stream 消费者调用
+     * @param messageId 消息ID
+     */
+    void syncSingleMessage(Long messageId);
 
     /**
      * 保存qq群聊消息
