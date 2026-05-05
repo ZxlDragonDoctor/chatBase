@@ -405,6 +405,12 @@ public void saveGroupMessage(String messageId, String groupId, String userId,
                 }
             }
 
+            // QQ平台空消息ID处理：生成唯一值避免唯一索引冲突
+            if ("qq".equalsIgnoreCase(platform) && !StringUtils.hasText(messageId)) {
+                messageId = "qq-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 10000);
+                log.debug("QQ消息ID为空，生成唯一ID: {}", messageId);
+            }
+
             GroupMessage gm = new GroupMessage();
             gm.setMessageId(messageId);
             gm.setGroupId(groupId);
@@ -486,7 +492,6 @@ public void saveGroupMessage(String messageId, String groupId, String userId,
                 boolean success = syncFileMessage(imKb, message, message.getGroupId(), groupName);
                 if (success) {
                     message.setSynced(true);
-                    message.setUpdateTime(LocalDateTime.now());
                     groupMessageMapper.updateById(message);
                     log.info("单条文件消息同步成功: messageId={}, groupId={}", messageId, message.getGroupId());
                 }

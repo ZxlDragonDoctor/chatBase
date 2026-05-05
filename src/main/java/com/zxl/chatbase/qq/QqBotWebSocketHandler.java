@@ -29,11 +29,13 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * QQ / OneBot WebSocket 事件处理
@@ -167,6 +169,11 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
                 })
                 .thenAccept(resp -> {
                     String answer = resp != null ? resp.getAnswer() : "【系统错误】暂时无法回答，请稍后再试";
+                    //过滤Ai思考<think>内容
+                    int endIndex = answer.lastIndexOf("</think>");
+                    if(endIndex!=-1){
+                        answer = answer.substring(endIndex+"</think>".length());
+                    }
                     sendGroupMessage(session, groupId, answer);
                 });
     }
@@ -198,17 +205,66 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             Map<String, Object> body = new HashMap<>();
             body.put("message_type", "group");
             body.put("group_id", groupId);
-            body.put("message", text);
+            body.put("message", buildMarkdownMessage(text));
 
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
-            log.info("调用 OneBot HTTP 接口发送群消息, url={}, body={}", url, body);
+            log.info("调用 OneBot HTTP 接口发送群消息(Markdown), url={}", url);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = (Map<String, Object>) restTemplate.postForObject(url, requestEntity, Map.class);
             log.info("OneBot HTTP send_msg 响应: {}", response);
+
+            if (response != null && "failed".equals(response.get("status"))) {
+                log.warn("Markdown消息发送失败，尝试降级为纯文本发送, groupId={}, retcode={}", 
+                        groupId, response.get("retcode"));
+                
+                body.put("message", text);
+                requestEntity = new HttpEntity<>(body, headers);
+                response = (Map<String, Object>) restTemplate.postForObject(url, requestEntity, Map.class);
+                log.info("纯文本消息发送响应: {}", response);
+            }
         } catch (Exception e) {
-            log.error("发送群消息失败", e);
+            log.error("发送群消息失败, groupId={}, text={}", groupId, text, e);
         }
+    }
+
+    /**
+     * 构建双层嵌套 Markdown 消息（NapCat 支持）
+     * 外层 node -> 内层 node -> markdown
+     */
+    private List<Map<String, Object>> buildMarkdownMessage(String text) {
+        List<Map<String, Object>> messageList = new ArrayList<>();
+        
+        Map<String, Object> outerNode = new HashMap<>();
+        outerNode.put("type", "node");
+        
+        Map<String, Object> outerData = new HashMap<>();
+        List<Map<String, Object>> content = new ArrayList<>();
+        
+        Map<String, Object> innerNode = new HashMap<>();
+        innerNode.put("type", "node");
+        
+        Map<String, Object> innerData = new HashMap<>();
+        innerData.put("nickname", "ChatBase");
+        innerData.put("user_id", String.valueOf(qqBotProperties.getSelfId()));
+        
+        List<Map<String, Object>> innerContent = new ArrayList<>();
+        Map<String, Object> markdown = new HashMap<>();
+        markdown.put("type", "markdown");
+        Map<String, Object> mdData = new HashMap<>();
+        mdData.put("content", text);
+        markdown.put("data", mdData);
+        innerContent.add(markdown);
+        
+        innerData.put("content", innerContent);
+        innerNode.put("data", innerData);
+        content.add(innerNode);
+        
+        outerData.put("content", content);
+        outerNode.put("data", outerData);
+        messageList.add(outerNode);
+        
+        return messageList;
     }
 
     @Override

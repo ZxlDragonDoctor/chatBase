@@ -7,7 +7,6 @@ import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.MonitorException;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
 import com.zxl.chatbase.dify.server.DifyService;
-import com.zxl.chatbase.im.entity.GroupMessage;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
@@ -120,7 +119,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             final String msgType = msg.getMsgtype();
             final String fileUrl;
             final String fileName;
-            final String rawMessage;
+            String rawMessage;
 
             if ("image".equals(msgType) && msg.getImage() != null) {
                 fileUrl = msg.getImage().getUrl();
@@ -141,12 +140,15 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 rawMessage = "";
             }
 
+
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
                 CompletableFuture.runAsync(() -> {
                     try {
+                        //过滤提问消息中@机器人的部分，TODO:机器人名字应该动态获取，而不是写死
+                        final String query = rawMessage.replace("@企业内部机器人", "");
                         groupMessageSyncService.saveGroupMessage(
                                 "wecom", msgId, msg.getChatid(), msg.getFrom().getUserid(),
-                                rawMessage, msgType, System.currentTimeMillis() / 1000,
+                                query, msgType, System.currentTimeMillis() / 1000,
                                 fileUrl, fileName
                         );
 
@@ -156,13 +158,18 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                         Long appId = getAppIdForGroup(msg.getChatid());
                         log.info("企微群组应用绑定: groupId={}, appId={}", msg.getChatid(), appId);
 
-                        String query = rawMessage;
                         DifyChatResponse difyChatResponse = chatService.chat(
                                 appId, "wecom", msg.getFrom().getUserid(), msg.getChatid(), query
                         );
 
                         String replyContent = decodeUnicode(difyChatResponse.getAnswer());
                         log.info("企微回复生成完成: groupId={}, reply={}", msg.getChatid(), replyContent);
+
+                        //过滤Ai思考<think>内容
+                        int endIndex = replyContent.lastIndexOf("</think>");
+                        if(endIndex!=-1){
+                            replyContent = replyContent.substring(endIndex+"</think>".length());
+                        }
 
                         if (msg.getResponse_url() != null && !msg.getResponse_url().isEmpty()) {
                             WeChatUtil.sendMarkdown(msg.getResponse_url(), replyContent);
