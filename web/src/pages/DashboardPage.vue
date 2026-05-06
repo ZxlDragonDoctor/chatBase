@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Home, BarChart3, Users, BookOpen, MessageCircle, RefreshCw, Zap } from 'lucide-vue-next'
 import { fetchSystemOverview } from '../api/statistics'

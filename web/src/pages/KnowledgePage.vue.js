@@ -221,7 +221,11 @@ async function deleteCategory(cat) {
     if (!confirm(`确定删除分类 "${cat.name}"？`))
         return;
     try {
-        await api.delete(`/kb/category/${cat.id}`);
+        const res = await api.delete(`/kb/category/${cat.id}`);
+        if (res.data && res.data.success === false) {
+            err.value = res.data.message || '删除失败';
+            return;
+        }
         loadCategoryTree();
     }
     catch (e) {

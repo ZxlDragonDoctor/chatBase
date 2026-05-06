@@ -118,7 +118,10 @@ async function handleLogin() {
     const resp = await login(username.value.trim(), password.value)
     if (resp.success && resp.token) {
       localStorage.setItem('chatbase_token', resp.token)
-      localStorage.setItem('chatbase_user', resp.user?.username || username.value.trim())
+      // 保存显示名（优先使用 nickname）
+      localStorage.setItem('chatbase_user', resp.user?.nickname || resp.user?.username || username.value.trim())
+      // 保存原始用户名（用于 API 调用）
+      localStorage.setItem('chatbase_original_username', resp.user?.username || username.value.trim())
       if (resp.user?.role) {
         localStorage.setItem('chatbase_role', resp.user.role)
       }

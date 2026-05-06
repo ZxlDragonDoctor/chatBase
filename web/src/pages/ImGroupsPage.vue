@@ -121,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { fetchGroups, fetchGroupMessages } from '../api/console'
 import { api } from '../api/client'

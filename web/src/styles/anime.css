@@ -288,6 +288,11 @@ body {
   background: linear-gradient(180deg, rgba(255, 183, 197, 0.08) 0%, transparent 100%);
 }
 
+.anime-card-header > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .anime-card-title {
   font-family: var(--anime-font-sans);
   font-size: 24px;
@@ -308,6 +313,44 @@ body {
   font-size: 14px;
   color: var(--anime-text-muted);
   margin-top: 6px;
+}
+
+.anime-user-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: var(--anime-radius-pill);
+  background: rgba(255, 183, 197, 0.1);
+  border: 1px solid var(--anime-border-light);
+  font-size: 13px;
+  color: var(--anime-text-secondary);
+}
+
+.anime-user-status-bar strong {
+  color: var(--anime-text-primary);
+}
+
+.anime-user-status-bar .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.anime-user-status-bar .status-dot.online {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.anime-badge.sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.anime-divider {
+  color: var(--anime-text-muted);
+  opacity: 0.5;
 }
 
 .anime-card-actions {

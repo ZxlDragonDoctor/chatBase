@@ -4,13 +4,12 @@ import { RouterLink } from 'vue-router';
 import { Plus, Trash2, Paperclip, Link, Send, ThumbsUp, ThumbsDown, MessageSquare, ChevronDown, ChevronUp, Brain } from 'lucide-vue-next';
 import { webChatWithSession } from '../api/chat';
 import { submitFeedback as submitFeedbackApi, getFeedbackStatus } from '../api/feedback';
-import { getOrCreateUserId, getCurrentUser } from '../lib/user';
+import { getOrCreateUserId } from '../lib/user';
 import { uploadFile } from '../api/upload';
 import { createSession, listSessions, getSessionMessages, deleteSession as deleteSessionApi } from '../api/session';
 import { renderMessage } from '../lib/markdown';
 import { api } from '../api/client';
 const userId = getOrCreateUserId();
-const displayUser = computed(() => getCurrentUser() || '访客用户');
 const input = ref('');
 const urlInput = ref('');
 const loading = ref(false);
@@ -342,33 +341,6 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-desc" },
 });
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "anime-pill" },
-    ...{ style: {} },
-});
-__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-    ...{ class: "anime-code" },
-});
-(__VLS_ctx.displayUser);
-if (__VLS_ctx.appList.length > 0) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "anime-pill" },
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-        value: (__VLS_ctx.selectedAppId),
-        ...{ class: "anime-app-select" },
-        ...{ style: {} },
-    });
-    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-            key: (app.id),
-            value: (app.id),
-        });
-        (app.icon || '🤖');
-        (app.name);
-    }
-}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-actions" },
 });
@@ -854,10 +826,6 @@ if (__VLS_ctx.error) {
 /** @type {__VLS_StyleScopedClasses['anime-card-header']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-desc']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-pill']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
@@ -947,7 +915,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             ChevronDown: ChevronDown,
             ChevronUp: ChevronUp,
             Brain: Brain,
-            displayUser: displayUser,
             input: input,
             urlInput: urlInput,
             loading: loading,
@@ -959,8 +926,6 @@ const __VLS_self = (await import('vue')).defineComponent({
             showAttachMenu: showAttachMenu,
             showUrlInput: showUrlInput,
             fileInputRef: fileInputRef,
-            appList: appList,
-            selectedAppId: selectedAppId,
             truncate: truncate,
             getThinkingHtml: getThinkingHtml,
             getContentHtml: getContentHtml,

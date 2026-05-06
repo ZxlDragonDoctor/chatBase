@@ -14,13 +14,25 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements UserService {
+
+    private static final String AVATAR_UPLOAD_DIR = "uploads/avatars";
+    private static final List<String> ALLOWED_AVATAR_TYPES = Arrays.asList("jpg", "jpeg", "png", "gif", "webp");
+    private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
     private final TokenService tokenService;
@@ -114,6 +126,73 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
         wrapper.eq(SysUser::getUsername, username);
         SysUser user = getOne(wrapper);
         return user != null && passwordEncoder.matches(rawPassword, user.getPassword());
+    }
+
+    @Override
+    public boolean changePassword(String username, String oldPassword, String newPassword) {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getUsername, username);
+        SysUser user = getOne(wrapper);
+        
+        if (user == null || !passwordEncoder.matches(oldPassword, user.getPassword())) {
+            log.warn("修改密码失败: 原密码错误, username={}", username);
+            return false;
+        }
+        
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        updateById(user);
+        
+        log.info("用户修改密码成功: username={}", username);
+        return true;
+    }
+
+    @Override
+    public UserVO uploadAvatar(String username, MultipartFile file) throws Exception {
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getUsername, username);
+        SysUser user = getOne(wrapper);
+        
+        if (user == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+
+        // Validate file type
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || !originalFilename.contains(".")) {
+            throw new IllegalArgumentException("无效的文件名");
+        }
+        String ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        if (!ALLOWED_AVATAR_TYPES.contains(ext)) {
+            throw new IllegalArgumentException("不支持的文件类型，仅支持: " + String.join(", ", ALLOWED_AVATAR_TYPES));
+        }
+
+        // Validate file size
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new IllegalArgumentException("文件大小不能超过5MB");
+        }
+
+        // Create upload directory
+        Path uploadDir = Paths.get(AVATAR_UPLOAD_DIR);
+        if (!Files.exists(uploadDir)) {
+            Files.createDirectories(uploadDir);
+        }
+
+        // Generate unique filename
+        String newFilename = username + "_" + UUID.randomUUID().toString().substring(0, 8) + "." + ext;
+        Path targetPath = uploadDir.resolve(newFilename);
+
+        // Save file
+        Files.copy(file.getInputStream(), targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+        // Update user avatar URL
+        String avatarUrl = "/uploads/avatars/" + newFilename;
+        user.setAvatar(avatarUrl);
+        user.setUpdateTime(LocalDateTime.now());
+        updateById(user);
+
+        log.info("用户头像上传成功: username={}, avatar={}", username, avatarUrl);
+        return toUserVO(user);
     }
 
     private UserVO toUserVO(SysUser user) {

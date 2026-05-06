@@ -158,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Sparkles, RefreshCw, Edit, Trash2, ToggleLeft, ToggleRight, Save, Plus, Search } from 'lucide-vue-next'
 import { getFaqPage, createFaq, updateFaq, deleteFaq, extractFaqFromConversations, getFaqStats } from '../api/faq'
 import { renderMarkdown } from '../lib/markdown'

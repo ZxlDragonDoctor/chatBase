@@ -5,17 +5,7 @@
         <div>
           <div class="anime-card-title">Web问答</div>
           <div class="anime-card-desc">
-            <span class="anime-pill" style="margin-left: 12px;">
-              当前用户: <span class="anime-code">{{ displayUser }}</span>
-            </span>
-            <span v-if="appList.length > 0" class="anime-pill" style="margin-left: 12px;">
-              应用: 
-              <select v-model="selectedAppId" class="anime-app-select" style="margin-left: 4px;">
-                <option v-for="app in appList" :key="app.id" :value="app.id">
-                  {{ app.icon || '🤖' }} {{ app.name }}
-                </option>
-              </select>
-            </span>
+            AI智能问答 · 知识库检索 · 对话管理
           </div>
         </div>
         <div class="anime-card-actions">
@@ -198,7 +188,6 @@ type DisplayMessage = {
 }
 
 const userId = getOrCreateUserId()
-const displayUser = computed(() => getCurrentUser() || '访客用户')
 
 const input = ref('')
 const urlInput = ref('')

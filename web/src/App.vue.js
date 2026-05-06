@@ -1,12 +1,83 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router';
 import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList } from 'lucide-vue-next';
+import UserProfile from './components/UserProfile.vue';
+import { getCurrentUser as fetchUserProfile } from './api/user';
 const router = useRouter();
 const route = useRoute();
 const isLoginPage = computed(() => route.path === '/login');
 const currentUser = computed(() => localStorage.getItem('chatbase_user'));
 const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin');
+function getOriginalUsername() {
+    return localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '';
+}
+const lastActive = computed(() => {
+    const now = new Date();
+    return now.toLocaleString('zh-CN', {
+        month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+    });
+});
+const showUserProfile = ref(false);
+const userProfile = ref(null);
+async function openUserProfile() {
+    showUserProfile.value = true;
+    await loadUserProfile();
+}
+const roleLabel = computed(() => {
+    const role = localStorage.getItem('chatbase_role');
+    switch (role) {
+        case 'admin': return '管理员';
+        case 'user': return '用户';
+        default: return '访客';
+    }
+});
+const roleBadgeClass = computed(() => {
+    const role = localStorage.getItem('chatbase_role');
+    switch (role) {
+        case 'admin': return 'pink';
+        case 'user': return 'blue';
+        default: return 'muted';
+    }
+});
+async function loadUserProfile() {
+    const username = getOriginalUsername();
+    if (!username)
+        return;
+    try {
+        const user = await fetchUserProfile(username);
+        if (user) {
+            userProfile.value = user;
+            localStorage.setItem('chatbase_original_username', user.username);
+        }
+    }
+    catch (e) {
+        console.error('加载用户信息失败', e);
+    }
+}
+function handleUserUpdated(user) {
+    userProfile.value = user;
+    const displayName = user.nickname || user.username;
+    if (displayName) {
+        localStorage.setItem('chatbase_user', displayName);
+    }
+    localStorage.setItem('chatbase_original_username', user.username);
+    if (user.role) {
+        localStorage.setItem('chatbase_role', user.role);
+    }
+}
+function getAvatarUrl(path) {
+    if (!path)
+        return '';
+    if (path.startsWith('http'))
+        return path;
+    return `/api${path}`;
+}
+function onAvatarError(e) {
+    const img = e.target;
+    img.style.display = 'none';
+}
 function handleLogout() {
     localStorage.removeItem('chatbase_token');
     localStorage.removeItem('chatbase_user');
@@ -14,10 +85,23 @@ function handleLogout() {
     localStorage.removeItem('chatbase_admin_id');
     router.push('/login');
 }
+onMounted(() => {
+    loadUserProfile();
+});
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['gus-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['global-user-status-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['global-user-status-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['global-user-status-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['global-user-status-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['danger']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -320,57 +404,133 @@ else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-nav-footer" },
     });
-    if (__VLS_ctx.currentUser) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "anime-user-info" },
-        });
-        const __VLS_76 = {}.User;
-        /** @type {[typeof __VLS_components.User, ]} */ ;
-        // @ts-ignore
-        const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
-            ...{ class: "anime-nav-icon" },
-            size: (16),
-        }));
-        const __VLS_78 = __VLS_77({
-            ...{ class: "anime-nav-icon" },
-            size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_77));
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-            ...{ class: "anime-user-name" },
-        });
-        (__VLS_ctx.currentUser);
-    }
-    if (__VLS_ctx.currentUser) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (__VLS_ctx.handleLogout) },
-            ...{ class: "anime-btn ghost sm" },
-        });
-        const __VLS_80 = {}.LogOut;
-        /** @type {[typeof __VLS_components.LogOut, ]} */ ;
-        // @ts-ignore
-        const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
-            size: (16),
-        }));
-        const __VLS_82 = __VLS_81({
-            size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_81));
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "anime-status-badge" },
+        ...{ class: "anime-nav-footer-text" },
     });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ class: "anime-status-dot" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.main, __VLS_intrinsicElements.main)({
         ...{ class: "anime-main" },
     });
-    const __VLS_84 = {}.RouterView;
+    if (__VLS_ctx.currentUser) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "global-user-status-bar" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onClick: (__VLS_ctx.openUserProfile) },
+            ...{ class: "gus-avatar" },
+        });
+        if (__VLS_ctx.userProfile?.avatar) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.img)({
+                ...{ onError: (__VLS_ctx.onAvatarError) },
+                src: (__VLS_ctx.getAvatarUrl(__VLS_ctx.userProfile.avatar)),
+                alt: "头像",
+            });
+        }
+        else {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            ((__VLS_ctx.userProfile?.nickname || __VLS_ctx.currentUser).charAt(0).toUpperCase());
+        }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ onClick: (__VLS_ctx.openUserProfile) },
+            ...{ class: "gus-info" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "gus-name" },
+        });
+        (__VLS_ctx.userProfile?.nickname || __VLS_ctx.currentUser);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "anime-badge sm" },
+            ...{ class: (__VLS_ctx.roleBadgeClass) },
+        });
+        (__VLS_ctx.roleLabel);
+        if (__VLS_ctx.userProfile?.email) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "gus-contact" },
+            });
+            const __VLS_76 = {}.Mail;
+            /** @type {[typeof __VLS_components.Mail, ]} */ ;
+            // @ts-ignore
+            const __VLS_77 = __VLS_asFunctionalComponent(__VLS_76, new __VLS_76({
+                size: (12),
+            }));
+            const __VLS_78 = __VLS_77({
+                size: (12),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_77));
+            (__VLS_ctx.userProfile.email);
+        }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "gus-divider" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "gus-active" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.strong, __VLS_intrinsicElements.strong)({});
+        (__VLS_ctx.lastActive);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.openUserProfile) },
+            ...{ class: "anime-btn ghost xs" },
+        });
+        const __VLS_80 = {}.User;
+        /** @type {[typeof __VLS_components.User, ]} */ ;
+        // @ts-ignore
+        const __VLS_81 = __VLS_asFunctionalComponent(__VLS_80, new __VLS_80({
+            size: (14),
+        }));
+        const __VLS_82 = __VLS_81({
+            size: (14),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_81));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.handleLogout) },
+            ...{ class: "anime-btn ghost xs danger" },
+        });
+        const __VLS_84 = {}.LogOut;
+        /** @type {[typeof __VLS_components.LogOut, ]} */ ;
+        // @ts-ignore
+        const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({
+            size: (14),
+        }));
+        const __VLS_86 = __VLS_85({
+            size: (14),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_85));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    }
+    const __VLS_88 = {}.RouterView;
     /** @type {[typeof __VLS_components.RouterView, ]} */ ;
     // @ts-ignore
-    const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({}));
-    const __VLS_86 = __VLS_85({}, ...__VLS_functionalComponentArgsRest(__VLS_85));
+    const __VLS_89 = __VLS_asFunctionalComponent(__VLS_88, new __VLS_88({}));
+    const __VLS_90 = __VLS_89({}, ...__VLS_functionalComponentArgsRest(__VLS_89));
+    if (__VLS_ctx.showUserProfile) {
+        /** @type {[typeof UserProfile, ]} */ ;
+        // @ts-ignore
+        const __VLS_92 = __VLS_asFunctionalComponent(UserProfile, new UserProfile({
+            ...{ 'onClose': {} },
+            ...{ 'onUpdated': {} },
+            show: (__VLS_ctx.showUserProfile),
+            user: (__VLS_ctx.userProfile),
+        }));
+        const __VLS_93 = __VLS_92({
+            ...{ 'onClose': {} },
+            ...{ 'onUpdated': {} },
+            show: (__VLS_ctx.showUserProfile),
+            user: (__VLS_ctx.userProfile),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_92));
+        let __VLS_95;
+        let __VLS_96;
+        let __VLS_97;
+        const __VLS_98 = {
+            onClose: (...[$event]) => {
+                if (!!(__VLS_ctx.isLoginPage))
+                    return;
+                if (!(__VLS_ctx.showUserProfile))
+                    return;
+                __VLS_ctx.showUserProfile = false;
+            }
+        };
+        const __VLS_99 = {
+            onUpdated: (__VLS_ctx.handleUserUpdated)
+        };
+        var __VLS_94;
+    }
 }
 /** @type {__VLS_StyleScopedClasses['anime-bg-decor']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-floating-stars']} */ ;
@@ -404,15 +564,24 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-footer']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-user-info']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-user-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-footer-text']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['global-user-status-bar']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-avatar']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-info']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-name']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-contact']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-divider']} */ ;
+/** @type {__VLS_StyleScopedClasses['gus-active']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
-/** @type {__VLS_StyleScopedClasses['sm']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-status-badge']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-status-dot']} */ ;
-/** @type {__VLS_StyleScopedClasses['anime-main']} */ ;
+/** @type {__VLS_StyleScopedClasses['xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
+/** @type {__VLS_StyleScopedClasses['ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['danger']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -430,9 +599,19 @@ const __VLS_self = (await import('vue')).defineComponent({
             LogOut: LogOut,
             Bot: Bot,
             ClipboardList: ClipboardList,
+            UserProfile: UserProfile,
             isLoginPage: isLoginPage,
             currentUser: currentUser,
             isAdmin: isAdmin,
+            lastActive: lastActive,
+            showUserProfile: showUserProfile,
+            userProfile: userProfile,
+            openUserProfile: openUserProfile,
+            roleLabel: roleLabel,
+            roleBadgeClass: roleBadgeClass,
+            handleUserUpdated: handleUserUpdated,
+            getAvatarUrl: getAvatarUrl,
+            onAvatarError: onAvatarError,
             handleLogout: handleLogout,
         };
     },
