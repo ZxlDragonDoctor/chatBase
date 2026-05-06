@@ -230,6 +230,15 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
         String documentId;
 
         if (existingDocId != null) {
+            // 验证文档是否存在（防止本地记录但Dify端已删除）
+            boolean docExists = difyService.documentExists(imKb.getDifyDatasetId(), existingDocId);
+            if (!docExists) {
+                log.warn("Dify文档已失效，将重新创建: docId={}, groupId={}", existingDocId, groupId);
+                existingDocId = null;
+            }
+        }
+
+        if (existingDocId != null) {
             log.info("群[{}]已有文本文档[{}]，更新内容（共{}条消息，新增{}条）", 
                     groupName, existingDocId, allTextMessages.size(), newMessages.size());
             success = difyService.updateDatasetDocument(imKb.getDifyDatasetId(), existingDocId, title, content);
@@ -328,8 +337,20 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             log.info("创建群聊助手知识库: id={}, name={}, difyDatasetId={}", kb.getId(), kb.getName(), difyDatasetId);
         }
 
+        // TODO：验证 Dataset 是否存在（防止本地记录但Dify端已删除）
+        if (kb.getDifyDatasetId() != null && !kb.getDifyDatasetId().trim().isEmpty()) {
+            boolean exists = difyService.datasetExists(kb.getDifyDatasetId());
+            if (!exists) {
+                log.warn("Dify Dataset 已失效，准备重建: id={}, datasetId={}", kb.getId(), kb.getDifyDatasetId());
+                kb.setDifyDatasetId(null);
+                kb.setUpdateTime(LocalDateTime.now());
+                knowledgeBaseService.updateById(kb);
+            }
+        }
+
+        // 如果为空或已清空，重新创建
         if (kb.getDifyDatasetId() == null || kb.getDifyDatasetId().trim().isEmpty()) {
-            log.warn("知识库缺少Dify Dataset ID，尝试从Dify查询: name={}", kb.getName());
+            log.info("知识库缺少Dify Dataset ID，尝试创建: name={}", kb.getName());
             String difyDatasetId = difyService.createDataset(kb.getName(), kb.getDescription());
             if (difyDatasetId != null && !difyDatasetId.trim().isEmpty()) {
                 kb.setDifyDatasetId(difyDatasetId);
@@ -380,7 +401,7 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
         }
     }
 
-public void saveGroupMessage(String messageId, String groupId, String userId,
+    public void saveGroupMessage(String messageId, String groupId, String userId,
                                   String rawMessage, String messageType, long time) {
         saveGroupMessage("qq", messageId, groupId, userId, rawMessage, messageType, time, null, null);
     }

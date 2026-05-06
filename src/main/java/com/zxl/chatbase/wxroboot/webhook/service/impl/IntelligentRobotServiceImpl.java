@@ -10,6 +10,8 @@ import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.im.service.ImGroupService;
+import com.zxl.chatbase.im.service.ImUserService;
 import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
 import com.zxl.chatbase.wxroboot.webhook.entity.DutyChatGroup;
@@ -23,11 +25,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 
 
 @Slf4j
@@ -51,9 +51,9 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     @Resource
     private GroupMessageSyncService groupMessageSyncService;
     @Resource
-    private com.zxl.chatbase.im.service.ImGroupService imGroupService;
+    private ImGroupService imGroupService;
     @Resource
-    private com.zxl.chatbase.im.service.ImUserService imUserService;
+    private ImUserService imUserService;
     @Resource
     private ImGroupMapper imGroupMapper;
     @Resource
@@ -165,11 +165,8 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                         String replyContent = decodeUnicode(difyChatResponse.getAnswer());
                         log.info("企微回复生成完成: groupId={}, reply={}", msg.getChatid(), replyContent);
 
-                        //过滤Ai思考<think>内容
-                        int endIndex = replyContent.lastIndexOf("</think>");
-                        if(endIndex!=-1){
-                            replyContent = replyContent.substring(endIndex+"</think>".length());
-                        }
+                        // 过滤AI思考过程（支持多行和多个块）
+                        replyContent = filterThinkingContent(replyContent);
 
                         if (msg.getResponse_url() != null && !msg.getResponse_url().isEmpty()) {
                             WeChatUtil.sendMarkdown(msg.getResponse_url(), replyContent);
@@ -228,6 +225,17 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * 过滤AI思考过程内容，避免暴露给群聊用户
+     * 支持多行和多个 <think>...</think> 块
+     */
+    private String filterThinkingContent(String text) {
+        if (text == null) return "";
+        // 使用正则表达式过滤 <think>...</think> 内容（支持多行）
+        String filtered = text.replaceAll("(?s)<think>.*?</think>", "").trim();
+        return filtered.isEmpty() ? text : filtered;
     }
 
     private String buildNullReturnString(String timestamp, String nonce) {

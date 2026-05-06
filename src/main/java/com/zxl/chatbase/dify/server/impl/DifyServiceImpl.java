@@ -1047,4 +1047,42 @@ public class DifyServiceImpl implements DifyService {
         }
         return null;
     }
+
+    @Override
+    public boolean datasetExists(String datasetId) {
+        if (datasetId == null || datasetId.trim().isEmpty()) {
+            return false;
+        }
+
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId;
+        HttpGet httpGet = new HttpGet(url);
+        httpGet.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            int statusCode = response.getStatusLine().getStatusCode();
+            return statusCode == 200;
+        } catch (Exception e) {
+            log.warn("验证Dify知识库存在异常: datasetId={}", datasetId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean documentExists(String datasetId, String documentId) {
+        if (datasetId == null || documentId == null || datasetId.trim().isEmpty() || documentId.trim().isEmpty()) {
+            return false;
+        }
+
+        String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/documents/" + documentId;
+        HttpGet httpGet = new HttpGet(url);
+        httpGet.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
+
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            int statusCode = response.getStatusLine().getStatusCode();
+            return statusCode == 200;
+        } catch (Exception e) {
+            log.warn("验证Dify文档存在异常: datasetId={}, documentId={}", datasetId, documentId, e);
+            return false;
+        }
+    }
 }

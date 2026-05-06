@@ -171,4 +171,21 @@ public interface DifyService {
      */
     String createDocumentByUrl(String datasetId, String fileUrl, String fileName, String user);
 
+    /**
+     * 验证知识库是否存在
+     *
+     * @param datasetId 知识库ID
+     * @return 是否存在
+     */
+    boolean datasetExists(String datasetId);
+
+    /**
+     * 验证文档是否存在
+     *
+     * @param datasetId 知识库ID
+     * @param documentId 文档ID
+     * @return 是否存在
+     */
+    boolean documentExists(String datasetId, String documentId);
+
 }

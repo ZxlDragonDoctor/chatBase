@@ -169,11 +169,8 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
                 })
                 .thenAccept(resp -> {
                     String answer = resp != null ? resp.getAnswer() : "【系统错误】暂时无法回答，请稍后再试";
-                    //过滤Ai思考<think>内容
-                    int endIndex = answer.lastIndexOf("</think>");
-                    if(endIndex!=-1){
-                        answer = answer.substring(endIndex+"</think>".length());
-                    }
+                    // 过滤AI思考过程（支持多行和多个块）
+                    answer = filterThinkingContent(answer);
                     sendGroupMessage(session, groupId, answer);
                 });
     }
@@ -226,6 +223,17 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
         } catch (Exception e) {
             log.error("发送群消息失败, groupId={}, text={}", groupId, text, e);
         }
+    }
+
+    /**
+     * 过滤AI思考过程内容，避免暴露给群聊用户
+     * 支持多行和多个 <think>...</think> 块
+     */
+    private String filterThinkingContent(String text) {
+        if (text == null) return "";
+        // 使用正则表达式过滤 <think>...</think> 内容（支持多行）
+        String filtered = text.replaceAll("(?s)<think>.*?</think>", "").trim();
+        return filtered.isEmpty() ? text : filtered;
     }
 
     /**
