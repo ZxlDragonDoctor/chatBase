@@ -24,13 +24,13 @@ spring:
     # 允许为空：为空时 Redis 按空密码校验（取决于 Redis 是否设置 requirepass）
     password: ${SPRING_REDIS_PASSWORD:}
 
-#logging:
-#  level:
-#    root: WARN
-#    com.zxl.chatbase: WARN
-#    com.zxl.chatbase.dify: INFO
-#  pattern:
-#    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+logging:
+  level:
+    root: WARN
+    com.zxl.chatbase: WARN
+    com.zxl.chatbase.dify: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
 difyApp:
   url: https://api.dify.ai/v1
@@ -45,12 +45,14 @@ qq:
     access-token: ${QQ_BOT_ACCESS_TOKEN:}
     file-save-path: /data/qq_files/
     self-id: ${QQ_BOT_SELF_ID:0}
+    nickname: ${QQ_BOT_NICKNAME:}
     http-base-url: ${QQ_BOT_HTTP_BASE_URL:http://napcat:3000}
 
 wechat:
   corp:
     stoken: ${WECHAT_CORP_STOKEN:}
     sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY:}
+    botName: ${WECHAT_CORP_BOT_NAME:企业内部机器人}
 #    botId: ${WECHAT_CORP_BOT_ID:}
 #    secret: ${WECHAT_CORP_SECRET:}
 

@@ -14,6 +14,7 @@ import com.zxl.chatbase.im.service.ImGroupService;
 import com.zxl.chatbase.im.service.ImUserService;
 import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.wxroboot.webhook.config.WXBizJsonMsgCryptConfig;
 import com.zxl.chatbase.wxroboot.webhook.entity.DutyChatGroup;
 import com.zxl.chatbase.wxroboot.webhook.entity.intelligentBot.IntelligentBotMsg;
 import com.zxl.chatbase.wxroboot.webhook.service.IntelligentRobotService;
@@ -39,6 +40,8 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
     @Resource
     private WXBizJsonMsgCrypt wxBizJsonMsgCrypt;
+    @Resource
+    private  WXBizJsonMsgCryptConfig wxBizJsonMsgCryptConfig;
 
     @Resource
     private ChatService chatService;
@@ -144,8 +147,8 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
             if (msg.isMsgImage() || msg.isMsgStream() || msg.isMsgText() || msg.isMsgMixed()) {
                 CompletableFuture.runAsync(() -> {
                     try {
-                        //过滤提问消息中@机器人的部分，TODO:机器人名字应该动态获取，而不是写死
-                        final String query = rawMessage.replace("@企业内部机器人", "");
+                        //过滤提问消息中@机器人的部分，
+                        final String query = rawMessage.replace("@".concat(wxBizJsonMsgCryptConfig.getBotName()), "");
                         groupMessageSyncService.saveGroupMessage(
                                 "wecom", msgId, msg.getChatid(), msg.getFrom().getUserid(),
                                 query, msgType, System.currentTimeMillis() / 1000,

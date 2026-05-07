@@ -66,10 +66,12 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         log.info("QQ Bot WebSocket 已连接, id={}", session.getId());
+        stringRedisTemplate.opsForValue().set("bot:qq:online", "1", 30, TimeUnit.SECONDS);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        stringRedisTemplate.opsForValue().set("bot:qq:online", "1", 30, TimeUnit.SECONDS);
         String payload = message.getPayload();
         log.info("收到 QQ Bot 消息: {}", payload);
 
@@ -278,6 +280,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         log.info("QQ Bot WebSocket 已关闭, id={}, status={}", session.getId(), status);
+        stringRedisTemplate.delete("bot:qq:online");
     }
 
     private boolean isAtSelf(String msg) {

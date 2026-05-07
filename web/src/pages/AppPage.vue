@@ -155,6 +155,14 @@
             <input v-model="form.icon" class="anime-input" placeholder="如：🏥、💬、🤖、📚" />
           </div>
           <div class="anime-form-group">
+            <label>创建者</label>
+            <div class="creator-display">
+              <User :size="16" />
+              <span>{{ currentUserName }}</span>
+            </div>
+            <div class="form-hint">应用公开后，其他用户将看到此创建者信息</div>
+          </div>
+          <div class="anime-form-group">
             <label>Dify API Key *</label>
             <input v-model="form.difyApiKey" class="anime-input" placeholder="从Dify控制台获取，格式：app-xxxxx" />
             <div class="api-key-actions">
@@ -284,8 +292,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-vue-next'
+import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle, User } from 'lucide-vue-next'
 import { api } from '../api/client'
+import { getCurrentUser } from '../lib/user'
 
 interface KbApp {
   id: number
@@ -356,6 +365,11 @@ const groupsTab = ref<'qq' | 'wx'>('qq')
 
 const qqGroups = computed(() => boundGroups.value.filter((g: ImGroup) => g.platform === 'qq'))
 const wxGroups = computed(() => boundGroups.value.filter((g: ImGroup) => g.platform === 'wx' || g.platform === 'wecom'))
+
+const currentUserName = computed(() => {
+  const user = getCurrentUser()
+  return user || '未知用户'
+})
 
 const form = ref({
   name: '',
@@ -450,8 +464,13 @@ const verifyApiKey = async () => {
   verifyError.value = ''
   try {
     const res = await api.post('/kb/app/verify', { apiKey: form.value.difyApiKey })
+    if (!res.data || !res.data.difyAppName) {
+      verifyError.value = 'API Key验证失败，请检查是否正确'
+      verifiedInfo.value = null
+      return
+    }
     verifiedInfo.value = {
-      difyAppName: res.data.difyAppName || '验证成功',
+      difyAppName: res.data.difyAppName,
       difyAppMode: res.data.difyAppMode || 'unknown'
     }
   } catch (e: any) {
@@ -774,6 +793,18 @@ onMounted(() => {
   font-size: 12px;
   color: var(--anime-text-muted);
   margin-top: 4px;
+}
+
+.creator-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(168, 216, 234, 0.1);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  font-weight: 600;
+  color: var(--anime-text-primary);
 }
 
 .groups-tabs {

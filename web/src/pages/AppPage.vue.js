@@ -1,8 +1,9 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle } from 'lucide-vue-next';
+import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle, User } from 'lucide-vue-next';
 import { api } from '../api/client';
+import { getCurrentUser } from '../lib/user';
 const difyConsoleUrl = 'https://cloud.dify.ai';
 const appList = ref([]);
 const categoryList = ref([]);
@@ -23,6 +24,10 @@ const saving = ref(false);
 const groupsTab = ref('qq');
 const qqGroups = computed(() => boundGroups.value.filter((g) => g.platform === 'qq'));
 const wxGroups = computed(() => boundGroups.value.filter((g) => g.platform === 'wx' || g.platform === 'wecom'));
+const currentUserName = computed(() => {
+    const user = getCurrentUser();
+    return user || '未知用户';
+});
 const form = ref({
     name: '',
     description: '',
@@ -116,8 +121,13 @@ const verifyApiKey = async () => {
     verifyError.value = '';
     try {
         const res = await api.post('/kb/app/verify', { apiKey: form.value.difyApiKey });
+        if (!res.data || !res.data.difyAppName) {
+            verifyError.value = 'API Key验证失败，请检查是否正确';
+            verifiedInfo.value = null;
+            return;
+        }
         verifiedInfo.value = {
-            difyAppName: res.data.difyAppName || '验证成功',
+            difyAppName: res.data.difyAppName,
             difyAppMode: res.data.difyAppMode || 'unknown'
         };
     }
@@ -704,6 +714,27 @@ if (__VLS_ctx.showCreateModal) {
         ...{ class: "anime-form-group" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "creator-display" },
+    });
+    const __VLS_36 = {}.User;
+    /** @type {[typeof __VLS_components.User, ]} */ ;
+    // @ts-ignore
+    const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
+        size: (16),
+    }));
+    const __VLS_38 = __VLS_37({
+        size: (16),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_37));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    (__VLS_ctx.currentUserName);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "form-hint" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-form-group" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({});
     __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
         ...{ class: "anime-input" },
         placeholder: "从Dify控制台获取，格式：app-xxxxx",
@@ -716,23 +747,8 @@ if (__VLS_ctx.showCreateModal) {
         ...{ onClick: (__VLS_ctx.verifyApiKey) },
         ...{ class: "anime-btn ghost" },
     });
-    const __VLS_36 = {}.RefreshCw;
+    const __VLS_40 = {}.RefreshCw;
     /** @type {[typeof __VLS_components.RefreshCw, ]} */ ;
-    // @ts-ignore
-    const __VLS_37 = __VLS_asFunctionalComponent(__VLS_36, new __VLS_36({
-        size: (16),
-    }));
-    const __VLS_38 = __VLS_37({
-        size: (16),
-    }, ...__VLS_functionalComponentArgsRest(__VLS_37));
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.a, __VLS_intrinsicElements.a)({
-        href: (__VLS_ctx.difyConsoleUrl),
-        target: "_blank",
-        ...{ class: "anime-btn blue" },
-    });
-    const __VLS_40 = {}.ExternalLink;
-    /** @type {[typeof __VLS_components.ExternalLink, ]} */ ;
     // @ts-ignore
     const __VLS_41 = __VLS_asFunctionalComponent(__VLS_40, new __VLS_40({
         size: (16),
@@ -741,6 +757,21 @@ if (__VLS_ctx.showCreateModal) {
         size: (16),
     }, ...__VLS_functionalComponentArgsRest(__VLS_41));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.a, __VLS_intrinsicElements.a)({
+        href: (__VLS_ctx.difyConsoleUrl),
+        target: "_blank",
+        ...{ class: "anime-btn blue" },
+    });
+    const __VLS_44 = {}.ExternalLink;
+    /** @type {[typeof __VLS_components.ExternalLink, ]} */ ;
+    // @ts-ignore
+    const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
+        size: (16),
+    }));
+    const __VLS_46 = __VLS_45({
+        size: (16),
+    }, ...__VLS_functionalComponentArgsRest(__VLS_45));
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     if (__VLS_ctx.verifiedInfo) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "verified-info" },
@@ -748,15 +779,15 @@ if (__VLS_ctx.showCreateModal) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "verified-success" },
         });
-        const __VLS_44 = {}.CheckCircle;
+        const __VLS_48 = {}.CheckCircle;
         /** @type {[typeof __VLS_components.CheckCircle, ]} */ ;
         // @ts-ignore
-        const __VLS_45 = __VLS_asFunctionalComponent(__VLS_44, new __VLS_44({
+        const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
             size: (16),
         }));
-        const __VLS_46 = __VLS_45({
+        const __VLS_50 = __VLS_49({
             size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_45));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_49));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({});
         (__VLS_ctx.verifiedInfo.difyAppName);
@@ -766,15 +797,15 @@ if (__VLS_ctx.showCreateModal) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                 ...{ class: "verified-warning" },
             });
-            const __VLS_48 = {}.AlertCircle;
+            const __VLS_52 = {}.AlertCircle;
             /** @type {[typeof __VLS_components.AlertCircle, ]} */ ;
             // @ts-ignore
-            const __VLS_49 = __VLS_asFunctionalComponent(__VLS_48, new __VLS_48({
+            const __VLS_53 = __VLS_asFunctionalComponent(__VLS_52, new __VLS_52({
                 size: (14),
             }));
-            const __VLS_50 = __VLS_49({
+            const __VLS_54 = __VLS_53({
                 size: (14),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_49));
+            }, ...__VLS_functionalComponentArgsRest(__VLS_53));
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         }
     }
@@ -782,15 +813,15 @@ if (__VLS_ctx.showCreateModal) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "verified-error" },
         });
-        const __VLS_52 = {}.XCircle;
+        const __VLS_56 = {}.XCircle;
         /** @type {[typeof __VLS_components.XCircle, ]} */ ;
         // @ts-ignore
-        const __VLS_53 = __VLS_asFunctionalComponent(__VLS_52, new __VLS_52({
+        const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
             size: (16),
         }));
-        const __VLS_54 = __VLS_53({
+        const __VLS_58 = __VLS_57({
             size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_53));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_57));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         (__VLS_ctx.verifyError);
     }
@@ -928,19 +959,19 @@ if (__VLS_ctx.showGroupsModal) {
                     ...{ class: "group-members" },
                 });
                 (g.memberCount || 0);
-                const __VLS_56 = {}.RouterLink;
+                const __VLS_60 = {}.RouterLink;
                 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
                 // @ts-ignore
-                const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
+                const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
                 }));
-                const __VLS_58 = __VLS_57({
+                const __VLS_62 = __VLS_61({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
-                }, ...__VLS_functionalComponentArgsRest(__VLS_57));
-                __VLS_59.slots.default;
-                var __VLS_59;
+                }, ...__VLS_functionalComponentArgsRest(__VLS_61));
+                __VLS_63.slots.default;
+                var __VLS_63;
             }
         }
     }
@@ -974,19 +1005,19 @@ if (__VLS_ctx.showGroupsModal) {
                     ...{ class: "group-members" },
                 });
                 (g.memberCount || 0);
-                const __VLS_60 = {}.RouterLink;
+                const __VLS_64 = {}.RouterLink;
                 /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
                 // @ts-ignore
-                const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
+                const __VLS_65 = __VLS_asFunctionalComponent(__VLS_64, new __VLS_64({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
                 }));
-                const __VLS_62 = __VLS_61({
+                const __VLS_66 = __VLS_65({
                     to: "/console/im",
                     ...{ class: "anime-btn ghost sm" },
-                }, ...__VLS_functionalComponentArgsRest(__VLS_61));
-                __VLS_63.slots.default;
-                var __VLS_63;
+                }, ...__VLS_functionalComponentArgsRest(__VLS_65));
+                __VLS_67.slots.default;
+                var __VLS_67;
             }
         }
     }
@@ -1152,6 +1183,9 @@ if (__VLS_ctx.showKbModal) {
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
+/** @type {__VLS_StyleScopedClasses['creator-display']} */ ;
+/** @type {__VLS_StyleScopedClasses['form-hint']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['api-key-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
@@ -1230,6 +1264,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             CheckCircle: CheckCircle,
             XCircle: XCircle,
             AlertCircle: AlertCircle,
+            User: User,
             difyConsoleUrl: difyConsoleUrl,
             appList: appList,
             categoryList: categoryList,
@@ -1248,6 +1283,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             groupsTab: groupsTab,
             qqGroups: qqGroups,
             wxGroups: wxGroups,
+            currentUserName: currentUserName,
             form: form,
             getCategoryName: getCategoryName,
             getCategoryKbCount: getCategoryKbCount,

@@ -66,7 +66,11 @@ public class KbAppController {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new RuntimeException("API Key不能为空");
         }
-        return appService.verifyApiKey(apiKey);
+        KbApp app = appService.verifyApiKey(apiKey);
+        if (app == null) {
+            throw new RuntimeException("API Key验证失败，请检查是否正确");
+        }
+        return app;
     }
 
     @GetMapping("/{id}/info")

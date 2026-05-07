@@ -14,6 +14,9 @@ public class WXBizJsonMsgCryptConfig {
     @Value("${wechat.corp.sEncodingAESKey}")
     private String sEncodingAESKey;
 
+    @Value("${wechat.corp.botName:企业内部机器人}")
+    private String botName;
+
     private String receiveId = "";
 
     @Bean
@@ -23,5 +26,9 @@ public class WXBizJsonMsgCryptConfig {
 
     public String getsEncodingAESKey() {
     	return sEncodingAESKey;
+    }
+
+    public String getBotName() {
+        return botName;
     }
 }

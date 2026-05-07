@@ -38,6 +38,11 @@ public class QqBotProperties {
     private long selfId;
 
     /**
+     * 机器人显示名称（可选，为空时通过 API 自动获取）
+     */
+    private String nickname = "";
+
+    /**
      * NapCat HTTP 请求的 Base URL
      */
     private String httpBaseUrl;

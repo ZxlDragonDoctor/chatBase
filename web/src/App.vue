@@ -41,6 +41,10 @@
           <Bot class="anime-nav-icon" :size="22" />
           <span>应用</span>
         </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/bots" active-class="active">
+          <Cpu class="anime-nav-icon" :size="22" />
+          <span>机器人</span>
+        </RouterLink>
         <RouterLink class="anime-nav-item" to="/console/faq" active-class="active">
           <HelpCircle class="anime-nav-icon" :size="22" />
           <span>FAQ</span>
@@ -96,7 +100,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList } from 'lucide-vue-next'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList, Cpu } from 'lucide-vue-next'
 import UserProfile from './components/UserProfile.vue'
 import { getCurrentUser as fetchUserProfile } from './api/user'
 import type { UserVO } from './api/user'
@@ -146,6 +150,8 @@ const roleBadgeClass = computed(() => {
 })
 
 async function loadUserProfile() {
+  if (!localStorage.getItem('chatbase_token')) return
+  
   const username = getOriginalUsername()
   if (!username) return
   
@@ -186,6 +192,7 @@ function onAvatarError(e: Event) {
 function handleLogout() {
   localStorage.removeItem('chatbase_token')
   localStorage.removeItem('chatbase_user')
+  localStorage.removeItem('chatbase_original_username')
   localStorage.removeItem('chatbase_role')
   localStorage.removeItem('chatbase_admin_id')
   router.push('/login')

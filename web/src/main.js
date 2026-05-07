@@ -11,6 +11,7 @@ import FeedbackPage from './pages/FeedbackPage.vue';
 import FeedbackManagePage from './pages/FeedbackManagePage.vue';
 import FaqPage from './pages/FaqPage.vue';
 import AppPage from './pages/AppPage.vue';
+import BotManagePage from './pages/BotManagePage.vue';
 import './styles/anime.css';
 const router = createRouter({
     history: createWebHistory(),
@@ -25,6 +26,7 @@ const router = createRouter({
         { path: '/console/im', component: ImGroupsPage },
         { path: '/console/knowledge', component: KnowledgePage },
         { path: '/console/app', component: AppPage },
+        { path: '/console/bots', component: BotManagePage },
         { path: '/console/faq', component: FaqPage },
         { path: '/console/feedback-manage', component: FeedbackManagePage, meta: { requiresAdmin: true } },
     ],

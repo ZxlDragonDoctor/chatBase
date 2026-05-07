@@ -15,6 +15,9 @@ api.interceptors.response.use(response => response, error => {
     if (error.response?.status === 401) {
         localStorage.removeItem('chatbase_token');
         localStorage.removeItem('chatbase_user');
+        localStorage.removeItem('chatbase_original_username');
+        localStorage.removeItem('chatbase_role');
+        localStorage.removeItem('chatbase_admin_id');
         window.location.href = '/login';
     }
     return Promise.reject(error);

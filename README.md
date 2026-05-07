@@ -2,42 +2,68 @@
 
 基于 Spring Boot + Vue 3 的智能对话系统，集成 Dify AI 平台，支持 QQ 群聊和企业微信消息收集与智能回复。
 
+![Java](https://img.shields.io/badge/Java-17-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7.6-brightgreen)
+![Vue](https://img.shields.io/badge/Vue-3.5-green)
+![License](https://img.shields.io/badge/License-MIT-blue)
+
 ## 功能特性
 
 ### 核心功能
-- **智能对话**：集成 Dify AI，支持多轮对话、上下文记忆
-- **知识库管理**：批量上传文档、自动同步到 Dify 知识库、搜索功能
-- **FAQ 管理**：自动提取高频问答、手动维护、优先级匹配、搜索功能
-- **会话管理**：多会话切换、历史记录查询
+
+| 功能 | 说明 |
+|------|------|
+| **智能对话** | 集成 Dify AI，支持多轮对话、上下文记忆、FAQ 优先匹配 |
+| **知识库管理** | 批量上传文档、自动同步到 Dify、搜索、分类管理 |
+| **FAQ 管理** | 自动提取高频问答、手动维护、优先级匹配 |
+| **会话管理** | 多会话切换、历史记录、自定义标题 |
+| **应用管理** | 多 Dify 应用配置、群组绑定、权限控制 |
 
 ### IM 集成
-- **QQ 群聊**：通过 NapCat 接入，自动回复群消息
-- **企业微信**：接收企业微信群消息，智能回复
+
+| 平台 | 接入方式 | 功能 |
+|------|----------|------|
+| **QQ 群聊** | NapCat 反向 WebSocket | 消息收集、智能回复、在线监控 |
+| **企业微信** | 回调模式 | 消息收集、智能回复、加解密 |
 
 ### 数据分析
+
 - **Token 统计**：消耗趋势图、月度统计、预测分析
-- **费用统计**：Prompt/Completion Tokens 分离计费、费用趋势
-- **关键词热度**：词云展示、多渠道关键词提取
-- **用户反馈**：点赞/踩统计、反馈表单、满意度分析
+- **费用统计**：Prompt/Completion 分离计费、费用趋势
+- **关键词热度**：词云展示、多渠道提取
+- **用户反馈**：评分、反馈表单、满意度分析
+- **群活跃度**：按平台统计、排名
+
+### 机器人管理
+
+- 多机器人状态监控（QQ / 企业微信）
+- 在线状态实时检测（Redis 心跳）
+- 消息统计（今日/总计）
+- QQ 昵称自动获取（OneBot API）
 
 ## 技术栈
 
 ### 后端
-- Java 17
-- Spring Boot 2.7.6
-- MyBatis-Plus
-- WebSocket
-- Redis
-- MySQL 8.0
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Java | 17 | 开发语言 |
+| Spring Boot | 2.7.6 | 应用框架 |
+| MyBatis-Plus | 3.5.15 | ORM 框架 |
+| WebSocket | - | QQ 机器人通信 |
+| Redis | 7 | 缓存、会话、消息队列 |
+| MySQL | 8.0 | 关系数据库 |
 
 ### 前端
-- Vue 3 + TypeScript
-- Vite
-- ECharts
-- Lucide Icons
 
-### AI 平台
-- Dify API
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| Vue | 3.5 | UI 框架 |
+| TypeScript | 5.7 | 类型安全 |
+| Vite | 6.1 | 构建工具 |
+| ECharts | 6.0 | 数据可视化 |
+| Lucide Icons | - | 图标库 |
+| CropperJS | 1.6.2 | 头像裁切 |
 
 ## 快速开始
 
@@ -50,7 +76,7 @@ cd chatBase
 
 # 2. 配置环境变量
 cp .env.example .env
-vim .env  # 填写 Dify API Key 等必填配置
+vim .env  # 填写必填配置
 
 # 3. 构建并启动
 docker-compose up --build -d
@@ -59,23 +85,278 @@ docker-compose up --build -d
 docker-compose logs -f chatbase-backend
 ```
 
-访问 `http://localhost` 打开前端页面。
-
-详细部署说明请参考 [DEPLOY.md](./DEPLOY.md)。
+访问 http://localhost 打开前端页面。
 
 ### 本地开发
 
 ```bash
-# 后端
+# 1. 启动 MySQL 和 Redis
+docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=zxl123 -e MYSQL_DATABASE=chat_base mysql:8.0
+docker run -d --name redis -p 6379:6379 redis:7
+
+# 2. 初始化数据库
+mysql -u root -pzxl123 chat_base < sql/init-schema.sql
+
+# 3. 启动后端
 mvn spring-boot:run
 
-# 前端
-cd web
-npm install
-npm run dev
+# 4. 启动前端
+cd web && npm install && npm run dev
 ```
 
-## 目录结构
+访问 http://localhost:5173 打开前端页面。
+
+## 配置说明
+
+### 必填配置
+
+| 环境变量 | 说明 | 示例 |
+|----------|------|------|
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | `root123` |
+| `MYSQL_PASSWORD` | 数据库密码 | `chatbase123` |
+| `DIFYAPP_API_KEY` | Dify Chat API Key | `app-xxxxxxxx` |
+| `DIFYAPP_DATASET_API_KEY` | Dify Dataset API Key | `dataset-xxxxxxxx` |
+
+### 可选配置
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `REDIS_PASSWORD` | Redis 密码 | 无 |
+| `QQ_BOT_ENABLE` | 启用 QQ 机器人 | `false` |
+| `QQ_BOT_ACCESS_TOKEN` | NapCat Token | - |
+| `QQ_BOT_SELF_ID` | 机器人 QQ 号 | - |
+| `QQ_BOT_HTTP_BASE_URL` | NapCat HTTP 地址 | `http://napcat:3000` |
+| `WECHAT_CORP_STOKEN` | 企业微信 Token | - |
+| `WECHAT_CORP_S_ENCODING_AES_KEY` | 企业微信 EncodingAESKey | - |
+| `JAVA_OPTS` | JVM 参数 | `-Xms512m -Xmx2048m` |
+
+完整配置说明请参考 [USER_GUIDE.md](./USER_GUIDE.md#4-配置说明)。
+
+## 功能模块
+
+### 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        前端层 (Vue 3)                        │
+│  登录注册 │ AI 问答 │ 知识库 │ 统计面板 │ 控制台 │ 机器人管理     |
+└───────────────────────────┬─────────────────────────────────┘
+                            │ HTTP / WebSocket
+┌───────────────────────────▼─────────────────────────────────┐
+│                      后端层 (Spring Boot)                    |
+│  Chat │ Dify │ KB │ IM │ QQ │ WeChat │ Statistics │ User    │
+└───────────────┬───────────────────────┬─────────────────────┘
+                │                       │
+┌───────────────▼──────────┐  ┌────────▼────────────────────┐
+│    数据层                 │  │    外部服务                  │
+│  MySQL 8.0 │ Redis 7     │  │  Dify API │ NapCat │ 企业微信|
+└──────────────────────────┘  └─────────────────────────────┘
+```
+
+### 模块说明
+
+| 模块 | 包路径 | 职责 |
+|------|--------|------|
+| **chat** | `com.zxl.chatbase.chat` | 聊天会话管理、消息处理、数据清理 |
+| **dify** | `com.zxl.chatbase.dify` | Dify API 集成、对话、文件上传 |
+| **kb** | `com.zxl.chatbase.kb` | 知识库、分类、文档、FAQ、应用、关键词 |
+| **im** | `com.zxl.chatbase.im` | IM 消息采集、群组管理、机器人管理 |
+| **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket 处理 |
+| **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
+| **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词 |
+| **user** | `com.zxl.chatbase.user` | 用户注册、登录、信息管理 |
+
+### 页面功能
+
+| 页面 | 路径 | 权限 | 功能 |
+|------|------|------|------|
+| 登录注册 | `/login` | 公开 | 用户认证 |
+| 系统概览 | `/console/dashboard` | admin | 统计卡片、快捷导航 |
+| 群聊采集 | `/console/groups` | admin | 群列表、消息查询、应用绑定 |
+| 机器人管理 | `/console/bots` | admin | 机器人状态、消息统计 |
+| 数据统计 | `/console/statistics` | admin | Token/费用趋势、词云、活跃度 |
+| 反馈管理 | `/console/feedback/manage` | admin | 反馈处理、回复 |
+| 应用管理 | `/app` | admin | Dify 应用配置、API Key 验证 |
+| AI 问答 | `/chat` | 登录 | 多会话对话、文件附件、引用来源 |
+| 知识库 | `/knowledge` | admin | 分类、知识库、文档、FAQ |
+| FAQ 管理 | `/faq` | admin | 手动维护、自动提取 |
+| 用户反馈 | `/feedback` | 登录 | 提交反馈、查看历史 |
+
+## QQ 机器人配置
+
+### 1. 启动 NapCat
+
+```bash
+docker-compose --profile qq up -d
+```
+
+### 2. 扫码登录
+
+访问 http://\<server\>:6099，使用小号扫码登录。
+
+⚠️ **务必使用小号，防止封禁。**
+
+### 3. 配置网络
+
+**反向 WebSocket**：
+- URL：`ws://chatbase-backend:8080/qq/ws`
+- 启用：是
+
+**HTTP 服务器**：
+- 地址：`0.0.0.0`
+- 端口：`3000`
+- 启用：是
+
+### 4. 配置 ChatBase
+
+```yaml
+qq:
+  bot:
+    enable: true
+    access-token: "your-napcat-token"
+    self-id: 123456789
+    http-base-url: "http://napcat:3000"
+    nickname: "ChatBase"  # 可选
+```
+
+### 5. 测试
+
+在 QQ 群中 @机器人 发送消息，等待回复。
+
+⚠️ **必须 @机器人 才会触发回复。**
+
+## 企业微信配置
+
+### 1. 创建机器人
+
+企业微信管理后台 → 应用管理 → 机器人 → 创建新机器人
+
+### 2. 配置回调 URL
+
+- **URL**：`http://\<server\>/intellrobot/callback/handle`
+- **Token**：自定义（与配置一致）
+- **EncodingAESKey**：随机生成（与配置一致）
+
+### 3. 配置 ChatBase
+
+```bash
+WECHAT_CORP_STOKEN=your-token
+WECHAT_CORP_S_ENCODING_AES_KEY=your-aes-key
+WECHAT_CORP_BOT_ID=your-bot-id
+WECHAT_CORP_SECRET=your-secret
+```
+
+### 4. 测试
+
+在企业微信群中添加机器人，发送消息等待异步回复。
+
+## 数据流程
+
+### Web 对话
+
+```
+用户提问 → ChatController → ChatService
+  → FAQ 匹配(优先) / Dify API 调用
+  → kb_conversation 表 → 返回答案
+```
+
+### QQ 群消息
+
+```
+QQ 群消息 → NapCat → WebSocket(/qq/ws)
+  → QqBotWebSocketHandler → group_message 表
+  → Redis Stream → GroupMessageConsumer
+  → 同步到 Dify 知识库
+```
+
+### 企业微信群消息
+
+```
+企业微信消息 → 回调(/intellrobot/callback/handle)
+  → 消息解密验证 → group_message 表
+  → Redis Stream → 异步处理
+  → ChatService → Webhook 回复
+```
+
+## 定时任务
+
+| 任务 | 频率 | 功能 | 状态 |
+|------|------|------|:----:|
+| Redis Stream 消费 | 每 5 秒 | 实时处理 IM 消息 | ✅ 推荐 |
+| 定时同步（废弃） | 每 60 秒 | 批量同步群消息 | ⚠️ 已过时 |
+| 统计聚合 | 每天 00:05 | 聚合昨日统计数据 | ✅ |
+| 关键词提取 | 每天 05:00 | 提取关键词 | ✅ |
+| 关键词清理 | 每天 06:00 | 清理 90 天前关键词 | ✅ |
+| 会话清理 | 每天 03:00 | 清理过期会话 | ✅ |
+| 消息清理 | 每天 04:30 | 清理 90 天前消息 | ✅ |
+
+详细定时任务说明请参考 [USER_GUIDE.md](./USER_GUIDE.md#8-定时任务说明)。
+
+## 数据库表
+
+### 核心表
+
+| 表名 | 说明 |
+|------|------|
+| `sys_user` | 系统用户 |
+| `kb_category` | 知识库分类（树形结构） |
+| `kb_knowledge_base` | 知识库管理 |
+| `kb_document` | 文档管理 |
+| `kb_conversation` | 会话记录 |
+| `kb_faq` | 常见问答 |
+| `kb_feedback` | 用户反馈 |
+| `kb_statistics` | 每日统计 |
+| `kb_keyword` | 关键词统计 |
+| `kb_app` | 应用配置 |
+| `group_message` | 群聊消息采集 |
+| `im_group` | 群组信息 |
+| `im_user` | 用户信息 |
+| `chat_session` | 聊天会话 |
+| `sys_config` | 系统配置 |
+
+完整表结构请参考 [DESIGN.md](./DESIGN.md#4-数据库设计)。
+
+## API 接口
+
+### 主要接口
+
+| 分类 | 路径前缀 | 说明 |
+|------|----------|------|
+| 用户 | `/api/user` | 注册、登录、信息管理 |
+| 聊天 | `/api/chat` | 对话、文件上传 |
+| 会话 | `/api/chat/session` | 会话 CRUD |
+| 知识库 | `/api/kb` | 知识库、分类、文档 |
+| 应用 | `/api/kb/app` | 应用管理、API Key 验证 |
+| FAQ | `/api/kb/conversation/faq` | FAQ CRUD、提取 |
+| 反馈 | `/api/feedback` | 提交、管理、统计 |
+| 统计 | `/api/statistics` | Token、费用、关键词 |
+| 控制台 | `/api/console` | 群聊采集管理 |
+| 机器人 | `/api/bot` | 机器人列表 |
+| 上传进度 | `/api/upload/progress` | SSE 实时推送 |
+
+完整 API 列表请参考 [DESIGN.md](./DESIGN.md#13-api-接口汇总)。
+
+## 文档导航
+
+| 文档 | 说明 |
+|------|------|
+| [DESIGN.md](./DESIGN.md) | 详细设计文档（架构、模块、数据库、数据流、API） |
+| [USER_GUIDE.md](./USER_GUIDE.md) | 使用文档（部署、配置、功能操作、故障排查、FAQ） |
+| [DEPLOY.md](./DEPLOY.md) | 部署指南（Docker 部署、环境变量、服务管理） |
+
+## 常见问题
+
+| 问题 | 解决方法 |
+|------|----------|
+| QQ 消息收到但不回复 | 必须 @机器人，检查 NapCat 连接状态 |
+| 知识库删除失败 | 检查 Dify API Key 配置 |
+| 统计数据为空 | 调用 `/api/statistics/aggregate` 聚合统计 |
+| Token 费用显示为 0 | 历史数据无费用，新对话正常记录 |
+| Docker 启动后无法访问 | 检查容器状态和日志 `docker-compose logs` |
+
+更多问题请参考 [USER_GUIDE.md](./USER_GUIDE.md#13-常见问题faq)。
+
+## 项目结构
 
 ```
 chatBase/
@@ -85,14 +366,18 @@ chatBase/
 │   ├── kb/             # 知识库管理
 │   ├── im/             # IM 消息收集
 │   ├── qq/             # QQ Bot WebSocket
+│   ├── wxroboot/       # 企业微信机器人
 │   ├── statistics/     # 统计分析
 │   ├── feedback/       # 用户反馈
+│   ├── user/           # 用户管理
+│   ├── config/         # 配置类
 │   └── controller/     # API 控制器
 │
 ├── web/                # Vue 3 前端
 │   ├── src/
 │   │   ├── pages/      # 页面组件
 │   │   ├── api/        # API 接口
+│   │   ├── components/ # 公共组件
 │   │   └── lib/        # 工具库
 │   ├── nginx.conf      # Nginx 配置
 │   └── Dockerfile      # 前端镜像
@@ -103,433 +388,15 @@ chatBase/
 ├── Dockerfile          # 后端镜像
 ├── docker-compose.yml  # 部署编排
 ├── .env.example        # 环境变量示例
-├── DEPLOY.md           # 部署说明
+├── DESIGN.md           # 详细设计文档
+├── USER_GUIDE.md       # 使用文档
 └── README.md           # 项目说明
 ```
 
-## 配置说明
+## 许可证
 
-### 必填配置
+MIT License
 
-| 配置项 | 说明 |
-|--------|------|
-| `DIFYAPP_API_KEY` | Dify Chat API Key |
-| `DIFYAPP_DATASET_API_KEY` | Dify Dataset API Key |
-| `MYSQL_PASSWORD` | MySQL 数据库密码 |
+---
 
-### 可选配置
-
-| 配置项 | 说明 |
-|--------|------|
-| `QQ_BOT_ENABLE` | 启用 QQ Bot |
-| `QQ_BOT_SELF_ID` | 机器人 QQ 号 |
-| `WECHAT_CORP_STOKEN` | 企业微信 Token |
-
-## API 接口
-
-### 对话接口
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/chat/ask` | GET | 简单问答 |
-| `/api/chat/web` | POST | Web 端对话 |
-| `/api/chat/im` | POST | IM 端对话 |
-| `/api/chat/v1/files/upload` | POST | 文件上传 |
-
-### 知识库接口
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/kb` | GET/POST/PUT/DELETE | 知识库 CRUD |
-| `/api/kb/{id}/sync` | POST | 同步到 Dify |
-| `/api/kb/{id}/batch-upload` | POST | 批量上传文件 |
-| `/api/kb/{id}/document/page` | GET | 文档列表（支持搜索） |
-
-### 统计接口
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/statistics/token/chart` | GET | Token 趋势 |
-| `/api/statistics/token/monthly` | GET | 本月统计 |
-| `/api/statistics/cost/chart` | GET | 费用趋势 |
-| `/api/statistics/keyword/cloud` | GET | 关键词词云 |
-| `/api/statistics/aggregate` | POST | 聚合统计 |
-
-### FAQ 接口
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/kb/conversation/faq/page` | GET | FAQ 列表（支持搜索） |
-| `/api/kb/conversation/faq/extract` | POST | 自动提取 FAQ |
-
-## 数据库表
-
-### 知识库模块
-| 表名 | 说明 |
-|------|------|
-| `kb_knowledge_base` | 知识库管理 |
-| `kb_document` | 文档管理 |
-| `kb_conversation` | 会话记录 |
-| `kb_faq` | 常见问答 |
-| `kb_feedback` | 用户反馈 |
-| `kb_statistics` | 每日统计 |
-| `kb_keyword` | 关键词统计 |
-
-### IM 模块
-| 表名 | 说明 |
-|------|------|
-| `group_message` | 群聊消息采集 |
-| `im_group` | 群组信息 |
-| `im_user` | 用户信息 |
-| `chat_session` | 聊天会话 |
-
-### 系统模块
-| 表名 | 说明 |
-|------|------|
-| `sys_user` | 系统用户 |
-| `sys_config` | 系统配置 |
-
-## QQ Bot 配置
-
-使用 NapCat 作为 QQ 协议实现：
-
-1. 启动 NapCat 容器
-```bash
-docker compose --profile qq up -d
-```
-
-2. 访问 `http://<server>:6099` 扫码登录，并配置网络配置
-
-3. 配置反向 WebSocket客户端：
-![img.png](img.png)
-
-4.配置Http服务器
-![img_1.png](img_1.png)
-
-项目地址：https://github.com/NapNeko/NapCatQQ
-
-⚠️ **注意**：务必使用小号登录，防止被封禁。
-
-## 企业微信配置
-
-在企业微信管理后台配置机器人：
-
-1. **回调URL**：`http://<server>/intellrobot/callback/handle`
-2. **配置参数**：
-   - `WECHAT_CORP_STOKEN` - Token
-   - `WECHAT_CORP_S_ENCODING_AES_KEY` - EncodingAESKey
-
-3. 消息处理流程：
-   - GET 请求：URL验证
-   - POST 请求：接收消息并回复
-
-## 数据流程
-
-### QQ 群消息收集
-```
-QQ群消息 → NapCat → WebSocket(/qq/ws) 
-→ QqBotWebSocketHandler → group_message 表
-→ 定时同步到 Dify 知识库
-```
-
-### 企业微信群消息收集
-```
-企业微信群消息 → 回调(/intellrobot/callback/handle)
-→ IntelligentRobotService → 消息解密验证
-→ group_message 表 + im_group/im_user 表同步
-→ ChatService(Dify API) → 返回答案 → Webhook回复群聊
-```
-
-### Web 对话流程
-```
-用户提问 → ChatController → ChatService
-→ FAQ匹配(优先) / Dify API调用
-→ kb_conversation 表 → 返回答案
-```
-
-## 定时任务
-
-系统中的定时任务汇总如下：
-
-| 序号 | 类名 | 方法名 | 执行频率 | 功能说明 | 状态 |
-|:----:|------|--------|----------|----------|:----:|
-| 1 | GroupMessageSyncServiceImpl | syncToKnowledgeBase() | 每60秒 | 同步群消息到Dify知识库，批量查询未同步的消息并创建文档 | ⚠️ 已过时 |
-| 2 | GroupMessageConsumer | consumeMessages() | 每5秒 | Redis Stream消息消费者，实时处理新消息 | ✅ 推荐 |
-| 3 | StatisticsAggregateServiceImpl | aggregateYesterdayStatistics() | 每天 00:05 | 聚合昨日统计数据，包括会话数、Token消耗、费用等 | ✅ |
-| 4 | KeywordSyncServiceImpl | syncKeywordsFromMessages() | 每天 05:00 | 从群聊消息和Web对话中批量提取关键词，更新关键词统计数据 | ✅ |
-| 5 | KeywordSyncServiceImpl | cleanOldKeywords() | 每天 06:00 | 清理超过保留期限的关键词，默认保留90天 | ✅ |
-| 6 | CleanupServiceImpl | cleanupExpiredConversations() | 每天 03:00 | 清理Redis和数据库中过期的会话数据 | ✅ |
-| 7 | CleanupServiceImpl | cleanupOldMessages() | 每天 04:30 | 清理超过保留期限的消息数据 | ✅ |
-
-### 定时任务详情
-
-#### 1. 群消息同步 (GroupMessageSyncServiceImpl) ⚠️ 已过时
-- **状态**: ⚠️ 已过时，推荐使用 Redis Stream 消息队列方案
-- **文件位置**: `src/main/java/com/zxl/chatbase/im/service/impl/GroupMessageSyncServiceImpl.java`
-- **执行频率**: 每60秒（fixedDelayString = "60000"）
-- **功能**:
-  - 查询 `synced = false` 的群消息（每次最多200条）
-  - 按群ID分组，每群一个文档
-  - **自动创建默认"群聊消息"分类**：如果不存在则创建
-  - **自动创建默认"群聊助手知识库"**：如果不存在则创建，并调用Dify API创建Dataset
-  - 创建/更新知识库和文档
-- **问题**:
-  - 无消息时仍执行数据库查询，浪费资源
-  - 最大延迟60秒才能处理新消息
-  - 数据库频繁查询增加压力
-
-#### 1.1 群消息同步 (GroupMessageConsumer) ✅ 推荐方案
-- **状态**: ✅ 推荐使用
-- **文件位置**: `src/main/java/com/zxl/chatbase/im/consumer/GroupMessageConsumer.java`
-- **执行频率**: 每5秒（阻塞读取，有消息立即处理）
-- **方案**: Redis Stream 消息队列
-- **功能**:
-  - 从 Redis Stream 消费新消息
-  - 消息驱动实时处理，无需轮询
-  - 支持消息确认机制
-  - 调用 `syncSingleMessage()` 处理单条消息
-- **优势**:
-  - 消息驱动：新消息到达立即处理，无需定时轮询
-  - 低延迟：秒级处理，无需等待60秒
-  - 低资源：仅处理新消息，不频繁查询数据库
-  - 高可靠：支持消息确认和失败重试
-
-### Redis Stream 消息队列方案
-
-#### 方案说明
-- **触发方式**: 消息驱动（消息到达立即处理）
-- **响应延迟**: 实时或秒级
-- **资源消耗**: 仅处理新消息，无需轮询
-- **配置项**: `im.sync.stream.enabled`（默认true）
-
-#### 消息流程
-```
-QQ/企微消息到达 → WebSocket处理器 → Redis Stream → 消费者处理 → Dify知识库
-                     ↓                                    ↓
-                保存到数据库                          更新synced状态
-```
-
-#### 核心组件
-
-| 组件 | 说明 |
-|------|------|
-| Stream Key | `chatbase:group:message:stream` |
-| Consumer Group | `chatbase-sync-group` |
-| 消费者 | `consumer-1` |
-
-#### 配置说明
-```yaml
-im:
-  sync:
-    stream:
-      enabled: true  # 启用Stream方案
-    polling:
-      enabled: false  # 禁用定时轮询
-```
-
-#### 待实现功能（可选）
-- 消息失败重试机制
-- 批量处理优化
-- 多个消费者并行处理
-
-#### 2. 每日统计聚合 (StatisticsAggregateServiceImpl)
-- **文件位置**: `src/main/java/com/zxl/chatbase/statistics/service/impl/StatisticsAggregateServiceImpl.java`
-- **执行频率**: 每天 00:05 (cron = "0 5 0 * * ?")
-- **功能**:
-  - 聚合昨日的会话统计数据
-  - 统计会话数、消息数、Token消耗、费用等
-
-#### 3. 关键词同步 (KeywordSyncServiceImpl)
-- **文件位置**: `src/main/java/com/zxl\chatbase/kb/service/impl/KeywordSyncServiceImpl.java`
-- **执行频率**: 每天 05:00 和 06:00
-- **功能**:
-  - `syncKeywordsFromMessages()`: 从最近7天的群聊消息和对话中提取关键词
-  - `cleanOldKeywords()`: 清理超过90天的关键词
-
-#### 4. 数据清理 (CleanupServiceImpl)
-- **文件位置**: `src/main/java/com/zxl\chatbase/chat/service/impl/CleanupServiceImpl.java`
-- **执行频率**: 每天 03:00 和 04:30
-- **功能**:
-  - `cleanupExpiredConversations()`: 清理Redis和数据库中的过期会话
-  - `cleanupOldMessages()`: 清理超过90天的消息
-
-### 注意事项
-
-⚠️ **定时同步方案已过时**：
-- 当前每60秒轮询方案（GroupMessageSyncServiceImpl.syncToKnowledgeBase）会造成资源浪费
-- 建议改用 Redis Stream 消息队列方案（GroupMessageConsumer）
-- 原定时任务保留作为降级方案（可通过 `im.sync.polling.enabled` 控制）
-
-⚠️ **定时任务与手动删除的冲突**：
-- 群消息同步任务会检查"群聊消息"分类是否存在，不存在则自动创建
-- 群消息同步任务会检查"群聊助手知识库"是否存在，不存在则自动创建
-- 如果手动删除该分类或知识库，定时任务会在60秒内重新创建
-
-⚠️ **定时任务触发的默认知识库创建**：
-- 当首次有群消息需要同步时，定时任务会自动创建：
-  - **"群聊消息"分类**（分类名称，parent_id=0）
-  - **"群聊助手知识库"**（知识库名称，source_type=im_sync）
-- 这是隐式创建，没有独立的定时任务，但在 GroupMessageSyncServiceImpl.syncToKnowledgeBase() 中通过 findOrCreateImSyncCategory() 和 findOrCreateImSyncKnowledgeBase() 方法实现
-
-⚠️ **统计数据延迟**：
-- 统计聚合任务每天0:05执行，聚合的是昨日数据
-- 当天的统计数据需要在次日才会显示
-
-## 常见问题
-
-1. **QQ消息收到但不回答**：确认 @机器人 而不是只发消息
-2. **知识库删除失败**：检查 Dify API Key 配置是否正确
-3. **统计数据为空**：调用 `/api/statistics/aggregate` 聚合统计
-4. **Token费用显示为0**：历史数据无费用信息，新对话正常记录
-
-## 默认数据创建
-
-### 1. 默认应用（kb_app 表）
-
-#### 创建时机
-- 数据库初始化时（init-schema.sql）
-
-#### 初始化数据
-```sql
--- init-schema.sql 中的初始化语句
-INSERT INTO `kb_app` 
-  (`name`, `description`, `icon`, `dify_api_key`, `dify_app_name`, `dify_app_mode`, `is_default`, `is_public`, `create_by`, `status`)
-VALUES 
-  ('默认助手', '系统默认应用，使用配置文件中的API Key', 'robot', 'PLACEHOLDER_API_KEY', NULL, NULL, 1, 1, 'admin', 1)
-ON DUPLICATE KEY UPDATE `update_time` = NOW();
-```
-
-#### 获取默认应用的逻辑（KbAppServiceImpl.getDefaultApp()）
-```java
-public KbApp getDefaultApp() {
-    // 1. 首先查询 is_default = true 且 status = 1 的应用
-    LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(KbApp::getStatus, true)
-            .eq(KbApp::getIsDefault, true)
-            .last("LIMIT 1");
-    KbApp app = appMapper.selectOne(wrapper);
-    
-    // 2. 如果没有默认应用，则返回任意一个启用的应用
-    if (app == null) {
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(KbApp::getStatus, true).last("LIMIT 1");
-        app = appMapper.selectOne(wrapper);
-    }
-    return app;
-}
-```
-
-#### 应用获取优先级
-1. 群组绑定的应用（优先）
-2. 默认应用（is_default = true）
-3. 任意启用的应用
-
-### 2. 默认知识库（群聊助手知识库）
-
-#### 创建时机
-- 首次同步群消息时，由 `GroupMessageSyncServiceImpl` 定时任务触发
-
-#### 创建流程
-```
-定时任务触发（每60秒） 
-    ↓
-findOrCreateImSyncCategory() 检查"群聊消息"分类
-    ├── 存在 → 直接使用
-    └── 不存在 → 创建新分类
-        ↓
-findOrCreateImSyncKnowledgeBase() 检查"群聊助手知识库"
-    ├── 存在 → 直接使用
-    └── 不存在 → 创建知识库 + 调用 Dify API 创建 Dataset
-        ↓
-保存到数据库
-```
-
-#### 关键代码位置
-- **文件**：`src/main/java/com/zxl/chatbase/im/service/impl/GroupMessageSyncServiceImpl.java`
-
-- **findOrCreateImSyncCategory()** - 第262-283行
-  ```java
-  private KbCategory findOrCreateImSyncCategory() {
-      // 检查 name='群聊消息' AND status=true 的分类
-      LambdaQueryWrapper<KbCategory> wrapper = new LambdaQueryWrapper<>();
-      wrapper.eq(KbCategory::getName, "群聊消息")
-              .eq(KbCategory::getStatus, true)
-              .last("LIMIT 1");
-      KbCategory category = kbCategoryMapper.selectOne(wrapper);
-      
-      // 不存在则创建
-      if (category == null) {
-          category = new KbCategory();
-          category.setName("群聊消息");
-          category.setDescription("群聊消息同步分类");
-          category.setParentId(0L);
-          category.setStatus(true);
-          kbCategoryMapper.insert(category);
-      }
-      return category;
-  }
-  ```
-
-- **findOrCreateImSyncKnowledgeBase()** - 第285-328行
-  ```java
-  private KbKnowledgeBase findOrCreateImSyncKnowledgeBase() {
-      // 1. 获取或创建"群聊消息"分类
-      KbCategory category = findOrCreateImSyncCategory();
-      
-      // 2. 检查"群聊助手知识库"是否存在
-      LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
-      wrapper.eq(KbKnowledgeBase::getSourceType, "im_sync")
-              .eq(KbKnowledgeBase::getName, "群聊助手知识库")
-              .eq(KbKnowledgeBase::getStatus, true)
-              .last("LIMIT 1");
-      
-      // 3. 不存在则创建
-      if (kb == null) {
-          kb = new KbKnowledgeBase();
-          kb.setName("群聊助手知识库");
-          kb.setDescription("所有群聊消息同步知识库");
-          kb.setCategoryId(category.getId());
-          kb.setSourceType("im_sync");
-          // 调用 Dify API 创建 Dataset
-          String difyDatasetId = difyService.createDataset(kb.getName(), kb.getDescription());
-          kb.setDifyDatasetId(difyDatasetId);
-          knowledgeBaseService.save(kb);
-      }
-      return kb;
-  }
-  ```
-
-#### 相关配置常量
-| 常量 | 值 | 说明 |
-|------|-----|------|
-| `IM_SYNC_KB_NAME` | 群聊助手知识库 | 知识库名称 |
-| `IM_SYNC_CATEGORY_NAME` | 群聊消息 | 分类名称 |
-| `IM_SYNC_SOURCE_TYPE` | im_sync | 来源类型 |
-
-### 3. 配置说明
-
-#### Dify API Key 来源
-1. **数据库 kb_app 表**：`dify_api_key` 字段存储应用级 API Key
-2. **配置文件**：`application-prod.yaml` 中的 `difyApp.apiKey` 环境变量
-3. **优先级**：配置文件 > 数据库
-
-#### 环境变量配置
-```yaml
-# application-prod.yaml
-difyApp:
-  url: https://api.dify.ai/v1
-  apiKey: ${DIFYAPP_API_KEY}        # 来自 .env 文件
-  datasetApiKey: ${DIFYAPP_DATASET_API_KEY}
-```
-
-### 4. 注意事项
-
-⚠️ **删除"群聊消息"分类的问题**：
-- 该分类由定时任务自动创建（每60秒检查）
-- 删除后会在下一次同步时自动重建
-- 如需删除该分类，需先禁用 IM 同步功能
-
-⚠️ **默认应用 API Key**：
-- 数据库初始化时使用占位符 `PLACEHOLDER_API_KEY`
-- 部署时需在 `.env` 文件中配置真实的 `DIFYAPP_API_KEY`
-
-⚠️ **定时任务配置**：
-- `GroupMessageSyncServiceImpl.syncToKnowledgeBase()` 每60秒执行一次
-- 定时任务会在启动后立即执行一次
-
+*最后更新：2026-05-07*

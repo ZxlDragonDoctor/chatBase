@@ -9,7 +9,9 @@ import com.zxl.chatbase.dify.config.DifyConfig;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.entity.SysUser;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import com.zxl.chatbase.kb.service.IKbAppService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -37,18 +39,26 @@ public class KbAppServiceImpl implements IKbAppService {
     private ObjectMapper objectMapper;
     @Autowired
     private ImGroupMapper imGroupMapper;
+    @Autowired
+    private SysUserMapper sysUserMapper;
     @javax.annotation.Resource
     private CloseableHttpClient httpClient;
 
     @Override
     public List<KbApp> listAll(String userId) {
         LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(KbApp::getStatus, true)
-                .and(w -> w.eq(KbApp::getIsPublic, true)
-                        .or()
-                        .eq(KbApp::getCreateBy, userId))
-                .orderByDesc(KbApp::getIsDefault)
-                .orderByDesc(KbApp::getCreateTime);
+        wrapper.eq(KbApp::getStatus, true);
+        
+        if (isAdmin(userId)) {
+            wrapper.orderByDesc(KbApp::getIsDefault)
+                    .orderByDesc(KbApp::getCreateTime);
+        } else {
+            wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
+                            .or()
+                            .eq(KbApp::getCreateBy, userId))
+                    .orderByDesc(KbApp::getIsDefault)
+                    .orderByDesc(KbApp::getCreateTime);
+        }
         return appMapper.selectList(wrapper);
     }
 
@@ -56,13 +66,20 @@ public class KbAppServiceImpl implements IKbAppService {
     public Page<KbApp> page(Integer pageNum, Integer pageSize, String userId, String name) {
         Page<KbApp> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(KbApp::getStatus, true)
-                .and(w -> w.eq(KbApp::getIsPublic, true)
-                        .or()
-                        .eq(KbApp::getCreateBy, userId))
-                .like(StringUtils.hasText(name), KbApp::getName, name)
-                .orderByDesc(KbApp::getIsDefault)
-                .orderByDesc(KbApp::getCreateTime);
+        wrapper.eq(KbApp::getStatus, true);
+        
+        if (isAdmin(userId)) {
+            wrapper.like(StringUtils.hasText(name), KbApp::getName, name)
+                    .orderByDesc(KbApp::getIsDefault)
+                    .orderByDesc(KbApp::getCreateTime);
+        } else {
+            wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
+                            .or()
+                            .eq(KbApp::getCreateBy, userId))
+                    .like(StringUtils.hasText(name), KbApp::getName, name)
+                    .orderByDesc(KbApp::getIsDefault)
+                    .orderByDesc(KbApp::getCreateTime);
+        }
         return appMapper.selectPage(page, wrapper);
     }
 
@@ -224,5 +241,13 @@ public class KbAppServiceImpl implements IKbAppService {
                 .eq(ImGroup::getStatus, true)
                 .orderByDesc(ImGroup::getUpdateTime);
         return imGroupMapper.selectList(wrapper);
+    }
+
+    private boolean isAdmin(String userId) {
+        if (userId == null) return false;
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getUsername, userId);
+        SysUser user = sysUserMapper.selectOne(wrapper);
+        return user != null && "admin".equals(user.getRole());
     }
 }
