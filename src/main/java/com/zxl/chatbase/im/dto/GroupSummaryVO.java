@@ -14,4 +14,5 @@ public class GroupSummaryVO {
     private LocalDateTime lastMessageTime;
     private Long appId;
     private String appName;
+    private String createdBy;
 }

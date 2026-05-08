@@ -2,6 +2,7 @@ package com.zxl.chatbase.user.service;
 
 import com.zxl.chatbase.user.dto.LoginRequest;
 import com.zxl.chatbase.user.dto.LoginResponse;
+import com.zxl.chatbase.user.dto.PageResult;
 import com.zxl.chatbase.user.dto.RegisterRequest;
 import com.zxl.chatbase.user.dto.UserVO;
 import com.zxl.chatbase.kb.entity.SysUser;
@@ -22,4 +23,14 @@ public interface UserService {
     boolean checkPassword(String username, String rawPassword);
     
     boolean changePassword(String username, String oldPassword, String newPassword);
+
+    PageResult<UserVO> listUsers(int pageNum, int pageSize, String keyword);
+
+    UserVO getUserDetail(Long id);
+
+    UserVO updateUserRole(Long id, String role);
+
+    UserVO toggleUserStatus(Long id, Boolean status);
+
+    void deleteUser(Long id);
 }

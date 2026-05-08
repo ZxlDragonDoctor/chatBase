@@ -299,6 +299,7 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             category.setParentId(0L);
             category.setSortOrder(0);
             category.setStatus(true);
+            category.setCreateBy(null);
             category.setCreateTime(LocalDateTime.now());
             category.setUpdateTime(LocalDateTime.now());
             kbCategoryMapper.insert(category);
@@ -327,6 +328,8 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             kb.setSyncGroupIds("[]");
             kb.setDocCount(0);
             kb.setStatus(true);
+            kb.setIsPublic(true);
+            kb.setCreateBy("admin");
             kb.setCreateTime(LocalDateTime.now());
             kb.setUpdateTime(LocalDateTime.now());
 

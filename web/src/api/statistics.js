@@ -1,32 +1,32 @@
 import { api } from './client';
-export async function fetchTokenDaily(days = 7) {
-    const resp = await api.get('/statistics/token/daily', { params: { days } });
+export async function fetchTokenDaily(days = 7, scope = 'all') {
+    const resp = await api.get('/statistics/token/daily', { params: { days, scope } });
     return resp.data;
 }
-export async function fetchTokenTotal() {
-    const resp = await api.get('/statistics/token/total');
+export async function fetchTokenTotal(scope = 'all') {
+    const resp = await api.get('/statistics/token/total', { params: { scope } });
     return resp.data;
 }
-export async function fetchGroupActive(platform = 'all', limit = 10) {
-    const resp = await api.get('/statistics/group/active', { params: { platform, limit } });
+export async function fetchGroupActive(platform = 'all', limit = 10, scope = 'all') {
+    const resp = await api.get('/statistics/group/active', { params: { platform, limit, scope } });
     return resp.data;
 }
-export async function fetchHotKeywords(platform = 'all', groupId, limit = 20) {
+export async function fetchHotKeywords(platform = 'all', groupId, limit = 20, scope = 'all') {
     const resp = await api.get('/statistics/group/hot-keywords', {
-        params: { platform, groupId, limit },
+        params: { platform, groupId, limit, scope },
     });
     return resp.data;
 }
-export async function fetchConversationOverview(days = 7) {
-    const resp = await api.get('/statistics/conversation/overview', { params: { days } });
+export async function fetchConversationOverview(days = 7, scope = 'all') {
+    const resp = await api.get('/statistics/conversation/overview', { params: { days, scope } });
     return resp.data;
 }
-export async function fetchConversationTrend(days = 30) {
-    const resp = await api.get('/statistics/conversation/trend', { params: { days } });
+export async function fetchConversationTrend(days = 30, scope = 'all') {
+    const resp = await api.get('/statistics/conversation/trend', { params: { days, scope } });
     return resp.data;
 }
-export async function fetchSystemOverview() {
-    const resp = await api.get('/statistics/system/overview');
+export async function fetchSystemOverview(scope = 'all') {
+    const resp = await api.get('/statistics/system/overview', { params: { scope } });
     return resp.data;
 }
 export async function fetchKeywordCloud(source = 'all', days = 30, limit = 50) {
@@ -41,23 +41,23 @@ export async function syncKeywordsFromMessages(days = 30) {
     });
     return resp.data;
 }
-export async function fetchTokenChartData(days = 7) {
-    const resp = await api.get('/statistics/token/chart', { params: { days } });
+export async function fetchTokenChartData(days = 7, scope = 'all') {
+    const resp = await api.get('/statistics/token/chart', { params: { days, scope } });
     return resp.data;
 }
-export async function fetchTokenMonthlyData() {
-    const resp = await api.get('/statistics/token/monthly');
+export async function fetchTokenMonthlyData(scope = 'all') {
+    const resp = await api.get('/statistics/token/monthly', { params: { scope } });
     return resp.data;
 }
 export async function aggregateStatistics(days = 7) {
     const resp = await api.post('/statistics/aggregate', null, { params: { days } });
     return resp.data;
 }
-export async function fetchCostChartData(days = 7) {
-    const resp = await api.get('/statistics/cost/chart', { params: { days } });
+export async function fetchCostChartData(days = 7, scope = 'all') {
+    const resp = await api.get('/statistics/cost/chart', { params: { days, scope } });
     return resp.data;
 }
-export async function fetchCostMonthlyData() {
-    const resp = await api.get('/statistics/cost/monthly');
+export async function fetchCostMonthlyData(scope = 'all') {
+    const resp = await api.get('/statistics/cost/monthly', { params: { scope } });
     return resp.data;
 }

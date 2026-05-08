@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `kb_category` (
   `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` BIGINT DEFAULT NULL COMMENT '创建人ID',
+  `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人用户名',
   PRIMARY KEY (`id`),
   KEY `idx_parent_id` (`parent_id`),
   KEY `idx_sort_order` (`sort_order`)
@@ -61,9 +61,10 @@ CREATE TABLE IF NOT EXISTS `kb_knowledge_base` (
   `doc_count` INT NOT NULL DEFAULT 0 COMMENT '文档数量',
   `chunk_count` INT NOT NULL DEFAULT 0 COMMENT '切片数量',
   `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  `is_public` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否公开：0-仅创建者，1-所有用户可用',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` BIGINT DEFAULT NULL COMMENT '创建人ID',
+  `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人用户名',
   PRIMARY KEY (`id`),
   KEY `idx_category_id` (`category_id`),
   KEY `idx_dify_dataset_id` (`dify_dataset_id`),
@@ -350,12 +351,14 @@ CREATE TABLE IF NOT EXISTS `im_group` (
   `robot_id` VARCHAR(64) DEFAULT NULL COMMENT '机器人ID',
   `auto_reply` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否自动回复：0-否，1-是',
   `kb_id` BIGINT DEFAULT NULL COMMENT '关联知识库ID',
+  `created_by` VARCHAR(50) DEFAULT NULL COMMENT '归属用户（创建者用户名）',
   `status` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_platform_group` (`platform`, `group_id`),
   KEY `idx_kb_id` (`kb_id`),
+  KEY `idx_created_by` (`created_by`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IM群组信息表';
 
@@ -455,6 +458,22 @@ VALUES ('默认助手', '系统默认应用，使用配置文件中的API Key', 
 ON DUPLICATE KEY UPDATE `update_time` = NOW();
 
 -- =============================================
+-- 知识库模块：用户分类关联表（将公开知识库关联到用户分类）
+-- =============================================
+CREATE TABLE IF NOT EXISTS `kb_user_category_mapping` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+  `category_id` BIGINT NOT NULL COMMENT '分类ID',
+  `kb_id` BIGINT NOT NULL COMMENT '知识库ID',
+  `user_id` VARCHAR(50) NOT NULL COMMENT '关联用户',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_category_kb_user` (`category_id`, `kb_id`, `user_id`),
+  KEY `idx_category_id` (`category_id`),
+  KEY `idx_kb_id` (`kb_id`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户分类关联表';
+
+-- =============================================
 -- 已有数据库升级脚本（ALTER语句）
 -- 注意：新部署会自动创建完整表结构，以下仅用于已有数据库升级
 -- =============================================
@@ -472,5 +491,12 @@ ALTER TABLE `kb_conversation` ADD KEY `idx_app_id` (`app_id`);
 -- kb_statistics表添加应用维度字段
 ALTER TABLE `kb_statistics` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '应用ID' AFTER `knowledge_base_id`;
 ALTER TABLE `kb_statistics` ADD KEY `idx_app_id` (`app_id`);
+
+-- 权限控制相关升级脚本
+ALTER TABLE `kb_knowledge_base` ADD COLUMN `is_public` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否公开：0-仅创建者，1-所有用户可用' AFTER `status`;
+ALTER TABLE `kb_knowledge_base` MODIFY COLUMN `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人用户名';
+ALTER TABLE `kb_category` MODIFY COLUMN `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人用户名';
+ALTER TABLE `im_group` ADD COLUMN `created_by` VARCHAR(50) DEFAULT NULL COMMENT '归属用户（创建者用户名）' AFTER `kb_id`;
+ALTER TABLE `im_group` ADD KEY `idx_created_by` (`created_by`);
 
 

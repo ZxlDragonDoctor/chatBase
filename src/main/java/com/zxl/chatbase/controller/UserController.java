@@ -132,4 +132,66 @@ public class UserController {
         result.put("valid", valid);
         return result;
     }
+
+    @GetMapping("/list")
+    public Map<String, Object> listUsers(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String keyword) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("data", userService.listUsers(pageNum, pageSize, keyword));
+        return result;
+    }
+
+    @GetMapping("/{id}/detail")
+    public Map<String, Object> getUserDetail(@PathVariable Long id) {
+        UserVO user = userService.getUserDetail(id);
+        Map<String, Object> result = new HashMap<>();
+        if (user != null) {
+            result.put("success", true);
+            result.put("data", user);
+        } else {
+            result.put("success", false);
+            result.put("message", "用户不存在");
+        }
+        return result;
+    }
+
+    @PutMapping("/{id}/role")
+    public Map<String, Object> updateUserRole(@PathVariable Long id, @RequestParam String role) {
+        UserVO user = userService.updateUserRole(id, role);
+        Map<String, Object> result = new HashMap<>();
+        if (user != null) {
+            result.put("success", true);
+            result.put("data", user);
+        } else {
+            result.put("success", false);
+            result.put("message", "用户不存在");
+        }
+        return result;
+    }
+
+    @PutMapping("/{id}/status")
+    public Map<String, Object> toggleUserStatus(@PathVariable Long id, @RequestParam Boolean status) {
+        UserVO user = userService.toggleUserStatus(id, status);
+        Map<String, Object> result = new HashMap<>();
+        if (user != null) {
+            result.put("success", true);
+            result.put("data", user);
+        } else {
+            result.put("success", false);
+            result.put("message", "用户不存在");
+        }
+        return result;
+    }
+
+    @DeleteMapping("/{id}/remove")
+    public Map<String, Object> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "删除成功");
+        return result;
+    }
 }

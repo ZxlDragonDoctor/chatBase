@@ -19,32 +19,43 @@
       <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
 
       <div class="anime-card-body">
-        <div class="anime-tabs" style="margin-bottom: 16px;">
-          <button v-for="t in platformTabs" :key="t.key" class="anime-tab" :class="{ active: platform === t.key }" @click="platform = t.key">{{ t.label }}</button>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+          <select v-model="scope" class="anime-scope-select" style="min-width: 100px;">
+            <option value="all">全部</option>
+            <option value="unassigned">未分配</option>
+            <option value="bound">已绑定</option>
+          </select>
+          <div class="anime-tabs">
+            <button v-for="t in platformTabs" :key="t.key" class="anime-tab" :class="{ active: platform === t.key }" @click="togglePlatform(t.key)">{{ t.label }}</button>
+          </div>
+          <input v-model="groupSearch" type="text" placeholder="搜索群名或群ID..." class="anime-search-input" style="min-width: 200px; flex: 1;" />
         </div>
 
-        <div class="im-split-view">
-          <div class="im-list-panel">
-            <div v-if="loading && groups.length === 0" class="anime-empty">
-              <span class="anime-loader-spinner"></span>
-              <span class="anime-empty-text">加载中...</span>
-            </div>
-            <div v-else-if="groups.length === 0" class="anime-empty">
-              <div class="anime-empty-icon">📭</div>
-              <div class="anime-empty-text">暂无群聊记录</div>
-            </div>
-            <button v-for="g in groups" :key="g.platform + ':' + g.groupId" class="im-group-item" :class="{ 'active': selected?.groupId === g.groupId && selected?.platform === g.platform }" @click="selectGroup(g)">
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
-                <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(g) }}</span>
-                <span v-if="g.appName" class="anime-badge blue" style="margin-left: 4px;">{{ g.appName }}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--anime-text-muted);">
-                <span style="color: var(--anime-blue);">{{ g.messageCount }} 条消息</span>
-                <span v-if="g.lastMessageTime">{{ formatTime(g.lastMessageTime) }}</span>
-              </div>
-            </button>
-          </div>
+              <div class="im-split-view">
+                <div class="im-list-panel">
+                  <div v-if="loading && groups.length === 0" class="anime-empty">
+                    <span class="anime-loader-spinner"></span>
+                    <span class="anime-empty-text">加载中...</span>
+                  </div>
+                  <div v-else-if="groups.length === 0" class="anime-empty">
+                    <div class="anime-empty-icon">📭</div>
+                    <div class="anime-empty-text">暂无群聊记录</div>
+                  </div>
+                  <button v-for="g in filteredGroups" :key="g.platform + ':' + g.groupId" class="im-group-item" :class="{ 'active': selected?.groupId === g.groupId && selected?.platform === g.platform }" @click="selectGroup(g)">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                      <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
+                      <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(g) }}</span>
+                      <span v-if="g.appName" class="anime-badge blue" style="margin-left: 4px;">{{ g.appName }}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--anime-text-muted);">
+                      <span style="color: var(--anime-blue);">{{ g.messageCount }} 条消息</span>
+                      <span v-if="g.lastMessageTime">{{ formatTime(g.lastMessageTime) }}</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--anime-text-muted); margin-top: 4px;">
+                      <span v-if="g.createdBy">归属: {{ g.createdBy }}</span>
+                    </div>
+                  </button>
+                </div>
 
           <div class="im-detail-panel">
             <template v-if="!selected">
@@ -59,7 +70,7 @@
                 <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(selected) }}</span>
               </div>
               
-              <div style="padding: 16px; background: rgba(168, 216, 234, 0.1); border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg); margin-bottom: 16px;">
+              <div v-if="!selected.createdBy || selected.createdBy === currentUserName" style="padding: 16px; background: rgba(168, 216, 234, 0.1); border: 2px solid var(--anime-border); border-radius: var(--anime-radius-lg); margin-bottom: 16px;">
                 <div style="font-weight: 600; color: var(--anime-text-primary); margin-bottom: 12px;">
                   <span style="color: var(--anime-pink);">应用绑定</span>
                 </div>
@@ -134,8 +145,22 @@ interface KbApp {
   isDefault: boolean
 }
 
-const platformTabs = [{ key: 'all' as const, label: '全部' }, { key: 'qq' as const, label: 'QQ 群' }, { key: 'wecom' as const, label: '企微群' }]
-const platform = ref<'all' | 'qq' | 'wecom'>('all')
+const currentUserName = computed(() => localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '')
+
+const filteredGroups = computed(() => {
+  const q = groupSearch.value.trim().toLowerCase()
+  if (!q) return groups.value
+  return groups.value.filter(g => {
+    const id = String(g.groupId ?? '').toLowerCase()
+    const name = String(g.groupName ?? '').toLowerCase()
+    return id.includes(q) || name.includes(q)
+  })
+})
+
+const platformTabs = [{ key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }]
+const platform = ref<string | null>(null)
+const scope = ref('all')
+const groupSearch = ref('')
 const groups = ref<GroupSummary[]>([])
 const loading = ref(false)
 const err = ref<string | null>(null)
@@ -164,7 +189,7 @@ async function reload() {
   loading.value = true
   err.value = null
   try {
-    groups.value = await fetchGroups(platform.value)
+    groups.value = await fetchGroups(platform.value ?? 'all', scope.value)
     if (selected.value) {
       const still = groups.value.find((g) => g.groupId === selected.value!.groupId && g.platform === selected.value!.platform)
       if (!still) { selected.value = null; messages.value = [] }
@@ -235,6 +260,10 @@ async function saveBindApp() {
   }
 }
 
+function togglePlatform(key: string) {
+  platform.value = platform.value === key ? null : key
+}
+
 function getPlatformColor(p: string): string { if (p === 'qq') return 'green'; if (p === 'wecom') return 'blue'; return 'purple' }
 function getPlatformLabel(p: string): string { if (p === 'qq') return 'QQ群'; if (p === 'wecom') return '企微群'; return '群聊' }
 function getGroupName(g: GroupSummary): string {
@@ -253,7 +282,7 @@ function formatTime(t: any): string {
   return String(t)
 }
 
-watch(platform, () => { selected.value = null; messages.value = []; reload() })
+watch([platform, scope], () => { selected.value = null; messages.value = []; reload() })
 onMounted(() => {
   reload()
   loadApps()
@@ -295,5 +324,18 @@ onMounted(() => {
 }
 .anime-search-input:focus {
   border-color: var(--anime-blue);
+}
+.anime-scope-select {
+  background: var(--anime-bg);
+  border: 2px solid var(--anime-border);
+  border-radius: var(--anime-radius-lg);
+  padding: 6px 10px;
+  font-size: 14px;
+  color: var(--anime-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+.anime-scope-select:focus {
+  border-color: var(--anime-pink);
 }
 </style>

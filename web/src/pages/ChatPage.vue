@@ -9,6 +9,9 @@
           </div>
         </div>
         <div class="anime-card-actions">
+          <select v-model="selectedAppId" class="anime-app-select" :disabled="loading">
+            <option v-for="app in appList" :key="app.id" :value="app.id">{{ app.name }}</option>
+          </select>
           <button class="anime-btn primary" @click="createNewSession">
             <Plus :size="18" />
             <span>新建对话</span>

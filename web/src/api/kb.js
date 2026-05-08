@@ -57,3 +57,9 @@ export async function listDifyDatasets() {
     const resp = await api.get('/kb/dify/list');
     return resp.data;
 }
+export async function linkCategoryToKb(kbId, categoryId) {
+    await api.post(`/kb/${kbId}/link-category`, { categoryId });
+}
+export async function unlinkCategoryFromKb(kbId, mappingId) {
+    await api.delete(`/kb/${kbId}/link-category/${mappingId}`);
+}

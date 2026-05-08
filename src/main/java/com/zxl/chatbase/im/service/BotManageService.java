@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface BotManageService {
 
-    List<BotInfoVO> listBots();
+    List<BotInfoVO> listBots(String userId);
 }

@@ -7,44 +7,45 @@ import type {
   SystemOverview,
 } from '../types/statistics'
 
-export async function fetchTokenDaily(days: number = 7): Promise<TokenStatistics> {
-  const resp = await api.get<TokenStatistics>('/statistics/token/daily', { params: { days } })
+export async function fetchTokenDaily(days: number = 7, scope: string = 'all'): Promise<TokenStatistics> {
+  const resp = await api.get<TokenStatistics>('/statistics/token/daily', { params: { days, scope } })
   return resp.data
 }
 
-export async function fetchTokenTotal(): Promise<TokenStatistics> {
-  const resp = await api.get<TokenStatistics>('/statistics/token/total')
+export async function fetchTokenTotal(scope: string = 'all'): Promise<TokenStatistics> {
+  const resp = await api.get<TokenStatistics>('/statistics/token/total', { params: { scope } })
   return resp.data
 }
 
-export async function fetchGroupActive(platform: string = 'all', limit: number = 10): Promise<GroupActive> {
-  const resp = await api.get<GroupActive>('/statistics/group/active', { params: { platform, limit } })
+export async function fetchGroupActive(platform: string = 'all', limit: number = 10, scope: string = 'all'): Promise<GroupActive> {
+  const resp = await api.get<GroupActive>('/statistics/group/active', { params: { platform, limit, scope } })
   return resp.data
 }
 
 export async function fetchHotKeywords(
   platform: string = 'all',
   groupId?: string,
-  limit: number = 20
+  limit: number = 20,
+  scope: string = 'all'
 ): Promise<KeywordHot> {
   const resp = await api.get<KeywordHot>('/statistics/group/hot-keywords', {
-    params: { platform, groupId, limit },
+    params: { platform, groupId, limit, scope },
   })
   return resp.data
 }
 
-export async function fetchConversationOverview(days: number = 7): Promise<ConversationStatistics> {
-  const resp = await api.get<ConversationStatistics>('/statistics/conversation/overview', { params: { days } })
+export async function fetchConversationOverview(days: number = 7, scope: string = 'all'): Promise<ConversationStatistics> {
+  const resp = await api.get<ConversationStatistics>('/statistics/conversation/overview', { params: { days, scope } })
   return resp.data
 }
 
-export async function fetchConversationTrend(days: number = 30): Promise<ConversationStatistics> {
-  const resp = await api.get<ConversationStatistics>('/statistics/conversation/trend', { params: { days } })
+export async function fetchConversationTrend(days: number = 30, scope: string = 'all'): Promise<ConversationStatistics> {
+  const resp = await api.get<ConversationStatistics>('/statistics/conversation/trend', { params: { days, scope } })
   return resp.data
 }
 
-export async function fetchSystemOverview(): Promise<SystemOverview> {
-  const resp = await api.get<SystemOverview>('/statistics/system/overview')
+export async function fetchSystemOverview(scope: string = 'all'): Promise<SystemOverview> {
+  const resp = await api.get<SystemOverview>('/statistics/system/overview', { params: { scope } })
   return resp.data
 }
 
@@ -82,13 +83,13 @@ export interface TokenMonthlyData extends TokenChartData {
   monthProgress: number
 }
 
-export async function fetchTokenChartData(days: number = 7): Promise<TokenChartData> {
-  const resp = await api.get<TokenChartData>('/statistics/token/chart', { params: { days } })
+export async function fetchTokenChartData(days: number = 7, scope: string = 'all'): Promise<TokenChartData> {
+  const resp = await api.get<TokenChartData>('/statistics/token/chart', { params: { days, scope } })
   return resp.data
 }
 
-export async function fetchTokenMonthlyData(): Promise<TokenMonthlyData> {
-  const resp = await api.get<TokenMonthlyData>('/statistics/token/monthly')
+export async function fetchTokenMonthlyData(scope: string = 'all'): Promise<TokenMonthlyData> {
+  const resp = await api.get<TokenMonthlyData>('/statistics/token/monthly', { params: { scope } })
   return resp.data
 }
 
@@ -114,12 +115,12 @@ export interface CostMonthlyData {
   monthProgress: number
 }
 
-export async function fetchCostChartData(days: number = 7): Promise<CostChartData> {
-  const resp = await api.get<CostChartData>('/statistics/cost/chart', { params: { days } })
+export async function fetchCostChartData(days: number = 7, scope: string = 'all'): Promise<CostChartData> {
+  const resp = await api.get<CostChartData>('/statistics/cost/chart', { params: { days, scope } })
   return resp.data
 }
 
-export async function fetchCostMonthlyData(): Promise<CostMonthlyData> {
-  const resp = await api.get<CostMonthlyData>('/statistics/cost/monthly')
+export async function fetchCostMonthlyData(scope: string = 'all'): Promise<CostMonthlyData> {
+  const resp = await api.get<CostMonthlyData>('/statistics/cost/monthly', { params: { scope } })
   return resp.data
 }

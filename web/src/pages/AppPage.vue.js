@@ -3,8 +3,13 @@ import { ref, computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle, User } from 'lucide-vue-next';
 import { api } from '../api/client';
-import { getCurrentUser } from '../lib/user';
 const difyConsoleUrl = 'https://cloud.dify.ai';
+const activeTab = ref('mine');
+const filteredAppList = computed(() => {
+    if (activeTab.value === 'all')
+        return appList.value.filter(a => a.isPublic);
+    return appList.value.filter(a => a.createBy === currentUserName.value);
+});
 const appList = ref([]);
 const categoryList = ref([]);
 const kbList = ref([]);
@@ -25,8 +30,7 @@ const groupsTab = ref('qq');
 const qqGroups = computed(() => boundGroups.value.filter((g) => g.platform === 'qq'));
 const wxGroups = computed(() => boundGroups.value.filter((g) => g.platform === 'wx' || g.platform === 'wecom'));
 const currentUserName = computed(() => {
-    const user = getCurrentUser();
-    return user || '未知用户';
+    return localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '未知用户';
 });
 const form = ref({
     name: '',
@@ -298,6 +302,24 @@ if (__VLS_ctx.err) {
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-body" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-tabs" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.activeTab = 'mine';
+        } },
+    ...{ class: "anime-tab" },
+    ...{ class: ({ active: __VLS_ctx.activeTab === 'mine' }) },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.activeTab = 'all';
+        } },
+    ...{ class: "anime-tab" },
+    ...{ class: ({ active: __VLS_ctx.activeTab === 'all' }) },
+});
 if (__VLS_ctx.loading) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-empty" },
@@ -309,7 +331,7 @@ if (__VLS_ctx.loading) {
         ...{ class: "anime-empty-text" },
     });
 }
-else if (__VLS_ctx.appList.length === 0) {
+else if (__VLS_ctx.filteredAppList.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-empty" },
     });
@@ -319,12 +341,13 @@ else if (__VLS_ctx.appList.length === 0) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-empty-text" },
     });
+    (__VLS_ctx.activeTab === 'mine' ? '暂无应用，点击上方按钮创建' : '暂无公开应用');
 }
 else {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "kb-grid" },
     });
-    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
+    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.filteredAppList))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             key: (app.id),
             ...{ class: "anime-card app-card" },
@@ -425,7 +448,7 @@ else {
                 ...{ onClick: (...[$event]) => {
                         if (!!(__VLS_ctx.loading))
                             return;
-                        if (!!(__VLS_ctx.appList.length === 0))
+                        if (!!(__VLS_ctx.filteredAppList.length === 0))
                             return;
                         if (!(app.categoryId && __VLS_ctx.getCategoryKbList(app.categoryId).length > 0))
                             return;
@@ -465,7 +488,7 @@ else {
                 ...{ onClick: (...[$event]) => {
                         if (!!(__VLS_ctx.loading))
                             return;
-                        if (!!(__VLS_ctx.appList.length === 0))
+                        if (!!(__VLS_ctx.filteredAppList.length === 0))
                             return;
                         if (!((app.qqGroups || 0) > 0 || (app.wxGroups || 0) > 0))
                             return;
@@ -501,7 +524,7 @@ else {
             ...{ onClick: (...[$event]) => {
                     if (!!(__VLS_ctx.loading))
                         return;
-                    if (!!(__VLS_ctx.appList.length === 0))
+                    if (!!(__VLS_ctx.filteredAppList.length === 0))
                         return;
                     __VLS_ctx.verifyApp(app);
                 } },
@@ -522,7 +545,7 @@ else {
                 ...{ onClick: (...[$event]) => {
                         if (!!(__VLS_ctx.loading))
                             return;
-                        if (!!(__VLS_ctx.appList.length === 0))
+                        if (!!(__VLS_ctx.filteredAppList.length === 0))
                             return;
                         if (!(!app.isDefault))
                             return;
@@ -541,34 +564,38 @@ else {
             }, ...__VLS_functionalComponentArgsRest(__VLS_21));
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         }
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (...[$event]) => {
-                    if (!!(__VLS_ctx.loading))
-                        return;
-                    if (!!(__VLS_ctx.appList.length === 0))
-                        return;
-                    __VLS_ctx.editApp(app);
-                } },
-            ...{ class: "anime-btn ghost" },
-        });
-        const __VLS_24 = {}.Edit3;
-        /** @type {[typeof __VLS_components.Edit3, ]} */ ;
-        // @ts-ignore
-        const __VLS_25 = __VLS_asFunctionalComponent(__VLS_24, new __VLS_24({
-            size: (16),
-        }));
-        const __VLS_26 = __VLS_25({
-            size: (16),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_25));
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-        if (!app.isDefault) {
+        if (app.createBy === __VLS_ctx.currentUserName) {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
                 ...{ onClick: (...[$event]) => {
                         if (!!(__VLS_ctx.loading))
                             return;
-                        if (!!(__VLS_ctx.appList.length === 0))
+                        if (!!(__VLS_ctx.filteredAppList.length === 0))
                             return;
-                        if (!(!app.isDefault))
+                        if (!(app.createBy === __VLS_ctx.currentUserName))
+                            return;
+                        __VLS_ctx.editApp(app);
+                    } },
+                ...{ class: "anime-btn ghost" },
+            });
+            const __VLS_24 = {}.Edit3;
+            /** @type {[typeof __VLS_components.Edit3, ]} */ ;
+            // @ts-ignore
+            const __VLS_25 = __VLS_asFunctionalComponent(__VLS_24, new __VLS_24({
+                size: (16),
+            }));
+            const __VLS_26 = __VLS_25({
+                size: (16),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_25));
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        }
+        if (!app.isDefault && app.createBy === __VLS_ctx.currentUserName) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                ...{ onClick: (...[$event]) => {
+                        if (!!(__VLS_ctx.loading))
+                            return;
+                        if (!!(__VLS_ctx.filteredAppList.length === 0))
+                            return;
+                        if (!(!app.isDefault && app.createBy === __VLS_ctx.currentUserName))
                             return;
                         __VLS_ctx.deleteApp(app);
                     } },
@@ -1095,6 +1122,9 @@ if (__VLS_ctx.showKbModal) {
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-error']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tabs']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-loader-spinner']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty-text']} */ ;
@@ -1266,7 +1296,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             AlertCircle: AlertCircle,
             User: User,
             difyConsoleUrl: difyConsoleUrl,
-            appList: appList,
+            activeTab: activeTab,
+            filteredAppList: filteredAppList,
             categoryList: categoryList,
             loading: loading,
             err: err,

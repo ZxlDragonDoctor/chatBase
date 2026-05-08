@@ -47,28 +47,48 @@ public class ImGroupServiceImpl implements ImGroupService {
     }
 
     @Override
-    public void bindApp(Long id, Long appId, String appName) {
+    public void bindApp(Long id, Long appId, String appName, String userId) {
         ImGroup group = imGroupMapper.selectById(id);
         if (group == null) {
             throw new RuntimeException("群组不存在");
         }
+        if (group.getCreatedBy() != null && !group.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权绑定应用：非群组归属用户");
+        }
+        group.setCreatedBy(userId);
         group.setAppId(appId);
         group.setAppName(appName);
         group.setUpdateTime(LocalDateTime.now());
         imGroupMapper.updateById(group);
-        log.info("群组绑定应用: groupId={}, appId={}, appName={}", id, appId, appName);
+        log.info("群组绑定应用: groupId={}, appId={}, appName={}, userId={}", id, appId, appName, userId);
     }
 
     @Override
-    public void unbindApp(Long id) {
+    public void unbindApp(Long id, String userId) {
         ImGroup group = imGroupMapper.selectById(id);
         if (group == null) {
             throw new RuntimeException("群组不存在");
         }
+        if (group.getCreatedBy() != null && !group.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权解绑应用：非群组归属用户");
+        }
+        group.setCreatedBy(null);
         group.setAppId(null);
         group.setAppName(null);
         group.setUpdateTime(LocalDateTime.now());
         imGroupMapper.updateById(group);
-        log.info("群组解除应用绑定: groupId={}", id);
+        log.info("群组解除应用绑定: groupId={}, userId={}", id, userId);
+    }
+
+    @Override
+    public void assignGroup(Long id, String targetUser, String currentUser) {
+        ImGroup group = imGroupMapper.selectById(id);
+        if (group == null) {
+            throw new RuntimeException("群组不存在");
+        }
+        group.setCreatedBy(targetUser);
+        group.setUpdateTime(LocalDateTime.now());
+        imGroupMapper.updateById(group);
+        log.info("分配群组: groupId={}, targetUser={}, operator={}", id, targetUser, currentUser);
     }
 }

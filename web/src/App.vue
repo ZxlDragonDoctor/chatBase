@@ -61,6 +61,18 @@
           <ClipboardList class="anime-nav-icon" :size="22" />
           <span>反馈管理</span>
         </RouterLink>
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/apps" active-class="active">
+          <Bot class="anime-nav-icon" :size="22" />
+          <span>应用管理</span>
+        </RouterLink>
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/kbs" active-class="active">
+          <BookOpen class="anime-nav-icon" :size="22" />
+          <span>知识库管理</span>
+        </RouterLink>
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/users" active-class="active">
+          <Users class="anime-nav-icon" :size="22" />
+          <span>用户管理</span>
+        </RouterLink>
       </nav>
       <div class="anime-nav-footer">
         <div class="anime-nav-footer-text">✿ ChatBase v1.0 ✿</div>
@@ -98,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList, Cpu } from 'lucide-vue-next'
 import UserProfile from './components/UserProfile.vue'
@@ -109,8 +121,15 @@ const router = useRouter()
 const route = useRoute()
 
 const isLoginPage = computed(() => route.path === '/login')
-const currentUser = computed(() => localStorage.getItem('chatbase_user'))
-const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin')
+const currentUser = ref('')
+const isAdmin = ref(false)
+const role = ref('')
+
+function syncAuthState() {
+  currentUser.value = localStorage.getItem('chatbase_user') || ''
+  isAdmin.value = localStorage.getItem('chatbase_role') === 'admin'
+  role.value = localStorage.getItem('chatbase_role') || ''
+}
 
 function getOriginalUsername(): string {
   return localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || ''
@@ -132,8 +151,7 @@ async function openUserProfile() {
 }
 
 const roleLabel = computed(() => {
-  const role = localStorage.getItem('chatbase_role')
-  switch (role) {
+  switch (role.value) {
     case 'admin': return '管理员'
     case 'user': return '用户'
     default: return '访客'
@@ -141,8 +159,7 @@ const roleLabel = computed(() => {
 })
 
 const roleBadgeClass = computed(() => {
-  const role = localStorage.getItem('chatbase_role')
-  switch (role) {
+  switch (role.value) {
     case 'admin': return 'pink'
     case 'user': return 'blue'
     default: return 'muted'
@@ -176,6 +193,7 @@ function handleUserUpdated(user: UserVO) {
   if (user.role) {
     localStorage.setItem('chatbase_role', user.role)
   }
+  syncAuthState()
 }
 
 function getAvatarUrl(path: string): string {
@@ -198,7 +216,15 @@ function handleLogout() {
   router.push('/login')
 }
 
+watch(() => route.path, () => {
+  syncAuthState()
+  if (localStorage.getItem('chatbase_token')) {
+    loadUserProfile()
+  }
+})
+
 onMounted(() => {
+  syncAuthState()
   loadUserProfile()
 })
 </script>

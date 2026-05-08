@@ -10,6 +10,8 @@ public interface IKbAppService {
 
     List<KbApp> listAll(String userId);
 
+    List<KbApp> listAllForAdmin();
+
     Page<KbApp> page(Integer pageNum, Integer pageSize, String userId, String name);
 
     KbApp getById(Long id);
@@ -28,7 +30,9 @@ public interface IKbAppService {
 
     void setDefault(Long id, String userId);
 
-    boolean canUserAccess(Long appId, String userId);
+    boolean canViewApp(Long appId, String userId);
+
+    boolean canModifyApp(Long appId, String userId);
 
     List<ImGroup> getBoundGroups(Long appId);
 }

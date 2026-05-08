@@ -9,15 +9,12 @@ import com.zxl.chatbase.dify.config.DifyConfig;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.kb.entity.KbApp;
-import com.zxl.chatbase.kb.entity.SysUser;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
-import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import com.zxl.chatbase.kb.service.IKbAppService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,8 +36,6 @@ public class KbAppServiceImpl implements IKbAppService {
     private ObjectMapper objectMapper;
     @Autowired
     private ImGroupMapper imGroupMapper;
-    @Autowired
-    private SysUserMapper sysUserMapper;
     @javax.annotation.Resource
     private CloseableHttpClient httpClient;
 
@@ -48,17 +43,20 @@ public class KbAppServiceImpl implements IKbAppService {
     public List<KbApp> listAll(String userId) {
         LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(KbApp::getStatus, true);
-        
-        if (isAdmin(userId)) {
-            wrapper.orderByDesc(KbApp::getIsDefault)
-                    .orderByDesc(KbApp::getCreateTime);
-        } else {
-            wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
-                            .or()
-                            .eq(KbApp::getCreateBy, userId))
-                    .orderByDesc(KbApp::getIsDefault)
-                    .orderByDesc(KbApp::getCreateTime);
-        }
+        wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
+                        .or()
+                        .eq(KbApp::getCreateBy, userId))
+                .orderByDesc(KbApp::getIsDefault)
+                .orderByDesc(KbApp::getCreateTime);
+        return appMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<KbApp> listAllForAdmin() {
+        LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KbApp::getStatus, true)
+                .orderByDesc(KbApp::getIsDefault)
+                .orderByDesc(KbApp::getCreateTime);
         return appMapper.selectList(wrapper);
     }
 
@@ -67,19 +65,12 @@ public class KbAppServiceImpl implements IKbAppService {
         Page<KbApp> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<KbApp> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(KbApp::getStatus, true);
-        
-        if (isAdmin(userId)) {
-            wrapper.like(StringUtils.hasText(name), KbApp::getName, name)
-                    .orderByDesc(KbApp::getIsDefault)
-                    .orderByDesc(KbApp::getCreateTime);
-        } else {
-            wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
-                            .or()
-                            .eq(KbApp::getCreateBy, userId))
-                    .like(StringUtils.hasText(name), KbApp::getName, name)
-                    .orderByDesc(KbApp::getIsDefault)
-                    .orderByDesc(KbApp::getCreateTime);
-        }
+        wrapper.and(w -> w.eq(KbApp::getIsPublic, true)
+                        .or()
+                        .eq(KbApp::getCreateBy, userId))
+                .like(StringUtils.hasText(name), KbApp::getName, name)
+                .orderByDesc(KbApp::getIsDefault)
+                .orderByDesc(KbApp::getCreateTime);
         return appMapper.selectPage(page, wrapper);
     }
 
@@ -127,7 +118,7 @@ public class KbAppServiceImpl implements IKbAppService {
         if (existing == null) {
             throw new RuntimeException("应用不存在");
         }
-        if (!canUserAccess(app.getId(), userId)) {
+        if (userId == null || !userId.equals(existing.getCreateBy())) {
             throw new RuntimeException("无权限修改此应用");
         }
         if (StringUtils.hasText(app.getDifyApiKey()) && !app.getDifyApiKey().equals(existing.getDifyApiKey())) {
@@ -149,7 +140,7 @@ public class KbAppServiceImpl implements IKbAppService {
         if (app == null) {
             throw new RuntimeException("应用不存在");
         }
-        if (!canUserAccess(id, userId)) {
+        if (userId == null || !userId.equals(app.getCreateBy())) {
             throw new RuntimeException("无权限删除此应用");
         }
         if (app.getIsDefault()) {
@@ -212,7 +203,7 @@ public class KbAppServiceImpl implements IKbAppService {
         if (app == null) {
             throw new RuntimeException("应用不存在");
         }
-        if (!canUserAccess(id, userId)) {
+        if (!canViewApp(id, userId)) {
             throw new RuntimeException("无权限设置默认应用");
         }
         LambdaUpdateWrapper<KbApp> clearWrapper = new LambdaUpdateWrapper<>();
@@ -226,12 +217,17 @@ public class KbAppServiceImpl implements IKbAppService {
     }
 
     @Override
-    public boolean canUserAccess(Long appId, String userId) {
+    public boolean canViewApp(Long appId, String userId) {
         KbApp app = appMapper.selectById(appId);
-        if (app == null) {
-            return false;
-        }
-        return app.getIsPublic() || app.getCreateBy().equals(userId);
+        if (app == null) return false;
+        return Boolean.TRUE.equals(app.getIsPublic()) || (userId != null && userId.equals(app.getCreateBy()));
+    }
+
+    @Override
+    public boolean canModifyApp(Long appId, String userId) {
+        KbApp app = appMapper.selectById(appId);
+        if (app == null) return false;
+        return userId != null && userId.equals(app.getCreateBy());
     }
 
     @Override
@@ -241,13 +237,5 @@ public class KbAppServiceImpl implements IKbAppService {
                 .eq(ImGroup::getStatus, true)
                 .orderByDesc(ImGroup::getUpdateTime);
         return imGroupMapper.selectList(wrapper);
-    }
-
-    private boolean isAdmin(String userId) {
-        if (userId == null) return false;
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysUser::getUsername, userId);
-        SysUser user = sysUserMapper.selectOne(wrapper);
-        return user != null && "admin".equals(user.getRole());
     }
 }

@@ -54,10 +54,10 @@
                     <Plus :size="14" />
                     <span>添加知识库</span>
                   </button>
-                  <button class="anime-btn ghost sm" @click="editCategory(cat)">
+                  <button v-if="cat.createBy === currentUserName" class="anime-btn ghost sm" @click="editCategory(cat)">
                     <Edit3 :size="14" />
                   </button>
-                  <button class="anime-btn ghost sm danger" @click="deleteCategory(cat)">
+                  <button v-if="cat.createBy === currentUserName" class="anime-btn ghost sm danger" @click="deleteCategory(cat)">
                     <Trash2 :size="14" />
                   </button>
                 </div>
@@ -113,6 +113,10 @@
 
         <!-- 知识库列表 Tab -->
         <div v-else-if="activeTab === 'kb'" class="kb-list">
+          <div class="kb-sub-tabs" style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <button class="anime-tab" :class="{ active: kbTab === 'mine' }" @click="kbTab = 'mine'">我的知识库</button>
+            <button class="anime-tab" :class="{ active: kbTab === 'all' }" @click="kbTab = 'all'">知识库大厅</button>
+          </div>
           <div class="kb-filter-bar">
             <div class="filter-group">
               <span style="font-size: 13px; color: var(--anime-text-muted);">筛选分类:</span>
@@ -142,7 +146,9 @@
               <div class="kb-desc">{{ kb.description || '无描述' }}</div>
               <div class="kb-meta">
                 <span class="anime-badge" :class="kb.status ? 'green' : 'pink'">{{ kb.status ? '启用' : '禁用' }}</span>
+                <span v-if="kb.isPublic !== undefined" class="anime-badge" :class="kb.isPublic ? 'green' : 'gray'">{{ kb.isPublic ? '公开' : '私有' }}</span>
                 <span class="anime-code">{{ kb.sourceType || '手动' }}</span>
+                <span class="kb-time">创建者: {{ kb.createBy || '-' }}</span>
                 <span class="kb-time">创建: {{ kb.createTime }}</span>
               </div>
               <div class="kb-actions">
@@ -158,11 +164,11 @@
                   <RefreshCw :size="16" />
                   <span>同步</span>
                 </button>
-                <button class="anime-btn ghost" @click="editKb(kb)">
+                <button v-if="kb.createBy === currentUserName" class="anime-btn ghost" @click="editKb(kb)">
                   <Edit3 :size="16" />
                   <span>编辑</span>
                 </button>
-                <button class="anime-btn ghost danger" @click="deleteKb(kb)">
+                <button v-if="kb.createBy === currentUserName" class="anime-btn ghost danger" @click="deleteKb(kb)">
                   <Trash2 :size="16" />
                   <span>删除</span>
                 </button>
@@ -350,6 +356,12 @@
               <label>描述</label>
               <textarea v-model="formKb.description" class="anime-input" rows="2" placeholder="知识库描述"></textarea>
             </div>
+            <div class="anime-form-group">
+              <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" v-model="formKb.isPublic" />
+                公开知识库（其他用户可使用）
+              </label>
+            </div>
           </div>
           <div class="anime-modal-footer">
             <button class="anime-btn ghost" @click="closeKbModal">取消</button>
@@ -454,6 +466,9 @@ import { getOrCreateUserId } from '../lib/user'
 
 const userId = getOrCreateUserId()
 
+const currentUserName = computed(() => localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '')
+const kbTab = ref<'mine' | 'all'>('mine')
+
 interface KbCategory {
   id: number
   name: string
@@ -462,6 +477,7 @@ interface KbCategory {
   sortOrder: number
   description: string
   kbCount?: number
+  createBy?: string
   children?: KbCategory[]
 }
 
@@ -492,8 +508,16 @@ const flatCategories = computed(() => {
 const kbList = ref<KbKnowledgeBase[]>([])
 const filterCategoryId = ref<string>('')
 const filteredKbList = computed(() => {
-  if (!filterCategoryId.value) return kbList.value
-  return kbList.value.filter(kb => kb.categoryId === Number(filterCategoryId.value))
+  let list = kbList.value
+  if (kbTab.value === 'mine') {
+    list = list.filter(kb => kb.createBy === currentUserName.value)
+  } else if (kbTab.value === 'all') {
+    list = list.filter(kb => kb.isPublic)
+  }
+  if (filterCategoryId.value) {
+    list = list.filter(kb => kb.categoryId === Number(filterCategoryId.value))
+  }
+  return list
 })
 
 const docList = ref<KbDocument[]>([])
@@ -524,7 +548,7 @@ const editingCategory = ref<KbCategory | null>(null)
 const editingKb = ref<KbKnowledgeBase | null>(null)
 
 const formCategory = ref({ name: '', icon: '', parentId: '', sortOrder: 0, description: '' })
-const formKb = ref({ name: '', categoryId: '', description: '' })
+const formKb = ref({ name: '', categoryId: '', description: '', isPublic: true })
 const formDoc = ref({ title: '', content: '' })
 
 const savingCategory = ref(false)
@@ -739,7 +763,8 @@ async function saveKb() {
     const payload = {
       name: formKb.value.name,
       categoryId: formKb.value.categoryId ? Number(formKb.value.categoryId) : null,
-      description: formKb.value.description
+      description: formKb.value.description,
+      isPublic: formKb.value.isPublic
     }
     if (editingKb.value) {
       await api.put('/kb', { ...payload, id: editingKb.value.id })
@@ -760,7 +785,8 @@ function editKb(kb: KbKnowledgeBase) {
   formKb.value = {
     name: kb.name,
     categoryId: kb.categoryId ? String(kb.categoryId) : '',
-    description: kb.description || ''
+    description: kb.description || '',
+    isPublic: kb.isPublic !== undefined ? kb.isPublic : true
   }
   showCreateKb.value = true
 }
@@ -778,7 +804,7 @@ async function deleteKb(kb: KbKnowledgeBase) {
 function closeKbModal() {
   showCreateKb.value = false
   editingKb.value = null
-  formKb.value = { name: '', categoryId: '', description: '' }
+  formKb.value = { name: '', categoryId: '', description: '', isPublic: true }
   err.value = ''
 }
 

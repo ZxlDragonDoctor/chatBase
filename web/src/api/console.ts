@@ -6,8 +6,8 @@ export async function fetchOverview(): Promise<ConsoleOverview> {
   return resp.data
 }
 
-export async function fetchGroups(platform: 'all' | 'qq' | 'wecom' | 'wx' = 'all'): Promise<GroupSummary[]> {
-  const resp = await api.get<GroupSummary[]>('/console/groups', { params: { platform } })
+export async function fetchGroups(platform: string = 'all', scope: string = 'all'): Promise<GroupSummary[]> {
+  const resp = await api.get<GroupSummary[]>('/console/groups', { params: { platform, scope } })
   return resp.data
 }
 

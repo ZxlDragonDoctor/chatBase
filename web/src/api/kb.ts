@@ -11,6 +11,8 @@ export type KbKnowledgeBase = {
   docCount: number
   chunkCount: number
   status: number
+  isPublic?: boolean
+  createBy?: string
   createTime: string
 }
 
@@ -37,6 +39,7 @@ export type KbCategory = {
   sortOrder: number
   description?: string
   status: number
+  createBy?: string
   createTime: string
 }
 
@@ -125,4 +128,12 @@ export async function syncFromDify(): Promise<{ success: boolean; count: number;
 export async function listDifyDatasets(): Promise<{ id: string; name: string; description: string; documentCount: number }[]> {
   const resp = await api.get<{ id: string; name: string; description: string; documentCount: number }[]>('/kb/dify/list')
   return resp.data
+}
+
+export async function linkCategoryToKb(kbId: number, categoryId: number): Promise<void> {
+  await api.post(`/kb/${kbId}/link-category`, { categoryId })
+}
+
+export async function unlinkCategoryFromKb(kbId: number, mappingId: number): Promise<void> {
+  await api.delete(`/kb/${kbId}/link-category/${mappingId}`)
 }

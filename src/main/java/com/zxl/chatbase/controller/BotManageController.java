@@ -4,6 +4,7 @@ import com.zxl.chatbase.im.dto.BotInfoVO;
 import com.zxl.chatbase.im.service.BotManageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,7 +18,7 @@ public class BotManageController {
     private final BotManageService botManageService;
 
     @GetMapping("/list")
-    public List<BotInfoVO> listBots() {
-        return botManageService.listBots();
+    public List<BotInfoVO> listBots(@RequestAttribute("currentUser") String userId) {
+        return botManageService.listBots(userId);
     }
 }

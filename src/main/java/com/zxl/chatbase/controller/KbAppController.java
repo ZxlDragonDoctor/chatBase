@@ -19,8 +19,13 @@ public class KbAppController {
     private final IKbAppService appService;
 
     @GetMapping("/list")
-    public List<KbApp> list(@RequestAttribute(value = "currentUser", required = false) String userId) {
+    public List<KbApp> list(@RequestAttribute("currentUser") String userId) {
         return appService.listAll(userId);
+    }
+
+    @GetMapping("/admin/list")
+    public List<KbApp> listAllForAdmin() {
+        return appService.listAllForAdmin();
     }
 
     @GetMapping("/page")
@@ -28,7 +33,7 @@ public class KbAppController {
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
             @RequestParam(required = false) String name,
-            @RequestAttribute(value = "currentUser", required = false) String userId) {
+            @RequestAttribute("currentUser") String userId) {
         return appService.page(pageNum, pageSize, userId, name);
     }
 
@@ -87,7 +92,7 @@ public class KbAppController {
     @GetMapping("/{id}/access")
     public boolean canAccess(@PathVariable Long id,
                              @RequestAttribute(value = "currentUser", required = false) String userId) {
-        return appService.canUserAccess(id, userId);
+        return appService.canViewApp(id, userId);
     }
 
     @GetMapping("/{id}/groups")

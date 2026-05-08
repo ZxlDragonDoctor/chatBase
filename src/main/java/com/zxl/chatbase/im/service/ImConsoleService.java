@@ -11,9 +11,9 @@ import java.util.List;
  */
 public interface ImConsoleService {
 
-    ConsoleOverviewVO overview();
+    ConsoleOverviewVO overview(String userId);
 
-    List<GroupSummaryVO> listGroups(String platform);
+    List<GroupSummaryVO> listGroups(String platform, String userId, String scope);
 
-    GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword);
+    GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword, String userId);
 }

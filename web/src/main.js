@@ -12,6 +12,9 @@ import FeedbackManagePage from './pages/FeedbackManagePage.vue';
 import FaqPage from './pages/FaqPage.vue';
 import AppPage from './pages/AppPage.vue';
 import BotManagePage from './pages/BotManagePage.vue';
+import AdminAppsPage from './pages/AdminAppsPage.vue';
+import AdminKbsPage from './pages/AdminKbsPage.vue';
+import UserManagePage from './pages/UserManagePage.vue';
 import './styles/anime.css';
 const router = createRouter({
     history: createWebHistory(),
@@ -29,6 +32,9 @@ const router = createRouter({
         { path: '/console/bots', component: BotManagePage },
         { path: '/console/faq', component: FaqPage },
         { path: '/console/feedback-manage', component: FeedbackManagePage, meta: { requiresAdmin: true } },
+        { path: '/console/admin/apps', component: AdminAppsPage, meta: { requiresAdmin: true } },
+        { path: '/console/admin/kbs', component: AdminKbsPage, meta: { requiresAdmin: true } },
+        { path: '/console/admin/users', component: UserManagePage, meta: { requiresAdmin: true } },
     ],
 });
 router.beforeEach((to, _from, next) => {

@@ -1,6 +1,9 @@
 package com.zxl.chatbase.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zxl.chatbase.feedback.service.IFeedbackStatsService;
+import com.zxl.chatbase.kb.entity.SysUser;
+import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import com.zxl.chatbase.kb.service.IKbKeywordService;
 import com.zxl.chatbase.statistics.dto.*;
 import com.zxl.chatbase.statistics.service.IStatisticsAggregateService;
@@ -20,45 +23,76 @@ public class StatisticsController {
     private final IKbKeywordService keywordService;
     private final IFeedbackStatsService feedbackStatsService;
     private final IStatisticsAggregateService aggregateService;
+    private final SysUserMapper sysUserMapper;
+
+    private String resolveUserId(String currentUser, String scope) {
+        if (currentUser == null) return null;
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, currentUser)
+                .select(SysUser::getRole);
+        SysUser user = sysUserMapper.selectOne(wrapper);
+        boolean isAdmin = user != null && "admin".equals(user.getRole());
+        if (isAdmin && !"mine".equals(scope)) {
+            return null;
+        }
+        return currentUser;
+    }
 
     @GetMapping("/token/daily")
-    public TokenStatisticsVO getTokenDaily(@RequestParam(defaultValue = "7") Integer days) {
-        return statisticsService.getTokenStatistics(days);
+    public TokenStatisticsVO getTokenDaily(
+            @RequestParam(defaultValue = "7") Integer days,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getTokenStatistics(days, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/token/total")
-    public TokenStatisticsVO getTokenTotal() {
-        return statisticsService.getTokenStatistics(30);
+    public TokenStatisticsVO getTokenTotal(
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getTokenStatistics(30, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/group/active")
     public GroupActiveVO getGroupActive(
             @RequestParam(defaultValue = "all") String platform,
-            @RequestParam(defaultValue = "10") Integer limit) {
-        return statisticsService.getGroupActiveRank(platform, limit);
+            @RequestParam(defaultValue = "10") Integer limit,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getGroupActiveRank(platform, limit, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/group/hot-keywords")
     public KeywordHotVO getHotKeywords(
             @RequestParam(defaultValue = "all") String platform,
             @RequestParam(required = false) String groupId,
-            @RequestParam(defaultValue = "20") Integer limit) {
-        return statisticsService.getHotKeywords(platform, groupId, limit);
+            @RequestParam(defaultValue = "20") Integer limit,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getHotKeywords(platform, groupId, limit, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/conversation/overview")
-    public ConversationStatisticsVO getConversationOverview(@RequestParam(defaultValue = "7") Integer days) {
-        return statisticsService.getConversationStatistics(days);
+    public ConversationStatisticsVO getConversationOverview(
+            @RequestParam(defaultValue = "7") Integer days,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getConversationStatistics(days, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/conversation/trend")
-    public ConversationStatisticsVO getConversationTrend(@RequestParam(defaultValue = "30") Integer days) {
-        return statisticsService.getConversationStatistics(days);
+    public ConversationStatisticsVO getConversationTrend(
+            @RequestParam(defaultValue = "30") Integer days,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getConversationStatistics(days, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/system/overview")
-    public SystemOverviewVO getSystemOverview() {
-        return statisticsService.getSystemOverview();
+    public SystemOverviewVO getSystemOverview(
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getSystemOverview(resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/keyword/cloud")
@@ -111,13 +145,17 @@ public class StatisticsController {
 
     @GetMapping("/token/chart")
     public Map<String, Object> getTokenChart(
-            @RequestParam(defaultValue = "7") Integer days) {
-        return statisticsService.getTokenChartData(days);
+            @RequestParam(defaultValue = "7") Integer days,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getTokenChartData(days, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/token/monthly")
-    public Map<String, Object> getTokenMonthly() {
-        return statisticsService.getTokenMonthlyData();
+    public Map<String, Object> getTokenMonthly(
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getTokenMonthlyData(resolveUserId(currentUser, scope));
     }
 
     @PostMapping("/aggregate")
@@ -129,12 +167,16 @@ public class StatisticsController {
 
     @GetMapping("/cost/chart")
     public Map<String, Object> getCostChart(
-            @RequestParam(defaultValue = "7") Integer days) {
-        return statisticsService.getCostChartData(days);
+            @RequestParam(defaultValue = "7") Integer days,
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getCostChartData(days, resolveUserId(currentUser, scope));
     }
 
     @GetMapping("/cost/monthly")
-    public Map<String, Object> getCostMonthly() {
-        return statisticsService.getCostMonthlyData();
+    public Map<String, Object> getCostMonthly(
+            @RequestAttribute("currentUser") String currentUser,
+            @RequestParam(required = false, defaultValue = "all") String scope) {
+        return statisticsService.getCostMonthlyData(resolveUserId(currentUser, scope));
     }
 }

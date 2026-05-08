@@ -6,21 +6,21 @@ import java.util.Map;
 
 public interface StatisticsService {
     
-    TokenStatisticsVO getTokenStatistics(Integer days);
+    TokenStatisticsVO getTokenStatistics(Integer days, String userId);
     
-    GroupActiveVO getGroupActiveRank(String platform, Integer limit);
+    GroupActiveVO getGroupActiveRank(String platform, Integer limit, String userId);
     
-    KeywordHotVO getHotKeywords(String platform, String groupId, Integer limit);
+    KeywordHotVO getHotKeywords(String platform, String groupId, Integer limit, String userId);
     
-    ConversationStatisticsVO getConversationStatistics(Integer days);
+    ConversationStatisticsVO getConversationStatistics(Integer days, String userId);
     
-    SystemOverviewVO getSystemOverview();
+    SystemOverviewVO getSystemOverview(String userId);
 
-    Map<String, Object> getTokenChartData(Integer days);
+    Map<String, Object> getTokenChartData(Integer days, String userId);
 
-    Map<String, Object> getTokenMonthlyData();
+    Map<String, Object> getTokenMonthlyData(String userId);
 
-    Map<String, Object> getCostChartData(Integer days);
+    Map<String, Object> getCostChartData(Integer days, String userId);
 
-    Map<String, Object> getCostMonthlyData();
+    Map<String, Object> getCostMonthlyData(String userId);
 }

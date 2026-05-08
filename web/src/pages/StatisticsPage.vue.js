@@ -7,6 +7,9 @@ import * as echarts from 'echarts';
 const period = ref(7);
 const loading = ref(false);
 const error = ref(null);
+const isAdmin = localStorage.getItem('chatbase_role') === 'admin';
+const showAllData = ref(true);
+const scope = computed(() => showAllData.value ? 'all' : 'mine');
 const tokenStats = ref(null);
 const tokenChartData = ref(null);
 const tokenMonthlyData = ref(null);
@@ -37,7 +40,7 @@ async function reload() {
 }
 async function loadCostChart() {
     try {
-        costChartData.value = await fetchCostChartData(period.value);
+        costChartData.value = await fetchCostChartData(period.value, scope.value);
         await nextTick();
         renderCostChart();
     }
@@ -47,7 +50,7 @@ async function loadCostChart() {
 }
 async function loadCostMonthly() {
     try {
-        costMonthlyData.value = await fetchCostMonthlyData();
+        costMonthlyData.value = await fetchCostMonthlyData(scope.value);
         await nextTick();
         renderCostChartMonthly();
     }
@@ -198,7 +201,7 @@ function renderCostChartMonthly() {
 }
 async function loadTokenChart() {
     try {
-        tokenChartData.value = await fetchTokenChartData(period.value);
+        tokenChartData.value = await fetchTokenChartData(period.value, scope.value);
         await nextTick();
         renderTokenChart();
     }
@@ -208,7 +211,7 @@ async function loadTokenChart() {
 }
 async function loadTokenMonthly() {
     try {
-        tokenMonthlyData.value = await fetchTokenMonthlyData();
+        tokenMonthlyData.value = await fetchTokenMonthlyData(scope.value);
         tokenChartData.value = tokenMonthlyData.value;
         await nextTick();
         renderTokenChart();
@@ -311,7 +314,7 @@ async function aggregateData() {
 }
 async function loadGroupActive() {
     try {
-        groupActive.value = await fetchGroupActive(selectedPlatform.value, 10);
+        groupActive.value = await fetchGroupActive(selectedPlatform.value, 10, scope.value);
     }
     catch {
         groupActive.value = null;
@@ -324,7 +327,7 @@ async function loadKeywords() {
     }
     catch {
         try {
-            keywordHot.value = await fetchHotKeywords('all', undefined, 30);
+            keywordHot.value = await fetchHotKeywords('all', undefined, 30, scope.value);
         }
         catch {
             keywordHot.value = null;
@@ -347,7 +350,7 @@ async function syncKeywords() {
 }
 async function loadConvStats() {
     try {
-        convStats.value = await fetchConversationOverview(period.value);
+        convStats.value = await fetchConversationOverview(period.value, scope.value);
     }
     catch {
         convStats.value = null;
@@ -440,6 +443,32 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
     ...{ class: "anime-tab" },
     ...{ class: ({ active: __VLS_ctx.period === 30 }) },
 });
+if (__VLS_ctx.isAdmin) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-tabs" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.isAdmin))
+                    return;
+                __VLS_ctx.showAllData = true;
+                __VLS_ctx.reload();
+            } },
+        ...{ class: "anime-tab" },
+        ...{ class: ({ active: __VLS_ctx.showAllData }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!(__VLS_ctx.isAdmin))
+                    return;
+                __VLS_ctx.showAllData = false;
+                __VLS_ctx.reload();
+            } },
+        ...{ class: "anime-tab" },
+        ...{ class: ({ active: !__VLS_ctx.showAllData }) },
+    });
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.aggregateData) },
     ...{ class: "anime-btn ghost" },
@@ -990,6 +1019,9 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
 /** @type {__VLS_StyleScopedClasses['anime-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tabs']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
@@ -1102,6 +1134,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             period: period,
             loading: loading,
             error: error,
+            isAdmin: isAdmin,
+            showAllData: showAllData,
             tokenChartData: tokenChartData,
             tokenMonthlyData: tokenMonthlyData,
             chartView: chartView,

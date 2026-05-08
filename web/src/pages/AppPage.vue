@@ -17,18 +17,22 @@
       <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
 
       <div class="anime-card-body">
+        <div class="anime-tabs" style="margin-bottom: 16px;">
+          <button class="anime-tab" :class="{ active: activeTab === 'mine' }" @click="activeTab = 'mine'">我的应用</button>
+          <button class="anime-tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">应用大厅</button>
+        </div>
         <div v-if="loading" class="anime-empty">
           <span class="anime-loader-spinner"></span>
           <span class="anime-empty-text">加载中...</span>
         </div>
 
-        <div v-else-if="appList.length === 0" class="anime-empty">
+        <div v-else-if="filteredAppList.length === 0" class="anime-empty">
           <div class="anime-empty-icon">🤖</div>
-          <div class="anime-empty-text">暂无应用，点击上方按钮创建</div>
+          <div class="anime-empty-text">{{ activeTab === 'mine' ? '暂无应用，点击上方按钮创建' : '暂无公开应用' }}</div>
         </div>
 
         <div v-else class="kb-grid">
-          <div v-for="app in appList" :key="app.id" class="anime-card app-card">
+          <div v-for="app in filteredAppList" :key="app.id" class="anime-card app-card">
             <div class="app-header">
               <div class="app-title-row">
                 <span class="app-icon">{{ app.icon || '🤖' }}</span>
@@ -87,11 +91,11 @@
                 <Star :size="16" />
                 <span>设为默认</span>
               </button>
-              <button class="anime-btn ghost" @click="editApp(app)">
+              <button v-if="app.createBy === currentUserName" class="anime-btn ghost" @click="editApp(app)">
                 <Edit3 :size="16" />
                 <span>编辑</span>
               </button>
-              <button v-if="!app.isDefault" class="anime-btn ghost danger" @click="deleteApp(app)">
+              <button v-if="!app.isDefault && app.createBy === currentUserName" class="anime-btn ghost danger" @click="deleteApp(app)">
                 <Trash2 :size="16" />
                 <span>删除</span>
               </button>
@@ -345,6 +349,12 @@ interface Category {
 
 const difyConsoleUrl = 'https://cloud.dify.ai'
 
+const activeTab = ref<'mine' | 'all'>('mine')
+const filteredAppList = computed(() => {
+  if (activeTab.value === 'all') return appList.value.filter(a => a.isPublic)
+  return appList.value.filter(a => a.createBy === currentUserName.value)
+})
+
 const appList = ref<KbApp[]>([])
 const categoryList = ref<Category[]>([])
 const kbList = ref<KbKnowledgeBase[]>([])
@@ -367,8 +377,7 @@ const qqGroups = computed(() => boundGroups.value.filter((g: ImGroup) => g.platf
 const wxGroups = computed(() => boundGroups.value.filter((g: ImGroup) => g.platform === 'wx' || g.platform === 'wecom'))
 
 const currentUserName = computed(() => {
-  const user = getCurrentUser()
-  return user || '未知用户'
+  return localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '未知用户'
 })
 
 const form = ref({

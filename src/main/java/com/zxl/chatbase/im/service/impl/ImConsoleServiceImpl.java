@@ -9,8 +9,12 @@ import com.zxl.chatbase.im.dto.GroupMessageItemVO;
 import com.zxl.chatbase.im.dto.GroupMessagePageVO;
 import com.zxl.chatbase.im.dto.GroupSummaryVO;
 import com.zxl.chatbase.im.entity.GroupMessage;
+import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.GroupMessageMapper;
+import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.ImConsoleService;
+import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.mapper.KbAppMapper;
 import com.zxl.chatbase.qq.QqBotProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,15 +30,56 @@ import java.util.stream.Collectors;
 public class ImConsoleServiceImpl implements ImConsoleService {
 
     private final GroupMessageMapper groupMessageMapper;
+    private final ImGroupMapper imGroupMapper;
     private final QqBotProperties qqBotProperties;
+    private final KbAppMapper appMapper;
+
+    private List<Long> getUserAppIds(String userId) {
+        if (userId == null) return List.of();
+        return appMapper.selectList(
+                new LambdaQueryWrapper<KbApp>()
+                        .eq(KbApp::getCreateBy, userId)
+                        .select(KbApp::getId)
+        ).stream().map(KbApp::getId).collect(Collectors.toList());
+    }
+
+    private List<String> getAccessibleGroupIds(String userId) {
+        if (userId == null) return List.of();
+        LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<ImGroup>()
+                .and(w -> w.isNull(ImGroup::getCreatedBy)
+                        .or().eq(ImGroup::getCreatedBy, userId))
+                .select(ImGroup::getGroupId);
+        return imGroupMapper.selectList(wrapper).stream()
+                .map(ImGroup::getGroupId)
+                .distinct()
+                .collect(Collectors.toList());
+    }
 
     @Override
-    public ConsoleOverviewVO overview() {
+    public ConsoleOverviewVO overview(String userId) {
         ConsoleOverviewVO vo = new ConsoleOverviewVO();
-        vo.setTotalMessages(groupMessageMapper.selectCount(null));
-        List<GroupSummaryVO> summaries = groupMessageMapper.selectGroupSummaries();
-        vo.setDistinctGroups(summaries.size());
+        List<String> userGroupIds = getAccessibleGroupIds(userId);
 
+        if (userGroupIds.isEmpty()) {
+            vo.setTotalMessages(0L);
+            vo.setDistinctGroups(0);
+            vo.setMessageCountByPlatform(new HashMap<>());
+            vo.setGroupCountByPlatform(new HashMap<>());
+        } else {
+            long total = groupMessageMapper.selectCount(
+                    new LambdaQueryWrapper<GroupMessage>().in(GroupMessage::getGroupId, userGroupIds)
+            );
+            vo.setTotalMessages(total);
+            List<GroupSummaryVO> summaries = groupMessageMapper.selectGroupSummariesByGroups(userGroupIds);
+            vo.setDistinctGroups(summaries.size());
+            buildPlatformStats(vo, summaries);
+        }
+
+        vo.setBots(buildBots());
+        return vo;
+    }
+
+    private void buildPlatformStats(ConsoleOverviewVO vo, List<GroupSummaryVO> summaries) {
         Map<String, Long> msgByPlat = new HashMap<>();
         Map<String, Integer> grpByPlat = new HashMap<>();
         for (GroupSummaryVO s : summaries) {
@@ -45,13 +90,39 @@ public class ImConsoleServiceImpl implements ImConsoleService {
         }
         vo.setMessageCountByPlatform(msgByPlat);
         vo.setGroupCountByPlatform(grpByPlat);
-        vo.setBots(buildBots());
-        return vo;
     }
 
     @Override
-    public List<GroupSummaryVO> listGroups(String platform) {
-        List<GroupSummaryVO> all = groupMessageMapper.selectGroupSummaries();
+    public List<GroupSummaryVO> listGroups(String platform, String userId, String scope) {
+        List<String> accessibleIds = getAccessibleGroupIds(userId);
+        if (accessibleIds.isEmpty()) return List.of();
+
+        List<String> filteredGroupIds = accessibleIds;
+        if ("unassigned".equals(scope)) {
+            filteredGroupIds = imGroupMapper.selectList(
+                    new LambdaQueryWrapper<ImGroup>()
+                            .in(ImGroup::getGroupId, accessibleIds)
+                            .isNull(ImGroup::getCreatedBy)
+                            .select(ImGroup::getGroupId)
+            ).stream().map(ImGroup::getGroupId).collect(Collectors.toList());
+        } else if ("bound".equals(scope)) {
+            List<Long> appIds = getUserAppIds(userId);
+            LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<ImGroup>()
+                    .in(ImGroup::getGroupId, accessibleIds)
+                    .and(w -> {
+                        w.eq(ImGroup::getCreatedBy, userId);
+                        if (!appIds.isEmpty()) {
+                            w.or().in(ImGroup::getAppId, appIds);
+                        }
+                    })
+                    .select(ImGroup::getGroupId);
+            filteredGroupIds = imGroupMapper.selectList(wrapper).stream()
+                    .map(ImGroup::getGroupId).collect(Collectors.toList());
+        }
+
+        if (filteredGroupIds.isEmpty()) return List.of();
+
+        List<GroupSummaryVO> all = groupMessageMapper.selectGroupSummariesByGroups(filteredGroupIds);
         if (!StringUtils.hasText(platform) || "all".equalsIgnoreCase(platform)) {
             return all;
         }
@@ -59,19 +130,20 @@ public class ImConsoleServiceImpl implements ImConsoleService {
     }
 
     @Override
-    public GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword) {
+    public GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword, String userId) {
+        List<String> accessibleIds = getAccessibleGroupIds(userId);
+
         if (!StringUtils.hasText(groupId)) {
             return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
         }
-        if (page < 0) {
-            page = 0;
+
+        if (!accessibleIds.contains(groupId)) {
+            return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
         }
-        if (size < 1) {
-            size = 20;
-        }
-        if (size > 200) {
-            size = 200;
-        }
+
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 200) size = 200;
 
         Page<GroupMessage> mp = new Page<>(page + 1L, size);
         LambdaQueryWrapper<GroupMessage> w = new LambdaQueryWrapper<GroupMessage>()

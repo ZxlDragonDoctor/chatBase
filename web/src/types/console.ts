@@ -29,6 +29,7 @@ export type GroupSummary = {
   lastMessageTime: string | null
   appId?: number | null
   appName?: string | null
+  createdBy?: string | null
 }
 
 export type GroupMessageItem = {

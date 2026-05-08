@@ -1,5 +1,5 @@
 /// <reference types="../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router';
 import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, User, LogOut, Bot, ClipboardList, Cpu } from 'lucide-vue-next';
 import UserProfile from './components/UserProfile.vue';
@@ -7,8 +7,14 @@ import { getCurrentUser as fetchUserProfile } from './api/user';
 const router = useRouter();
 const route = useRoute();
 const isLoginPage = computed(() => route.path === '/login');
-const currentUser = computed(() => localStorage.getItem('chatbase_user'));
-const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin');
+const currentUser = ref('');
+const isAdmin = ref(false);
+const role = ref('');
+function syncAuthState() {
+    currentUser.value = localStorage.getItem('chatbase_user') || '';
+    isAdmin.value = localStorage.getItem('chatbase_role') === 'admin';
+    role.value = localStorage.getItem('chatbase_role') || '';
+}
 function getOriginalUsername() {
     return localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '';
 }
@@ -26,16 +32,14 @@ async function openUserProfile() {
     await loadUserProfile();
 }
 const roleLabel = computed(() => {
-    const role = localStorage.getItem('chatbase_role');
-    switch (role) {
+    switch (role.value) {
         case 'admin': return '管理员';
         case 'user': return '用户';
         default: return '访客';
     }
 });
 const roleBadgeClass = computed(() => {
-    const role = localStorage.getItem('chatbase_role');
-    switch (role) {
+    switch (role.value) {
         case 'admin': return 'pink';
         case 'user': return 'blue';
         default: return 'muted';
@@ -68,6 +72,7 @@ function handleUserUpdated(user) {
     if (user.role) {
         localStorage.setItem('chatbase_role', user.role);
     }
+    syncAuthState();
 }
 function getAvatarUrl(path) {
     if (!path)
@@ -88,7 +93,14 @@ function handleLogout() {
     localStorage.removeItem('chatbase_admin_id');
     router.push('/login');
 }
+watch(() => route.path, () => {
+    syncAuthState();
+    if (localStorage.getItem('chatbase_token')) {
+        loadUserProfile();
+    }
+});
 onMounted(() => {
+    syncAuthState();
     loadUserProfile();
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -431,6 +443,93 @@ else {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         var __VLS_79;
     }
+    if (__VLS_ctx.isAdmin) {
+        const __VLS_84 = {}.RouterLink;
+        /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+        // @ts-ignore
+        const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/apps",
+            activeClass: "active",
+        }));
+        const __VLS_86 = __VLS_85({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/apps",
+            activeClass: "active",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_85));
+        __VLS_87.slots.default;
+        const __VLS_88 = {}.Bot;
+        /** @type {[typeof __VLS_components.Bot, ]} */ ;
+        // @ts-ignore
+        const __VLS_89 = __VLS_asFunctionalComponent(__VLS_88, new __VLS_88({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }));
+        const __VLS_90 = __VLS_89({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_89));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        var __VLS_87;
+    }
+    if (__VLS_ctx.isAdmin) {
+        const __VLS_92 = {}.RouterLink;
+        /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+        // @ts-ignore
+        const __VLS_93 = __VLS_asFunctionalComponent(__VLS_92, new __VLS_92({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/kbs",
+            activeClass: "active",
+        }));
+        const __VLS_94 = __VLS_93({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/kbs",
+            activeClass: "active",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_93));
+        __VLS_95.slots.default;
+        const __VLS_96 = {}.BookOpen;
+        /** @type {[typeof __VLS_components.BookOpen, ]} */ ;
+        // @ts-ignore
+        const __VLS_97 = __VLS_asFunctionalComponent(__VLS_96, new __VLS_96({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }));
+        const __VLS_98 = __VLS_97({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_97));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        var __VLS_95;
+    }
+    if (__VLS_ctx.isAdmin) {
+        const __VLS_100 = {}.RouterLink;
+        /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+        // @ts-ignore
+        const __VLS_101 = __VLS_asFunctionalComponent(__VLS_100, new __VLS_100({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/users",
+            activeClass: "active",
+        }));
+        const __VLS_102 = __VLS_101({
+            ...{ class: "anime-nav-item" },
+            to: "/console/admin/users",
+            activeClass: "active",
+        }, ...__VLS_functionalComponentArgsRest(__VLS_101));
+        __VLS_103.slots.default;
+        const __VLS_104 = {}.Users;
+        /** @type {[typeof __VLS_components.Users, ]} */ ;
+        // @ts-ignore
+        const __VLS_105 = __VLS_asFunctionalComponent(__VLS_104, new __VLS_104({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }));
+        const __VLS_106 = __VLS_105({
+            ...{ class: "anime-nav-icon" },
+            size: (22),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_105));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        var __VLS_103;
+    }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-nav-footer" },
     });
@@ -476,15 +575,15 @@ else {
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "gus-contact" },
             });
-            const __VLS_84 = {}.Mail;
+            const __VLS_108 = {}.Mail;
             /** @type {[typeof __VLS_components.Mail, ]} */ ;
             // @ts-ignore
-            const __VLS_85 = __VLS_asFunctionalComponent(__VLS_84, new __VLS_84({
+            const __VLS_109 = __VLS_asFunctionalComponent(__VLS_108, new __VLS_108({
                 size: (12),
             }));
-            const __VLS_86 = __VLS_85({
+            const __VLS_110 = __VLS_109({
                 size: (12),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_85));
+            }, ...__VLS_functionalComponentArgsRest(__VLS_109));
             (__VLS_ctx.userProfile.email);
         }
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
@@ -499,55 +598,55 @@ else {
             ...{ onClick: (__VLS_ctx.openUserProfile) },
             ...{ class: "anime-btn ghost xs" },
         });
-        const __VLS_88 = {}.User;
+        const __VLS_112 = {}.User;
         /** @type {[typeof __VLS_components.User, ]} */ ;
         // @ts-ignore
-        const __VLS_89 = __VLS_asFunctionalComponent(__VLS_88, new __VLS_88({
+        const __VLS_113 = __VLS_asFunctionalComponent(__VLS_112, new __VLS_112({
             size: (14),
         }));
-        const __VLS_90 = __VLS_89({
+        const __VLS_114 = __VLS_113({
             size: (14),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_89));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_113));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ onClick: (__VLS_ctx.handleLogout) },
             ...{ class: "anime-btn ghost xs danger" },
         });
-        const __VLS_92 = {}.LogOut;
+        const __VLS_116 = {}.LogOut;
         /** @type {[typeof __VLS_components.LogOut, ]} */ ;
         // @ts-ignore
-        const __VLS_93 = __VLS_asFunctionalComponent(__VLS_92, new __VLS_92({
+        const __VLS_117 = __VLS_asFunctionalComponent(__VLS_116, new __VLS_116({
             size: (14),
         }));
-        const __VLS_94 = __VLS_93({
+        const __VLS_118 = __VLS_117({
             size: (14),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_93));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_117));
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
     }
-    const __VLS_96 = {}.RouterView;
+    const __VLS_120 = {}.RouterView;
     /** @type {[typeof __VLS_components.RouterView, ]} */ ;
     // @ts-ignore
-    const __VLS_97 = __VLS_asFunctionalComponent(__VLS_96, new __VLS_96({}));
-    const __VLS_98 = __VLS_97({}, ...__VLS_functionalComponentArgsRest(__VLS_97));
+    const __VLS_121 = __VLS_asFunctionalComponent(__VLS_120, new __VLS_120({}));
+    const __VLS_122 = __VLS_121({}, ...__VLS_functionalComponentArgsRest(__VLS_121));
     if (__VLS_ctx.showUserProfile) {
         /** @type {[typeof UserProfile, ]} */ ;
         // @ts-ignore
-        const __VLS_100 = __VLS_asFunctionalComponent(UserProfile, new UserProfile({
+        const __VLS_124 = __VLS_asFunctionalComponent(UserProfile, new UserProfile({
             ...{ 'onClose': {} },
             ...{ 'onUpdated': {} },
             show: (__VLS_ctx.showUserProfile),
             user: (__VLS_ctx.userProfile),
         }));
-        const __VLS_101 = __VLS_100({
+        const __VLS_125 = __VLS_124({
             ...{ 'onClose': {} },
             ...{ 'onUpdated': {} },
             show: (__VLS_ctx.showUserProfile),
             user: (__VLS_ctx.userProfile),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_100));
-        let __VLS_103;
-        let __VLS_104;
-        let __VLS_105;
-        const __VLS_106 = {
+        }, ...__VLS_functionalComponentArgsRest(__VLS_124));
+        let __VLS_127;
+        let __VLS_128;
+        let __VLS_129;
+        const __VLS_130 = {
             onClose: (...[$event]) => {
                 if (!!(__VLS_ctx.isLoginPage))
                     return;
@@ -556,10 +655,10 @@ else {
                 __VLS_ctx.showUserProfile = false;
             }
         };
-        const __VLS_107 = {
+        const __VLS_131 = {
             onUpdated: (__VLS_ctx.handleUserUpdated)
         };
-        var __VLS_102;
+        var __VLS_126;
     }
 }
 /** @type {__VLS_StyleScopedClasses['anime-bg-decor']} */ ;
@@ -575,6 +674,12 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-brand-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-brand-sub']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-icon']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-item']} */ ;

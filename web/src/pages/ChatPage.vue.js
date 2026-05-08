@@ -344,6 +344,18 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "anime-card-actions" },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+    value: (__VLS_ctx.selectedAppId),
+    ...{ class: "anime-app-select" },
+    disabled: (__VLS_ctx.loading),
+});
+for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+        key: (app.id),
+        value: (app.id),
+    });
+    (app.name);
+}
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
     ...{ onClick: (__VLS_ctx.createNewSession) },
     ...{ class: "anime-btn primary" },
@@ -827,6 +839,7 @@ if (__VLS_ctx.error) {
 /** @type {__VLS_StyleScopedClasses['anime-card-title']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-desc']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-actions']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['primary']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-chat-layout']} */ ;
@@ -926,6 +939,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             showAttachMenu: showAttachMenu,
             showUrlInput: showUrlInput,
             fileInputRef: fileInputRef,
+            appList: appList,
+            selectedAppId: selectedAppId,
             truncate: truncate,
             getThinkingHtml: getThinkingHtml,
             getContentHtml: getContentHtml,

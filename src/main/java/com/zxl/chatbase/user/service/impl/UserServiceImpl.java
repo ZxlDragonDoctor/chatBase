@@ -1,12 +1,15 @@
 package com.zxl.chatbase.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zxl.chatbase.config.TokenService;
 import com.zxl.chatbase.kb.entity.SysUser;
 import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import com.zxl.chatbase.user.dto.LoginRequest;
 import com.zxl.chatbase.user.dto.LoginResponse;
+import com.zxl.chatbase.user.dto.PageResult;
 import com.zxl.chatbase.user.dto.RegisterRequest;
 import com.zxl.chatbase.user.dto.UserVO;
 import com.zxl.chatbase.user.service.UserService;
@@ -14,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -24,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -195,6 +200,59 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
         return toUserVO(user);
     }
 
+    @Override
+    public PageResult<UserVO> listUsers(int pageNum, int pageSize, String keyword) {
+        Page<SysUser> mp = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<SysUser> w = new LambdaQueryWrapper<>();
+        w.eq(SysUser::getIsDeleted, false);
+        if (StringUtils.hasText(keyword)) {
+            w.and(wrapper -> wrapper
+                    .like(SysUser::getUsername, keyword)
+                    .or()
+                    .like(SysUser::getNickname, keyword)
+                    .or()
+                    .like(SysUser::getEmail, keyword)
+            );
+        }
+        w.orderByDesc(SysUser::getCreateTime);
+        IPage<SysUser> result = baseMapper.selectPage(mp, w);
+        List<UserVO> items = result.getRecords().stream()
+                .map(this::toUserVO)
+                .collect(Collectors.toList());
+        return new PageResult<>(items, result.getTotal(), pageNum, pageSize);
+    }
+
+    @Override
+    public UserVO getUserDetail(Long id) {
+        SysUser user = getById(id);
+        return user != null ? toUserVO(user) : null;
+    }
+
+    @Override
+    public UserVO updateUserRole(Long id, String role) {
+        SysUser user = getById(id);
+        if (user == null) return null;
+        user.setRole(role);
+        user.setUpdateTime(LocalDateTime.now());
+        updateById(user);
+        return toUserVO(user);
+    }
+
+    @Override
+    public UserVO toggleUserStatus(Long id, Boolean status) {
+        SysUser user = getById(id);
+        if (user == null) return null;
+        user.setStatus(status);
+        user.setUpdateTime(LocalDateTime.now());
+        updateById(user);
+        return toUserVO(user);
+    }
+
+    @Override
+    public void deleteUser(Long id) {
+        removeById(id);
+    }
+
     private UserVO toUserVO(SysUser user) {
         UserVO vo = new UserVO();
         vo.setId(user.getId());
@@ -204,7 +262,9 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
         vo.setEmail(user.getEmail());
         vo.setPhone(user.getPhone());
         vo.setRole(user.getRole());
+        vo.setStatus(user.getStatus());
         vo.setCreateTime(user.getCreateTime());
+        vo.setUpdateTime(user.getUpdateTime());
         return vo;
     }
 }

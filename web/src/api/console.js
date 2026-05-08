@@ -3,8 +3,8 @@ export async function fetchOverview() {
     const resp = await api.get('/console/overview');
     return resp.data;
 }
-export async function fetchGroups(platform = 'all') {
-    const resp = await api.get('/console/groups', { params: { platform } });
+export async function fetchGroups(platform = 'all', scope = 'all') {
+    const resp = await api.get('/console/groups', { params: { platform, scope } });
     return resp.data;
 }
 export async function fetchGroupMessages(params) {

@@ -6,6 +6,8 @@ import { syncFromDify } from '../api/kb';
 import { subscribeUploadProgress } from '../api/progress';
 import { getOrCreateUserId } from '../lib/user';
 const userId = getOrCreateUserId();
+const currentUserName = computed(() => localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '');
+const kbTab = ref('mine');
 const tabs = [
     { key: 'category', label: '分类' },
     { key: 'kb', label: '知识库' },
@@ -32,9 +34,17 @@ const flatCategories = computed(() => {
 const kbList = ref([]);
 const filterCategoryId = ref('');
 const filteredKbList = computed(() => {
-    if (!filterCategoryId.value)
-        return kbList.value;
-    return kbList.value.filter(kb => kb.categoryId === Number(filterCategoryId.value));
+    let list = kbList.value;
+    if (kbTab.value === 'mine') {
+        list = list.filter(kb => kb.createBy === currentUserName.value);
+    }
+    else if (kbTab.value === 'all') {
+        list = list.filter(kb => kb.isPublic);
+    }
+    if (filterCategoryId.value) {
+        list = list.filter(kb => kb.categoryId === Number(filterCategoryId.value));
+    }
+    return list;
 });
 const docList = ref([]);
 const faqList = ref([]);
@@ -61,7 +71,7 @@ const filteredAvailableKbList = computed(() => {
 const editingCategory = ref(null);
 const editingKb = ref(null);
 const formCategory = ref({ name: '', icon: '', parentId: '', sortOrder: 0, description: '' });
-const formKb = ref({ name: '', categoryId: '', description: '' });
+const formKb = ref({ name: '', categoryId: '', description: '', isPublic: true });
 const formDoc = ref({ title: '', content: '' });
 const savingCategory = ref(false);
 const savingKb = ref(false);
@@ -286,7 +296,8 @@ async function saveKb() {
         const payload = {
             name: formKb.value.name,
             categoryId: formKb.value.categoryId ? Number(formKb.value.categoryId) : null,
-            description: formKb.value.description
+            description: formKb.value.description,
+            isPublic: formKb.value.isPublic
         };
         if (editingKb.value) {
             await api.put('/kb', { ...payload, id: editingKb.value.id });
@@ -309,7 +320,8 @@ function editKb(kb) {
     formKb.value = {
         name: kb.name,
         categoryId: kb.categoryId ? String(kb.categoryId) : '',
-        description: kb.description || ''
+        description: kb.description || '',
+        isPublic: kb.isPublic !== undefined ? kb.isPublic : true
     };
     showCreateKb.value = true;
 }
@@ -327,7 +339,7 @@ async function deleteKb(kb) {
 function closeKbModal() {
     showCreateKb.value = false;
     editingKb.value = null;
-    formKb.value = { name: '', categoryId: '', description: '' };
+    formKb.value = { name: '', categoryId: '', description: '', isPublic: true };
     err.value = '';
 }
 function viewDocs(kb) {
@@ -701,48 +713,56 @@ else if (__VLS_ctx.activeTab === 'category') {
                 size: (14),
             }, ...__VLS_functionalComponentArgsRest(__VLS_13));
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!!(__VLS_ctx.loading))
-                            return;
-                        if (!(__VLS_ctx.activeTab === 'category'))
-                            return;
-                        if (!!(__VLS_ctx.categoryTree.length === 0))
-                            return;
-                        __VLS_ctx.editCategory(cat);
-                    } },
-                ...{ class: "anime-btn ghost sm" },
-            });
-            const __VLS_16 = {}.Edit3;
-            /** @type {[typeof __VLS_components.Edit3, ]} */ ;
-            // @ts-ignore
-            const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
-                size: (14),
-            }));
-            const __VLS_18 = __VLS_17({
-                size: (14),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_17));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!!(__VLS_ctx.loading))
-                            return;
-                        if (!(__VLS_ctx.activeTab === 'category'))
-                            return;
-                        if (!!(__VLS_ctx.categoryTree.length === 0))
-                            return;
-                        __VLS_ctx.deleteCategory(cat);
-                    } },
-                ...{ class: "anime-btn ghost sm danger" },
-            });
-            const __VLS_20 = {}.Trash2;
-            /** @type {[typeof __VLS_components.Trash2, ]} */ ;
-            // @ts-ignore
-            const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({
-                size: (14),
-            }));
-            const __VLS_22 = __VLS_21({
-                size: (14),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_21));
+            if (cat.createBy === __VLS_ctx.currentUserName) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                    ...{ onClick: (...[$event]) => {
+                            if (!!(__VLS_ctx.loading))
+                                return;
+                            if (!(__VLS_ctx.activeTab === 'category'))
+                                return;
+                            if (!!(__VLS_ctx.categoryTree.length === 0))
+                                return;
+                            if (!(cat.createBy === __VLS_ctx.currentUserName))
+                                return;
+                            __VLS_ctx.editCategory(cat);
+                        } },
+                    ...{ class: "anime-btn ghost sm" },
+                });
+                const __VLS_16 = {}.Edit3;
+                /** @type {[typeof __VLS_components.Edit3, ]} */ ;
+                // @ts-ignore
+                const __VLS_17 = __VLS_asFunctionalComponent(__VLS_16, new __VLS_16({
+                    size: (14),
+                }));
+                const __VLS_18 = __VLS_17({
+                    size: (14),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_17));
+            }
+            if (cat.createBy === __VLS_ctx.currentUserName) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                    ...{ onClick: (...[$event]) => {
+                            if (!!(__VLS_ctx.loading))
+                                return;
+                            if (!(__VLS_ctx.activeTab === 'category'))
+                                return;
+                            if (!!(__VLS_ctx.categoryTree.length === 0))
+                                return;
+                            if (!(cat.createBy === __VLS_ctx.currentUserName))
+                                return;
+                            __VLS_ctx.deleteCategory(cat);
+                        } },
+                    ...{ class: "anime-btn ghost sm danger" },
+                });
+                const __VLS_20 = {}.Trash2;
+                /** @type {[typeof __VLS_components.Trash2, ]} */ ;
+                // @ts-ignore
+                const __VLS_21 = __VLS_asFunctionalComponent(__VLS_20, new __VLS_20({
+                    size: (14),
+                }));
+                const __VLS_22 = __VLS_21({
+                    size: (14),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_21));
+            }
             if (__VLS_ctx.getCategoryKbList(cat.id).length > 0) {
                 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
                     ...{ class: "category-kb-list" },
@@ -970,6 +990,36 @@ else if (__VLS_ctx.activeTab === 'kb') {
         ...{ class: "kb-list" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "kb-sub-tabs" },
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.loading))
+                    return;
+                if (!!(__VLS_ctx.activeTab === 'category'))
+                    return;
+                if (!(__VLS_ctx.activeTab === 'kb'))
+                    return;
+                __VLS_ctx.kbTab = 'mine';
+            } },
+        ...{ class: "anime-tab" },
+        ...{ class: ({ active: __VLS_ctx.kbTab === 'mine' }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (...[$event]) => {
+                if (!!(__VLS_ctx.loading))
+                    return;
+                if (!!(__VLS_ctx.activeTab === 'category'))
+                    return;
+                if (!(__VLS_ctx.activeTab === 'kb'))
+                    return;
+                __VLS_ctx.kbTab = 'all';
+            } },
+        ...{ class: "anime-tab" },
+        ...{ class: ({ active: __VLS_ctx.kbTab === 'all' }) },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "kb-filter-bar" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -1049,10 +1099,21 @@ else if (__VLS_ctx.activeTab === 'kb') {
                 ...{ class: (kb.status ? 'green' : 'pink') },
             });
             (kb.status ? '启用' : '禁用');
+            if (kb.isPublic !== undefined) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                    ...{ class: "anime-badge" },
+                    ...{ class: (kb.isPublic ? 'green' : 'gray') },
+                });
+                (kb.isPublic ? '公开' : '私有');
+            }
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "anime-code" },
             });
             (kb.sourceType || '手动');
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ class: "kb-time" },
+            });
+            (kb.createBy || '-');
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
                 ...{ class: "kb-time" },
             });
@@ -1132,54 +1193,62 @@ else if (__VLS_ctx.activeTab === 'kb') {
                 size: (16),
             }, ...__VLS_functionalComponentArgsRest(__VLS_53));
             __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!!(__VLS_ctx.loading))
-                            return;
-                        if (!!(__VLS_ctx.activeTab === 'category'))
-                            return;
-                        if (!(__VLS_ctx.activeTab === 'kb'))
-                            return;
-                        if (!!(__VLS_ctx.filteredKbList.length === 0))
-                            return;
-                        __VLS_ctx.editKb(kb);
-                    } },
-                ...{ class: "anime-btn ghost" },
-            });
-            const __VLS_56 = {}.Edit3;
-            /** @type {[typeof __VLS_components.Edit3, ]} */ ;
-            // @ts-ignore
-            const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
-                size: (16),
-            }));
-            const __VLS_58 = __VLS_57({
-                size: (16),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_57));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-                ...{ onClick: (...[$event]) => {
-                        if (!!(__VLS_ctx.loading))
-                            return;
-                        if (!!(__VLS_ctx.activeTab === 'category'))
-                            return;
-                        if (!(__VLS_ctx.activeTab === 'kb'))
-                            return;
-                        if (!!(__VLS_ctx.filteredKbList.length === 0))
-                            return;
-                        __VLS_ctx.deleteKb(kb);
-                    } },
-                ...{ class: "anime-btn ghost danger" },
-            });
-            const __VLS_60 = {}.Trash2;
-            /** @type {[typeof __VLS_components.Trash2, ]} */ ;
-            // @ts-ignore
-            const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
-                size: (16),
-            }));
-            const __VLS_62 = __VLS_61({
-                size: (16),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_61));
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            if (kb.createBy === __VLS_ctx.currentUserName) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                    ...{ onClick: (...[$event]) => {
+                            if (!!(__VLS_ctx.loading))
+                                return;
+                            if (!!(__VLS_ctx.activeTab === 'category'))
+                                return;
+                            if (!(__VLS_ctx.activeTab === 'kb'))
+                                return;
+                            if (!!(__VLS_ctx.filteredKbList.length === 0))
+                                return;
+                            if (!(kb.createBy === __VLS_ctx.currentUserName))
+                                return;
+                            __VLS_ctx.editKb(kb);
+                        } },
+                    ...{ class: "anime-btn ghost" },
+                });
+                const __VLS_56 = {}.Edit3;
+                /** @type {[typeof __VLS_components.Edit3, ]} */ ;
+                // @ts-ignore
+                const __VLS_57 = __VLS_asFunctionalComponent(__VLS_56, new __VLS_56({
+                    size: (16),
+                }));
+                const __VLS_58 = __VLS_57({
+                    size: (16),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_57));
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            }
+            if (kb.createBy === __VLS_ctx.currentUserName) {
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+                    ...{ onClick: (...[$event]) => {
+                            if (!!(__VLS_ctx.loading))
+                                return;
+                            if (!!(__VLS_ctx.activeTab === 'category'))
+                                return;
+                            if (!(__VLS_ctx.activeTab === 'kb'))
+                                return;
+                            if (!!(__VLS_ctx.filteredKbList.length === 0))
+                                return;
+                            if (!(kb.createBy === __VLS_ctx.currentUserName))
+                                return;
+                            __VLS_ctx.deleteKb(kb);
+                        } },
+                    ...{ class: "anime-btn ghost danger" },
+                });
+                const __VLS_60 = {}.Trash2;
+                /** @type {[typeof __VLS_components.Trash2, ]} */ ;
+                // @ts-ignore
+                const __VLS_61 = __VLS_asFunctionalComponent(__VLS_60, new __VLS_60({
+                    size: (16),
+                }));
+                const __VLS_62 = __VLS_61({
+                    size: (16),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_61));
+                __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+            }
         }
     }
 }
@@ -1736,6 +1805,16 @@ if (__VLS_ctx.showCreateKb) {
         placeholder: "知识库描述",
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "anime-form-group" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.label, __VLS_intrinsicElements.label)({
+        ...{ style: {} },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+        type: "checkbox",
+    });
+    (__VLS_ctx.formKb.isPublic);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "anime-modal-footer" },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
@@ -2064,6 +2143,9 @@ if (__VLS_ctx.showUploadModal) {
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['muted']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-list']} */ ;
+/** @type {__VLS_StyleScopedClasses['kb-sub-tabs']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-filter-bar']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['filter-select']} */ ;
@@ -2084,7 +2166,9 @@ if (__VLS_ctx.showUploadModal) {
 /** @type {__VLS_StyleScopedClasses['kb-desc']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-meta']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-badge']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-code']} */ ;
+/** @type {__VLS_StyleScopedClasses['kb-time']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-time']} */ ;
 /** @type {__VLS_StyleScopedClasses['kb-actions']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
@@ -2207,6 +2291,7 @@ if (__VLS_ctx.showUploadModal) {
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-form-group']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-modal-footer']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-btn']} */ ;
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
@@ -2258,6 +2343,8 @@ const __VLS_self = (await import('vue')).defineComponent({
             Upload: Upload,
             Download: Download,
             Search: Search,
+            currentUserName: currentUserName,
+            kbTab: kbTab,
             tabs: tabs,
             activeTab: activeTab,
             loading: loading,

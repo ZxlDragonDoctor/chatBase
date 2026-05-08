@@ -8,7 +8,9 @@ public interface ImGroupService {
 
     void updateGroupInfo(ImGroup group);
 
-    void bindApp(Long id, Long appId, String appName);
+    void bindApp(Long id, Long appId, String appName, String userId);
 
-    void unbindApp(Long id);
+    void unbindApp(Long id, String userId);
+
+    void assignGroup(Long id, String targetUser, String currentUser);
 }

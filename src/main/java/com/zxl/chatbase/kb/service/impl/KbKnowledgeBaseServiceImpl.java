@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,13 +31,43 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
     private final DifyService difyService;
 
     @Override
-    public Page<KbKnowledgeBase> pageList(Long categoryId, String name, Integer pageNum, Integer pageSize) {
+    public boolean canViewKb(Long kbId, String userId) {
+        KbKnowledgeBase kb = getById(kbId);
+        if (kb == null) return false;
+        return Boolean.TRUE.equals(kb.getIsPublic()) || (userId != null && userId.equals(kb.getCreateBy()));
+    }
+
+    @Override
+    public boolean canModifyKb(Long kbId, String userId) {
+        KbKnowledgeBase kb = getById(kbId);
+        if (kb == null) return false;
+        return userId != null && userId.equals(kb.getCreateBy());
+    }
+
+    @Override
+    public Page<KbKnowledgeBase> pageList(Long categoryId, String name, Integer pageNum, Integer pageSize, String userId) {
+        Page<KbKnowledgeBase> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
+        wrapper.and(w -> w.eq(KbKnowledgeBase::getIsPublic, true)
+                .or().eq(KbKnowledgeBase::getCreateBy, userId));
+        if (categoryId != null) {
+            wrapper.eq(KbKnowledgeBase::getCategoryId, categoryId);
+        }
+        if (StringUtils.hasText(name)) {
+            wrapper.like(KbKnowledgeBase::getName, name);
+        }
+        wrapper.orderByDesc(KbKnowledgeBase::getCreateTime);
+        return page(page, wrapper);
+    }
+
+    @Override
+    public Page<KbKnowledgeBase> pageAllForAdmin(Long categoryId, String name, Integer pageNum, Integer pageSize) {
         Page<KbKnowledgeBase> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
         if (categoryId != null) {
             wrapper.eq(KbKnowledgeBase::getCategoryId, categoryId);
         }
-        if (name != null && !name.isBlank()) {
+        if (StringUtils.hasText(name)) {
             wrapper.like(KbKnowledgeBase::getName, name);
         }
         wrapper.orderByDesc(KbKnowledgeBase::getCreateTime);
@@ -45,7 +76,7 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
 
     @Override
     @Transactional
-    public boolean createKnowledgeBase(KbKnowledgeBase knowledgeBase) {
+    public boolean createKnowledgeBase(KbKnowledgeBase knowledgeBase, String userId) {
         String difyDatasetId = difyService.createDataset(
                 knowledgeBase.getName(),
                 knowledgeBase.getDescription()
@@ -56,6 +87,7 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
         }
 
         knowledgeBase.setDifyDatasetId(difyDatasetId);
+        knowledgeBase.setCreateBy(userId);
         knowledgeBase.setCreateTime(LocalDateTime.now());
         knowledgeBase.setUpdateTime(LocalDateTime.now());
         knowledgeBase.setDocCount(0);
@@ -66,6 +98,9 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
         if (knowledgeBase.getStatus() == null) {
             knowledgeBase.setStatus(true);
         }
+        if (knowledgeBase.getIsPublic() == null) {
+            knowledgeBase.setIsPublic(true);
+        }
 
         boolean saved = save(knowledgeBase);
         if (saved && difyDatasetId != null) {
@@ -75,14 +110,20 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
     }
 
     @Override
-    public boolean updateKnowledgeBase(KbKnowledgeBase knowledgeBase) {
+    public boolean updateKnowledgeBase(KbKnowledgeBase knowledgeBase, String userId) {
+        if (!canModifyKb(knowledgeBase.getId(), userId)) {
+            throw new RuntimeException("无权修改此知识库");
+        }
         knowledgeBase.setUpdateTime(LocalDateTime.now());
         return updateById(knowledgeBase);
     }
 
     @Override
     @Transactional
-    public boolean deleteKnowledgeBase(Long id) {
+    public boolean deleteKnowledgeBase(Long id, String userId) {
+        if (!canModifyKb(id, userId)) {
+            throw new RuntimeException("无权删除此知识库");
+        }
         KbKnowledgeBase kb = getById(id);
         if (kb == null) {
             log.warn("知识库不存在: id={}", id);
@@ -184,9 +225,10 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
                 newKb.setDocCount(dataset.getDocumentCount() != null ? dataset.getDocumentCount() : 0);
                 newKb.setChunkCount(dataset.getWordCount() != null ? dataset.getWordCount() : 0);
                 newKb.setStatus(true);
+                newKb.setIsPublic(true);
                 newKb.setCreateTime(LocalDateTime.now());
                 newKb.setUpdateTime(LocalDateTime.now());
-                
+
                 boolean saved = save(newKb);
                 if (saved) {
                     syncCount++;
@@ -242,7 +284,7 @@ public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMappe
                 newDoc.setStatus(difyDoc.getEnabled() != null ? difyDoc.getEnabled() : true);
                 newDoc.setCreateTime(LocalDateTime.now());
                 newDoc.setUpdateTime(LocalDateTime.now());
-                
+
                 boolean saved = documentService.save(newDoc);
                 if (saved) {
                     syncCount++;

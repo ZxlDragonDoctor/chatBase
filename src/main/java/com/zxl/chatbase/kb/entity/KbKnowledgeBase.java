@@ -40,9 +40,11 @@ public class KbKnowledgeBase {
 
     private Boolean status;
 
+    private Boolean isPublic;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
 
-    private Long createBy;
+    private String createBy;
 }

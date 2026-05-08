@@ -11,6 +11,10 @@
             <button class="anime-tab" :class="{ active: period === 7 }" @click="period = 7; reload()">近7天</button>
             <button class="anime-tab" :class="{ active: period === 30 }" @click="period = 30; reload()">近30天</button>
           </div>
+          <div v-if="isAdmin" class="anime-tabs" style="margin-left: 8px;">
+            <button class="anime-tab" :class="{ active: showAllData }" @click="showAllData = true; reload()">全部数据</button>
+            <button class="anime-tab" :class="{ active: !showAllData }" @click="showAllData = false; reload()">我的数据</button>
+          </div>
           <button class="anime-btn ghost" @click="aggregateData">
             <Database :size="18" />
             <span>聚合统计</span>
@@ -240,6 +244,10 @@ const period = ref(7)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+const isAdmin = localStorage.getItem('chatbase_role') === 'admin'
+const showAllData = ref(true)
+const scope = computed(() => showAllData.value ? 'all' : 'mine')
+
 const tokenStats = ref<TokenStatistics | null>(null)
 const tokenChartData = ref<TokenChartData | null>(null)
 const tokenMonthlyData = ref<TokenMonthlyData | null>(null)
@@ -275,7 +283,7 @@ async function reload() {
 
 async function loadCostChart() {
   try {
-    costChartData.value = await fetchCostChartData(period.value)
+    costChartData.value = await fetchCostChartData(period.value, scope.value)
     await nextTick()
     renderCostChart()
   } catch {
@@ -285,7 +293,7 @@ async function loadCostChart() {
 
 async function loadCostMonthly() {
   try {
-    costMonthlyData.value = await fetchCostMonthlyData()
+    costMonthlyData.value = await fetchCostMonthlyData(scope.value)
     await nextTick()
     renderCostChartMonthly()
   } catch {
@@ -442,7 +450,7 @@ function renderCostChartMonthly() {
 
 async function loadTokenChart() {
   try {
-    tokenChartData.value = await fetchTokenChartData(period.value)
+    tokenChartData.value = await fetchTokenChartData(period.value, scope.value)
     await nextTick()
     renderTokenChart()
   } catch {
@@ -452,7 +460,7 @@ async function loadTokenChart() {
 
 async function loadTokenMonthly() {
   try {
-    tokenMonthlyData.value = await fetchTokenMonthlyData()
+    tokenMonthlyData.value = await fetchTokenMonthlyData(scope.value)
     tokenChartData.value = tokenMonthlyData.value
     await nextTick()
     renderTokenChart()
@@ -557,7 +565,7 @@ async function aggregateData() {
 }
 
 async function loadGroupActive() {
-  try { groupActive.value = await fetchGroupActive(selectedPlatform.value, 10) } catch { groupActive.value = null }
+  try { groupActive.value = await fetchGroupActive(selectedPlatform.value, 10, scope.value) } catch { groupActive.value = null }
 }
 
 async function loadKeywords() {
@@ -566,7 +574,7 @@ async function loadKeywords() {
     keywordHot.value = await fetchKeywordCloud('all', period.value, 50)
   } catch {
     try {
-      keywordHot.value = await fetchHotKeywords('all', undefined, 30)
+      keywordHot.value = await fetchHotKeywords('all', undefined, 30, scope.value)
     } catch { keywordHot.value = null }
   }
   keywordLoading.value = false
@@ -586,7 +594,7 @@ async function syncKeywords() {
 }
 
 async function loadConvStats() {
-  try { convStats.value = await fetchConversationOverview(period.value) } catch { convStats.value = null }
+  try { convStats.value = await fetchConversationOverview(period.value, scope.value) } catch { convStats.value = null }
 }
 
 async function loadFeedbackStats() {

@@ -32,7 +32,7 @@ public class KbCategory {
 
     private LocalDateTime updateTime;
 
-    private Long createBy;
+    private String createBy;
 
     @TableField(exist = false)
     private Integer kbCount;

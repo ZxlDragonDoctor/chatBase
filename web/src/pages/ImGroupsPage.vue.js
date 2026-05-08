@@ -1,10 +1,23 @@
 /// <reference types="../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import { RefreshCw } from 'lucide-vue-next';
 import { fetchGroups, fetchGroupMessages } from '../api/console';
 import { api } from '../api/client';
-const platformTabs = [{ key: 'all', label: '全部' }, { key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }];
-const platform = ref('all');
+const currentUserName = computed(() => localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '');
+const filteredGroups = computed(() => {
+    const q = groupSearch.value.trim().toLowerCase();
+    if (!q)
+        return groups.value;
+    return groups.value.filter(g => {
+        const id = String(g.groupId ?? '').toLowerCase();
+        const name = String(g.groupName ?? '').toLowerCase();
+        return id.includes(q) || name.includes(q);
+    });
+});
+const platformTabs = [{ key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }];
+const platform = ref(null);
+const scope = ref('all');
+const groupSearch = ref('');
 const groups = ref([]);
 const loading = ref(false);
 const err = ref(null);
@@ -31,7 +44,7 @@ async function reload() {
     loading.value = true;
     err.value = null;
     try {
-        groups.value = await fetchGroups(platform.value);
+        groups.value = await fetchGroups(platform.value ?? 'all', scope.value);
         if (selected.value) {
             const still = groups.value.find((g) => g.groupId === selected.value.groupId && g.platform === selected.value.platform);
             if (!still) {
@@ -123,6 +136,9 @@ async function saveBindApp() {
         bindSaving.value = false;
     }
 }
+function togglePlatform(key) {
+    platform.value = platform.value === key ? null : key;
+}
 function getPlatformColor(p) { if (p === 'qq')
     return 'green'; if (p === 'wecom')
     return 'blue'; return 'purple'; }
@@ -149,7 +165,7 @@ function formatTime(t) {
         return t.slice(0, 16).replace('T', ' ');
     return String(t);
 }
-watch(platform, () => { selected.value = null; messages.value = []; reload(); });
+watch([platform, scope], () => { selected.value = null; messages.value = []; reload(); });
 onMounted(() => {
     reload();
     loadApps();
@@ -163,6 +179,7 @@ let __VLS_directives;
 /** @type {__VLS_StyleScopedClasses['im-group-item']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-app-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-search-input']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-scope-select']} */ ;
 // CSS variable injection 
 // CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -212,13 +229,29 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "anime-card-body" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "anime-tabs" },
     ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+    value: (__VLS_ctx.scope),
+    ...{ class: "anime-scope-select" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "all",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "unassigned",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+    value: "bound",
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "anime-tabs" },
 });
 for (const [t] of __VLS_getVForSourceType((__VLS_ctx.platformTabs))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
-                __VLS_ctx.platform = t.key;
+                __VLS_ctx.togglePlatform(t.key);
             } },
         key: (t.key),
         ...{ class: "anime-tab" },
@@ -226,6 +259,13 @@ for (const [t] of __VLS_getVForSourceType((__VLS_ctx.platformTabs))) {
     });
     (t.label);
 }
+__VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
+    value: (__VLS_ctx.groupSearch),
+    type: "text",
+    placeholder: "搜索群名或群ID...",
+    ...{ class: "anime-search-input" },
+    ...{ style: {} },
+});
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "im-split-view" },
 });
@@ -254,7 +294,7 @@ else if (__VLS_ctx.groups.length === 0) {
         ...{ class: "anime-empty-text" },
     });
 }
-for (const [g] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
+for (const [g] of __VLS_getVForSourceType((__VLS_ctx.filteredGroups))) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
                 __VLS_ctx.selectGroup(g);
@@ -293,6 +333,13 @@ for (const [g] of __VLS_getVForSourceType((__VLS_ctx.groups))) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
         (__VLS_ctx.formatTime(g.lastMessageTime));
     }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ style: {} },
+    });
+    if (g.createdBy) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (g.createdBy);
+    }
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "im-detail-panel" },
@@ -321,53 +368,55 @@ else {
         ...{ style: {} },
     });
     (__VLS_ctx.getGroupName(__VLS_ctx.selected));
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
-        value: (__VLS_ctx.bindAppId),
-        ...{ class: "anime-app-select" },
-        ...{ style: {} },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-        value: "",
-    });
-    for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
-            key: (app.id),
-            value: (app.id),
+    if (!__VLS_ctx.selected.createdBy || __VLS_ctx.selected.createdBy === __VLS_ctx.currentUserName) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ style: {} },
         });
-        (app.icon || '🤖');
-        (app.name);
-    }
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (__VLS_ctx.saveBindApp) },
-        ...{ class: "anime-btn primary" },
-        disabled: (__VLS_ctx.bindSaving),
-    });
-    if (__VLS_ctx.bindSaving) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    }
-    else {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-    }
-    if (__VLS_ctx.selected.appName) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ style: {} },
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
             ...{ style: {} },
         });
-        (__VLS_ctx.selected.appName);
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.select, __VLS_intrinsicElements.select)({
+            value: (__VLS_ctx.bindAppId),
+            ...{ class: "anime-app-select" },
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+            value: "",
+        });
+        for (const [app] of __VLS_getVForSourceType((__VLS_ctx.appList))) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.option, __VLS_intrinsicElements.option)({
+                key: (app.id),
+                value: (app.id),
+            });
+            (app.icon || '🤖');
+            (app.name);
+        }
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (__VLS_ctx.saveBindApp) },
+            ...{ class: "anime-btn primary" },
+            disabled: (__VLS_ctx.bindSaving),
+        });
+        if (__VLS_ctx.bindSaving) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        }
+        else {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        }
+        if (__VLS_ctx.selected.appName) {
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+                ...{ style: {} },
+            });
+            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+                ...{ style: {} },
+            });
+            (__VLS_ctx.selected.appName);
+        }
     }
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ style: {} },
@@ -496,8 +545,10 @@ else {
 /** @type {__VLS_StyleScopedClasses['ghost']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-error']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-card-body']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-scope-select']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-tabs']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-tab']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-search-input']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-split-view']} */ ;
 /** @type {__VLS_StyleScopedClasses['im-list-panel']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-empty']} */ ;
@@ -545,8 +596,12 @@ const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             RefreshCw: RefreshCw,
+            currentUserName: currentUserName,
+            filteredGroups: filteredGroups,
             platformTabs: platformTabs,
             platform: platform,
+            scope: scope,
+            groupSearch: groupSearch,
             groups: groups,
             loading: loading,
             err: err,
@@ -566,6 +621,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             searchMessages: searchMessages,
             clearSearch: clearSearch,
             saveBindApp: saveBindApp,
+            togglePlatform: togglePlatform,
             getPlatformColor: getPlatformColor,
             getPlatformLabel: getPlatformLabel,
             getGroupName: getGroupName,

@@ -32,6 +32,8 @@ public class ImGroup {
 
     private String appName;
 
+    private String createdBy;
+
     private Boolean status;
 
     private LocalDateTime createTime;

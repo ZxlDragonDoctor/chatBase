@@ -7,14 +7,14 @@ import com.zxl.chatbase.kb.entity.KbCategory;
 import java.util.List;
 
 public interface IKbCategoryService extends IService<KbCategory> {
-    
-    List<KbCategory> treeList();
-    
-    Page<KbCategory> pageList(String name, Integer pageNum, Integer pageSize);
-    
-    boolean createCategory(KbCategory category);
-    
-    boolean updateCategory(KbCategory category);
-    
-    String deleteCategory(Long id);
+
+    List<KbCategory> treeList(String userId);
+
+    Page<KbCategory> pageList(String name, Integer pageNum, Integer pageSize, String userId);
+
+    boolean createCategory(KbCategory category, String userId);
+
+    boolean updateCategory(KbCategory category, String userId);
+
+    String deleteCategory(Long id, String userId);
 }

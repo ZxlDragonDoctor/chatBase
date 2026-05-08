@@ -20,11 +20,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/user/login",
             "/api/user/register",
             "/api/chat/**",
-            "/api/statistics/**",
-            "/api/console/**",
             "/api/upload/**",
             "/api/uploads/**",
-            "/api/bot/**",
             "/api/feedback/submit",
             "/api/feedback/user/**",
             "/qq/**",
@@ -37,7 +34,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/feedback/page",
             "/api/feedback/*/reply",
             "/api/feedback/*/status",
-            "/api/feedback/stats"
+            "/api/feedback/stats",
+            "/api/user/list",
+            "/api/user/*/detail",
+            "/api/user/*/role",
+            "/api/user/*/status",
+            "/api/user/*/remove",
+            "/api/kb/app/admin/**",
+            "/api/kb/admin/**"
     );
 
     @Override

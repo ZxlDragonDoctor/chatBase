@@ -9,9 +9,11 @@ import com.zxl.chatbase.dify.server.DifyService;
 import com.zxl.chatbase.kb.entity.KbCategory;
 import com.zxl.chatbase.kb.entity.KbDocument;
 import com.zxl.chatbase.kb.entity.KbKnowledgeBase;
+import com.zxl.chatbase.kb.entity.KbUserCategoryMapping;
 import com.zxl.chatbase.kb.service.IKbCategoryService;
 import com.zxl.chatbase.kb.service.IKbDocumentService;
 import com.zxl.chatbase.kb.service.IKbKnowledgeBaseService;
+import com.zxl.chatbase.kb.service.IKbUserCategoryMappingService;
 import com.zxl.chatbase.upload.service.UploadProgressService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +24,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +47,7 @@ public class KnowledgeBaseController {
     private final IKbKnowledgeBaseService knowledgeBaseService;
     private final IKbDocumentService documentService;
     private final IKbCategoryService categoryService;
+    private final IKbUserCategoryMappingService categoryMappingService;
     private final DifyService difyService;
     private final UploadProgressService progressService;
     private final DifyConfig difyConfig;
@@ -55,32 +57,36 @@ public class KnowledgeBaseController {
     private CloseableHttpClient httpClient;
 
     @GetMapping("/category/tree")
-    public List<KbCategory> categoryTree() {
-        return categoryService.treeList();
+    public List<KbCategory> categoryTree(@RequestAttribute("currentUser") String userId) {
+        return categoryService.treeList(userId);
     }
 
     @GetMapping("/category/page")
     public Page<KbCategory> categoryPage(
             @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize) {
-        return categoryService.pageList(name, pageNum, pageSize);
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestAttribute("currentUser") String userId) {
+        return categoryService.pageList(name, pageNum, pageSize, userId);
     }
 
     @PostMapping("/category")
-    public boolean createCategory(@RequestBody KbCategory category) {
-        return categoryService.createCategory(category);
+    public boolean createCategory(@RequestBody KbCategory category,
+                                  @RequestAttribute("currentUser") String userId) {
+        return categoryService.createCategory(category, userId);
     }
 
     @PutMapping("/category")
-    public boolean updateCategory(@RequestBody KbCategory category) {
-        return categoryService.updateCategory(category);
+    public boolean updateCategory(@RequestBody KbCategory category,
+                                  @RequestAttribute("currentUser") String userId) {
+        return categoryService.updateCategory(category, userId);
     }
 
     @DeleteMapping("/category/{id}")
-    public Map<String, Object> deleteCategory(@PathVariable Long id) {
+    public Map<String, Object> deleteCategory(@PathVariable Long id,
+                                              @RequestAttribute("currentUser") String userId) {
         Map<String, Object> result = new HashMap<>();
-        String errorMsg = categoryService.deleteCategory(id);
+        String errorMsg = categoryService.deleteCategory(id, userId);
         if (errorMsg != null) {
             result.put("success", false);
             result.put("message", errorMsg);
@@ -96,8 +102,18 @@ public class KnowledgeBaseController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String name,
             @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestAttribute("currentUser") String userId) {
+        return knowledgeBaseService.pageList(categoryId, name, pageNum, pageSize, userId);
+    }
+
+    @GetMapping("/admin/page")
+    public Page<KbKnowledgeBase> pageForAdmin(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize) {
-        return knowledgeBaseService.pageList(categoryId, name, pageNum, pageSize);
+        return knowledgeBaseService.pageAllForAdmin(categoryId, name, pageNum, pageSize);
     }
 
     @GetMapping("/{id}")
@@ -106,18 +122,21 @@ public class KnowledgeBaseController {
     }
 
     @PostMapping
-    public boolean create(@RequestBody KbKnowledgeBase knowledgeBase) {
-        return knowledgeBaseService.createKnowledgeBase(knowledgeBase);
+    public boolean create(@RequestBody KbKnowledgeBase knowledgeBase,
+                          @RequestAttribute("currentUser") String userId) {
+        return knowledgeBaseService.createKnowledgeBase(knowledgeBase, userId);
     }
 
     @PutMapping
-    public boolean update(@RequestBody KbKnowledgeBase knowledgeBase) {
-        return knowledgeBaseService.updateKnowledgeBase(knowledgeBase);
+    public boolean update(@RequestBody KbKnowledgeBase knowledgeBase,
+                          @RequestAttribute("currentUser") String userId) {
+        return knowledgeBaseService.updateKnowledgeBase(knowledgeBase, userId);
     }
 
     @DeleteMapping("/{id}")
-    public boolean delete(@PathVariable Long id) {
-        return knowledgeBaseService.deleteKnowledgeBase(id);
+    public boolean delete(@PathVariable Long id,
+                          @RequestAttribute("currentUser") String userId) {
+        return knowledgeBaseService.deleteKnowledgeBase(id, userId);
     }
 
     @PostMapping("/{id}/sync")
@@ -133,25 +152,25 @@ public class KnowledgeBaseController {
             @RequestPart(value = "user", required = false) String user
     ) {
         log.info("批量上传请求: kbId={}, filesCount={}", id, files.size());
-        
+
         KbKnowledgeBase kb = knowledgeBaseService.getById(id);
         if (kb == null) {
             log.warn("知识库不存在: {}", id);
             return Map.of("success", false, "message", "知识库不存在", "taskId", "");
         }
-        
+
         String datasetId = kb.getDifyDatasetId();
         if (datasetId == null || datasetId.isBlank()) {
             log.warn("知识库未关联Dify Dataset: kbId={}, difyDatasetId={}", id, datasetId);
             return Map.of("success", false, "message", "知识库未关联Dify Dataset，请先同步到Dify", "taskId", "");
         }
-        
+
         String taskId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         progressService.createProgress(taskId, files.size());
         log.info("创建上传任务: taskId={}, totalCount={}, datasetId={}", taskId, files.size(), datasetId);
-        
+
         String uploadUser = (user != null && !user.isBlank()) ? user : "kb-upload";
-        
+
         List<Map<String, Object>> fileDataList = new ArrayList<>();
         for (MultipartFile file : files) {
             try {
@@ -164,20 +183,20 @@ public class KnowledgeBaseController {
                 log.warn("读取文件失败: {}", file.getOriginalFilename(), e);
             }
         }
-        
+
         uploadExecutor.submit(() -> {
             log.info("上传任务开始执行: taskId={}, filesCount={}", taskId, fileDataList.size());
             try {
                 progressService.updateProgress(taskId, null, false, "开始上传", null);
-                
+
                 int successCount = 0;
                 int failedCount = 0;
-                
+
                 for (Map<String, Object> fileData : fileDataList) {
                     String fileName = (String) fileData.get("fileName");
                     String contentType = (String) fileData.get("contentType");
                     byte[] bytes = (byte[]) fileData.get("bytes");
-                    
+
                     log.info("开始上传文件: taskId={}, fileName={}", taskId, fileName);
                     try {
                         boolean success = uploadSingleFile(fileName, contentType, bytes, uploadUser, datasetId);
@@ -196,43 +215,43 @@ public class KnowledgeBaseController {
                         progressService.updateProgress(taskId, fileName, false, "上传异常: " + e.getMessage(), null);
                     }
                 }
-                
+
                 log.info("批量上传完成: taskId={}, success={}, failed={}", taskId, successCount, failedCount);
             } catch (Exception e) {
                 log.error("批量上传异常: taskId={}", taskId, e);
                 progressService.markFailed(taskId, e.getMessage());
             }
         });
-        
+
         return Map.of("success", true, "taskId", taskId, "message", "上传任务已创建");
     }
-    
-private boolean uploadSingleFile(String fileName, String contentType, byte[] bytes, String user, String datasetId) {
+
+    private boolean uploadSingleFile(String fileName, String contentType, byte[] bytes, String user, String datasetId) {
         try {
             log.info("上传文件到Dify: fileName={}, size={}bytes, user={}", fileName, bytes.length, user);
-            
+
             HttpPost httpPost = new HttpPost(difyConfig.getApiUrl() + "/files/upload");
             httpPost.setHeader("Authorization", "Bearer " + difyConfig.getApiKey());
-            
+
             ContentType ct = contentType != null ? ContentType.parse(contentType) : ContentType.APPLICATION_OCTET_STREAM;
-            
+
             HttpEntity multipartEntity = MultipartEntityBuilder.create()
                     .setCharset(StandardCharsets.UTF_8)
                     .addBinaryBody("file", bytes, ct, fileName)
                     .addTextBody("user", user, ContentType.TEXT_PLAIN.withCharset(StandardCharsets.UTF_8))
                     .build();
-            
+
             httpPost.setEntity(multipartEntity);
-            
+
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String jsonResponse = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 log.info("Dify文件上传响应: fileName={}, statusCode={}, body={}", fileName, statusCode, jsonResponse);
-                
+
                 if (statusCode == 200 || statusCode == 201) {
                     JsonNode jsonNode = objectMapper.readTree(jsonResponse);
                     String difyFileId = jsonNode.path("id").asText(null);
-                    
+
                     if (difyFileId != null) {
                         log.info("Dify文件ID获取成功: fileName={}, difyFileId={}", fileName, difyFileId);
                         return syncFileToDataset(fileName, contentType, bytes, datasetId, difyFileId);
@@ -249,33 +268,33 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
             return false;
         }
     }
-    
+
     private boolean syncFileToDataset(String fileName, String contentType, byte[] bytes, String datasetId, String difyFileId) {
         try {
             String url = difyConfig.getApiUrl() + "/datasets/" + datasetId + "/document/create-by-file";
             log.info("同步文件到Dataset: fileName={}, url={}, datasetId={}, difyFileId={}", fileName, url, datasetId, difyFileId);
-            
+
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Authorization", "Bearer " + difyConfig.getDatasetApiKey());
-            
+
             String jsonData = "{\"indexing_technique\":\"high_quality\",\"process_rule\":{\"mode\":\"automatic\"}}";
-            
+
             ContentType ct = contentType != null ? ContentType.parse(contentType).withCharset(StandardCharsets.UTF_8) : ContentType.APPLICATION_OCTET_STREAM;
-            
+
             HttpEntity multipartEntity = MultipartEntityBuilder.create()
                     .setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
                     .setCharset(StandardCharsets.UTF_8)
                     .addBinaryBody("file", bytes, ct, fileName)
                     .addTextBody("data", jsonData, ContentType.TEXT_PLAIN.withCharset(StandardCharsets.UTF_8))
                     .build();
-            
+
             httpPost.setEntity(multipartEntity);
-            
+
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String respBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
                 log.info("同步文件响应: fileName={}, statusCode={}, body={}", fileName, statusCode, respBody);
-                
+
                 if (statusCode == 200 || statusCode == 201) {
                     log.info("文件同步成功: fileName={}, datasetId={}", fileName, datasetId);
                     return true;
@@ -317,17 +336,33 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
     }
 
     @PostMapping("/document")
-    public boolean createDocument(@RequestBody KbDocument document) {
+    public boolean createDocument(@RequestBody KbDocument document,
+                                  @RequestAttribute("currentUser") String userId) {
+        if (!knowledgeBaseService.canModifyKb(document.getKnowledgeBaseId(), userId)) {
+            throw new RuntimeException("无权在此知识库创建文档");
+        }
         return documentService.createDocument(document);
     }
 
     @PutMapping("/document")
-    public boolean updateDocument(@RequestBody KbDocument document) {
+    public boolean updateDocument(@RequestBody KbDocument document,
+                                  @RequestAttribute("currentUser") String userId) {
+        KbDocument existing = documentService.getById(document.getId());
+        if (existing == null) throw new RuntimeException("文档不存在");
+        if (!knowledgeBaseService.canModifyKb(existing.getKnowledgeBaseId(), userId)) {
+            throw new RuntimeException("无权修改此文档");
+        }
         return documentService.updateDocument(document);
     }
 
     @DeleteMapping("/document/{id}")
-    public boolean deleteDocument(@PathVariable Long id) {
+    public boolean deleteDocument(@PathVariable Long id,
+                                  @RequestAttribute("currentUser") String userId) {
+        KbDocument doc = documentService.getById(id);
+        if (doc == null) throw new RuntimeException("文档不存在");
+        if (!knowledgeBaseService.canModifyKb(doc.getKnowledgeBaseId(), userId)) {
+            throw new RuntimeException("无权删除此文档");
+        }
         return documentService.deleteDocumentWithDify(id);
     }
 
@@ -335,5 +370,25 @@ private boolean uploadSingleFile(String fileName, String contentType, byte[] byt
     public Map<String, Object> syncDocument(@PathVariable Long id) {
         boolean success = documentService.syncToDify(id);
         return Map.of("success", success, "message", success ? "同步成功" : "同步失败");
+    }
+
+    @PostMapping("/{kbId}/link-category")
+    public void linkCategory(@PathVariable Long kbId,
+                             @RequestBody Map<String, Object> body,
+                             @RequestAttribute("currentUser") String userId) {
+        Long categoryId = Long.valueOf(body.get("categoryId").toString());
+        categoryMappingService.link(kbId, categoryId, userId);
+    }
+
+    @DeleteMapping("/{kbId}/link-category/{mappingId}")
+    public void unlinkCategory(@PathVariable Long kbId,
+                               @PathVariable Long mappingId,
+                               @RequestAttribute("currentUser") String userId) {
+        categoryMappingService.unlink(mappingId, userId);
+    }
+
+    @GetMapping("/{kbId}/link-category/list")
+    public List<KbUserCategoryMapping> listLinkedCategories(@PathVariable Long kbId) {
+        return categoryMappingService.listByCategory(kbId);
     }
 }
