@@ -17,6 +17,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final AdminInterceptor adminInterceptor;
 
     private static final List<String> EXCLUDE_PATHS = Arrays.asList(
+            "/api/health",
             "/api/user/login",
             "/api/user/register",
             "/api/chat/**",
