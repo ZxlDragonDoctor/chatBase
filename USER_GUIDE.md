@@ -140,6 +140,8 @@ mvn spring-boot:run
 # 或使用 IDE 运行 ChatBaseApplication.java
 ```
 
+> **⚠️ 注意**：`pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 注解会抛出 `Name not specified` 异常。如果遇到此错误，请检查 pom.xml 中的编译插件配置。
+
 ### 3.3 启动前端
 
 ```bash
@@ -616,6 +618,11 @@ WECHAT_CORP_SECRET=your-secret
 
 ### 7.8 数据统计
 
+**权限说明**：
+- **admin 用户**：统计页默认展示全部数据，可通过右上角开关切换为"仅我的数据"
+- **普通用户**：始终仅看自己的数据（scope=mine）
+- 数据隔离规则：`created_by = 当前用户 OR created_by IS NULL`
+
 #### 7.8.1 Token 统计
 
 1. 点击左侧菜单"数据统计"
@@ -656,6 +663,8 @@ WECHAT_CORP_SECRET=your-secret
 1. 点击"聚合统计"按钮
 2. 手动触发昨日数据聚合
 3. 用于补录历史数据
+
+> 聚合结果按用户维度过滤：普通用户的聚合仅含其自身数据，admin 的聚合包含全部。
 
 ### 7.9 反馈管理
 
@@ -1034,6 +1043,7 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
 | v1.0 | 2026-05-07 | 初始版本，完整功能 |
+| v1.1 | 2026-05-09 | 新增用户数据隔离、scope 切换支持、pom.xml 编译参数说明 |
 
 ---
 
@@ -1045,5 +1055,5 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 
 ---
 
-*文档版本：v1.0*
-*最后更新：2026-05-07*
+*文档版本：v1.1*
+*最后更新：2026-05-09*

@@ -606,23 +606,30 @@ user/
     ↓
 WebMvcConfig.addInterceptors()
     ↓
-AuthInterceptor.preHandle()
-    ├── 排除路径：/api/user/login, /api/user/register, /uploads/**, /intellrobot/**
+AuthInterceptor.preHandle()（拦截 /api/**，排除公开路径）
+    ├── 排除路径：/api/user/login, /api/user/register, /api/chat/**,
+    │            /api/upload/**, /api/uploads/**, /api/feedback/submit,
+    │            /api/feedback/user/**, /qq/**, /intellrobot/**, /error, /uploads/**
     ├── 获取 Token（Header: Authorization 或 Query: token）
     ├── 校验 Token（Redis：chatbase:token:{token}）
-    ├── 设置用户信息到 RequestAttribute（currentUser, originalUsername, role, adminId）
+    ├── 设置 username 到 @RequestAttribute("currentUser")
     └── 放行
     ↓
-AdminInterceptor.preHandle()（仅 /api/console/**, /api/kb/**, /api/bot/**）
-    ├── 检查 role=admin
-    └── 拒绝访问 → 返回 403
+AdminInterceptor.preHandle()（仅 admin 路径）
+    ├── /api/feedback/page, /api/feedback/*/reply, /api/feedback/*/status,
+    │   /api/feedback/stats, /api/user/list, /api/user/*/detail,
+    │   /api/user/*/role, /api/user/*/status, /api/user/*/remove,
+    │   /api/kb/app/admin/**, /api/kb/admin/**
+    ├── 查询 SysUser 表校验 role=admin
+    ├── 非 admin → 返回 403
+    └── 放行
     ↓
 Controller 处理
-    ↓
-AuthInterceptor.afterCompletion()
-    ├── 清除 ThreadLocal（防止内存泄漏）
-    └── 清除 RequestAttribute
 ```
+
+**AuthInterceptor** 仅校验 JWT 并注入用户名，不区分角色；
+**AdminInterceptor** 在 admin 专用路径上单独校验 role=admin。
+普通业务路径的数据权限通过 Service 层查询时按 `created_by` 字段实时过滤实现。|
 
 #### 3.9.3 401 处理机制
 
@@ -1068,9 +1075,45 @@ StatisticsController.getTokenChart()
 
 ---
 
-## 7. 缓存设计
+## 7. 数据隔离设计
 
-### 7.1 Redis Key 设计
+### 7.1 权限模型
+
+| 组件 | 职责 | 实现方式 |
+|------|------|----------|
+| `AuthInterceptor` | 认证 | JWT Token 校验，注入 `@RequestAttribute("currentUser")` |
+| `AdminInterceptor` | 授权 | 查询 SysUser 表校验 `role=admin`，仅作用于 admin 专属路径 |
+| Service 层 | 数据隔离 | 查询时追加 `created_by = currentUser OR created_by IS NULL` 条件 |
+
+### 7.2 数据隔离规则
+
+- **通用规则**：`created_by = 当前用户 OR created_by IS NULL`（NULL 表示系统级记录，所有人可见）
+- **统计页**：admin 可通过 `scope=all`（默认）看全部数据，`scope=mine` 看自己的；普通用户始终只看自己的
+- **群聊**：`im_group.created_by` 默认 NULL（公共）。`bindApp()` 设 `created_by = 用户名` 完成认领，`unbindApp()` 恢复 NULL
+- **分类**：`kb_category.create_by` 为 NULL 表示系统分类（如"群聊消息"），所有人可见但不可编辑
+- **应用/知识库**：严格按 `created_by = 当前用户` 过滤，admin 管理端可通过 `/api/kb/app/admin/**` 和 `/api/kb/admin/**` 查看全部
+
+### 7.3 关键实现
+
+```
+StatisticsServiceImpl:
+    isAdmin(username) → 查询 sys_user.role
+    getUserAppIds(username) → 查询 kb_app.created_by
+    getUserGroupIds(username) → 查询 im_group.created_by
+    getUserKbIds(username) → 查询 kb_knowledge_base.created_by
+
+ImConsoleServiceImpl:
+    getAccessibleGroupIds(username) → created_by = username OR created_by IS NULL
+
+KbCategoryServiceImpl:
+    treeList() / pageList() → create_by = username OR create_by IS NULL
+```
+
+---
+
+## 8. 缓存设计
+
+### 8.1 Redis Key 设计
 
 | Key 模式 | 说明 | TTL | 示例 |
 |----------|------|-----|------|
@@ -1082,7 +1125,7 @@ StatisticsController.getTokenChart()
 | `wechat:lock:{messageId}` | 企微消息分布式锁 | 5 分钟 | `wechat:lock:msg123` |
 | `chatbase:upload:progress:{taskId}` | 上传进度 | 1 小时 | `chatbase:upload:progress:task1` |
 
-### 7.2 缓存策略
+### 8.2 缓存策略
 
 - **会话 Token**：UUID 生成，Redis 存储，TTL 7 天，每次请求刷新 TTL
 - **对话会话 ID**：用户首次对话创建，后续复用，TTL 7 天
@@ -1091,23 +1134,23 @@ StatisticsController.getTokenChart()
 
 ---
 
-## 8. 安全设计
+## 9. 安全设计
 
-### 8.1 认证与授权
+### 9.1 认证与授权
 
 - **Token 机制**：UUID Token，Redis 存储，拦截器校验
 - **密码加密**：BCrypt 算法，不可逆
 - **角色权限**：admin/user，AdminInterceptor 校验管理接口
 - **路径排除**：登录、注册、静态资源、企微回调无需认证
 
-### 8.2 数据安全
+### 9.2 数据安全
 
 - **逻辑删除**：is_deleted 标记，不物理删除
 - **唯一索引**：防止重复数据（username, platform+group_id, platform+message_id）
 - **分布式锁**：企微消息处理防重复（Redis 锁，5 分钟 TTL）
 - **频率限制**：QQ 群 @机器人限流（5 秒窗口 1 次）
 
-### 8.3 消息加解密（企业微信）
+### 9.3 消息加解密（企业微信）
 
 - **算法**：AES-256-CBC，PKCS7 填充
 - **签名**：SHA1（msg_signature）
@@ -1116,9 +1159,9 @@ StatisticsController.getTokenChart()
 
 ---
 
-## 9. 异常处理
+## 10. 异常处理
 
-### 9.1 异常类型
+### 10.1 异常类型
 
 | 异常类 | 说明 | 处理方式 |
 |--------|------|----------|
@@ -1126,7 +1169,7 @@ StatisticsController.getTokenChart()
 | `RateLimitException` | 频率限制异常 | 返回 429 提示 |
 | `AesException` | AES 加解密异常 | 记录日志，返回错误 |
 
-### 9.2 统一响应格式
+### 10.2 统一响应格式
 
 ```json
 {
@@ -1148,15 +1191,15 @@ StatisticsController.getTokenChart()
 
 ---
 
-## 10. 前端架构
+## 11. 前端架构
 
-### 10.1 目录结构
+### 11.1 目录结构
 
 ```
 web/
 ├── src/
 │   ├── main.ts                    # 入口文件
-│   ├── pages/                     # 页面组件（11 个）
+│   ├── pages/                     # 页面组件（14 个）
 │   ├── components/                # 公共组件（7 个）
 │   ├── api/                       # API 接口（16 个）
 │   ├── types/                     # 类型定义
@@ -1169,29 +1212,32 @@ web/
 └── package.json                   # 依赖配置
 ```
 
-### 10.2 路由设计
+### 11.2 路由设计
 
 | 路径 | 页面 | 说明 | 权限 |
 |------|------|------|------|
 | `/login` | LoginPage | 登录注册 | 公开 |
-| `/console/dashboard` | DashboardPage | 系统概览 | admin |
-| `/console/groups` | ImGroupsPage | 群聊采集管理 | admin |
-| `/console/bots` | BotManagePage | 机器人管理 | admin |
-| `/console/statistics` | StatisticsPage | 数据统计 | admin |
-| `/console/feedback/manage` | FeedbackManagePage | 反馈管理 | admin |
-| `/app` | AppPage | 应用管理 | admin |
-| `/chat` | ChatPage | AI 问答 | 登录 |
-| `/knowledge` | KnowledgePage | 知识库管理 | admin |
-| `/faq` | FaqPage | FAQ 管理 | admin |
-| `/feedback` | FeedbackPage | 用户反馈 | 登录 |
+| `/console/dashboard` | DashboardPage | 系统概览 | 登录 |
+| `/console/statistics` | StatisticsPage | 数据统计 | 登录（admin 可切换 scope） |
+| `/console/im` | ImGroupsPage | 群聊采集管理 | 登录 |
+| `/console/knowledge` | KnowledgePage | 知识库管理 | 登录 |
+| `/console/app` | AppPage | 应用管理 | 登录 |
+| `/console/bots` | BotManagePage | 机器人管理 | 登录 |
+| `/console/faq` | FaqPage | FAQ 管理 | 登录 |
+| `/chat` | ChatPage | AI 问答 | 公开 |
+| `/feedback` | FeedbackPage | 用户反馈 | 公开 |
+| `/console/feedback-manage` | FeedbackManagePage | 反馈管理 | admin |
+| `/console/admin/apps` | AdminAppsPage | 所有应用管理 | admin |
+| `/console/admin/kbs` | AdminKbsPage | 所有知识库管理 | admin |
+| `/console/admin/users` | UserManagePage | 用户管理 | admin |
 
-### 10.3 状态管理
+### 11.3 状态管理
 
 - **认证状态**：localStorage 存储 token、用户信息、角色
 - **API 客户端**：axios 封装，统一拦截器（401 处理、Token 注入）
 - **响应式数据**：Vue 3 Composition API（ref, reactive, computed）
 
-### 10.4 关键组件
+### 11.4 关键组件
 
 | 组件 | 功能 |
 |------|------|
@@ -1205,9 +1251,9 @@ web/
 
 ---
 
-## 11. 部署架构
+## 12. 部署架构
 
-### 11.1 Docker Compose 服务
+### 12.1 Docker Compose 服务
 
 | 服务 | 镜像 | 端口 | 说明 |
 |------|------|------|------|
@@ -1217,7 +1263,7 @@ web/
 | chatbase-frontend | chatbase-frontend:latest | 80 | 前端服务（Nginx） |
 | napcat | mlikiowa/napcat-docker:v4.17.46 | 3000, 6099 | QQ 机器人（可选） |
 
-### 11.2 网络拓扑
+### 12.2 网络拓扑
 
 ```
 ┌─────────────────────────────────────────┐
@@ -1242,7 +1288,7 @@ web/
   外部访问（80 端口）
 ```
 
-### 11.3 Nginx 配置（web/nginx.conf）
+### 12.3 Nginx 配置（web/nginx.conf）
 
 ```nginx
 server {
@@ -1283,9 +1329,9 @@ server {
 
 ---
 
-## 12. 配置说明
+## 13. 配置说明
 
-### 12.1 必填配置
+### 13.1 必填配置
 
 | 配置项 | 环境变量 | 说明 |
 |--------|----------|------|
@@ -1293,7 +1339,7 @@ server {
 | `difyApp.datasetApiKey` | `DIFYAPP_DATASET_API_KEY` | Dify Dataset API Key |
 | `spring.datasource.password` | `MYSQL_PASSWORD` | MySQL 数据库密码 |
 
-### 12.2 可选配置
+### 13.2 可选配置
 
 | 配置项 | 环境变量 | 默认值 | 说明 |
 |--------|----------|--------|------|
@@ -1552,5 +1598,5 @@ server {
 
 ---
 
-*文档版本：v1.0*
-*最后更新：2026-05-07*
+*文档版本：v1.1*
+*最后更新：2026-05-09*

@@ -171,16 +171,29 @@ cd web && npm install && npm run dev
 | 页面 | 路径 | 权限 | 功能 |
 |------|------|------|------|
 | 登录注册 | `/login` | 公开 | 用户认证 |
-| 系统概览 | `/console/dashboard` | admin | 统计卡片、快捷导航 |
-| 群聊采集 | `/console/groups` | admin | 群列表、消息查询、应用绑定 |
-| 机器人管理 | `/console/bots` | admin | 机器人状态、消息统计 |
-| 数据统计 | `/console/statistics` | admin | Token/费用趋势、词云、活跃度 |
-| 反馈管理 | `/console/feedback/manage` | admin | 反馈处理、回复 |
-| 应用管理 | `/app` | admin | Dify 应用配置、API Key 验证 |
-| AI 问答 | `/chat` | 登录 | 多会话对话、文件附件、引用来源 |
-| 知识库 | `/knowledge` | admin | 分类、知识库、文档、FAQ |
-| FAQ 管理 | `/faq` | admin | 手动维护、自动提取 |
-| 用户反馈 | `/feedback` | 登录 | 提交反馈、查看历史 |
+| 系统概览 | `/console/dashboard` | 登录 | 统计卡片、快捷导航 |
+| 数据统计 | `/console/statistics` | 登录 | Token/费用趋势、词云、活跃度（admin 可切换全部/个人） |
+| 群聊采集 | `/console/im` | 登录 | 群列表、消息查询、应用绑定 |
+| 知识库管理 | `/console/knowledge` | 登录 | 分类、知识库、文档、FAQ |
+| 应用管理 | `/console/app` | 登录 | Dify 应用配置、API Key 验证 |
+| 机器人管理 | `/console/bots` | 登录 | 机器人状态、消息统计 |
+| FAQ 管理 | `/console/faq` | 登录 | 手动维护、自动提取 |
+| AI 问答 | `/chat` | 公开 | 多会话对话、文件附件、引用来源 |
+| 用户反馈 | `/feedback` | 公开 | 提交反馈、查看历史 |
+| 反馈管理 | `/console/feedback-manage` | admin | 反馈处理、回复 |
+| 应用管理(全部) | `/console/admin/apps` | admin | 所有应用管理 |
+| 知识库管理(全部) | `/console/admin/kbs` | admin | 所有知识库管理 |
+| 用户管理 | `/console/admin/users` | admin | 用户增删改查 |
+
+### 数据隔离与权限
+
+- **用户角色**：`admin` / `user`，通过 AuthInterceptor + AdminInterceptor 控制
+- **数据隔离规则**：`created_by = 当前用户 OR created_by IS NULL`（系统级记录所有人可见）
+- **统计页**：admin 可通过 `scope=all`（默认）看全部数据，`scope=mine` 看自己的；普通用户始终只看自己的
+- **群聊可见性**：`created_by IS NULL`（未分配/公共）或 `created_by = 当前用户`（已认领）
+- **分类可见性**：`create_by = 当前用户` 或 `create_by IS NULL`（系统默认分类）
+- **应用/知识库**：按 `created_by = 当前用户` 过滤
+- **pom.xml** 必须配置 `<parameters>true</parameters>` 在 `maven-compiler-plugin` 中，否则 `@RequestParam`/`@RequestAttribute` 运行时报 `Name not specified` 异常
 
 ## QQ 机器人配置
 
@@ -399,4 +412,10 @@ MIT License
 
 ---
 
-*最后更新：2026-05-07*
+## 重要注意事项
+
+- **pom.xml 编译参数**：`maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 运行时报 `Name not specified` 异常。
+- **数据隔离**：所有业务数据通过 `created_by` 字段按用户维度过滤。普通用户仅看自己的数据，admin 可在统计页切换 scope=all/mine。
+- **前端路由**：admin 菜单项（反馈管理、应用管理、知识库管理、用户管理）在登录后自动显示，基于 `localStorage.getItem('chatbase_role')`。
+
+*最后更新：2026-05-09*
