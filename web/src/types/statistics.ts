@@ -72,4 +72,6 @@ export type BotStatus = {
   qqSelfId?: string
   wecomEnabled: boolean
   wecomCallbackPath?: string
+  wxEnabled: boolean
+  wxNickname?: string
 }

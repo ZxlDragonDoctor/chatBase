@@ -4,7 +4,7 @@
       <div class="anime-card-header">
         <div>
           <div class="anime-card-title">✿ 机器人管理 ✿</div>
-          <div class="anime-card-desc">QQ 机器人 · 企业微信机器人 · 运行状态监控</div>
+          <div class="anime-card-desc">QQ 机器人 · 企业微信机器人 · 微信个人号 · 运行状态监控</div>
         </div>
         <div class="anime-card-actions">
           <button class="anime-btn ghost" @click="loadBots">
@@ -50,7 +50,8 @@
                 <div class="bot-identity">
                   <div class="bot-icon" :class="bot.platform">
                     <span v-if="bot.platform === 'qq'">🐧</span>
-                    <span v-else>🏢</span>
+                    <span v-else-if="bot.platform === 'wecom'">🏢</span>
+                    <span v-else>💬</span>
                   </div>
                   <div class="bot-info">
                     <div class="bot-name-row">
@@ -60,11 +61,14 @@
                         {{ bot.online ? '在线' : '离线' }}
                       </span>
                     </div>
-                    <div class="bot-detail" v-if="bot.botId">
+                    <div class="bot-detail" v-if="bot.platform === 'qq' && bot.botId">
                       QQ: {{ bot.botId }}
                     </div>
-                    <div class="bot-detail" v-else>
+                    <div class="bot-detail" v-else-if="bot.platform === 'wecom'">
                       企业微信回调模式
+                    </div>
+                    <div class="bot-detail" v-else-if="bot.platform === 'wx'">
+                      微信个人号 · ilink 协议
                     </div>
                   </div>
                 </div>

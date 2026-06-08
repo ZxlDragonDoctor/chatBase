@@ -33,6 +33,8 @@ public class ImConsoleServiceImpl implements ImConsoleService {
     private final ImGroupMapper imGroupMapper;
     private final QqBotProperties qqBotProperties;
     private final KbAppMapper appMapper;
+    private final com.zxl.chatbase.wx.config.WxProperties wxProperties;
+    private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     private List<Long> getUserAppIds(String userId) {
         if (userId == null) return List.of();
@@ -210,6 +212,15 @@ public class ImConsoleServiceImpl implements ImConsoleService {
         we.setCallbackPath("/intellrobot/callback/handle");
         we.setNote("企业微信智能机器人回调；需在企微后台配置可公网访问的 URL，并与此路径一致。");
         vo.setWecom(we);
+
+        BotStatusVO.WxBotVO wx = new BotStatusVO.WxBotVO();
+        wx.setEnabled(wxProperties.isEnable());
+        wx.setTokenConfigured(org.springframework.util.StringUtils.hasText(wxProperties.getBotToken()));
+        wx.setOnline("1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online")));
+        wx.setNickname(wxProperties.getNickname());
+        wx.setBaseUrlPreview(shortenUrl(wxProperties.getBaseUrl()));
+        vo.setWx(wx);
+
         return vo;
     }
 

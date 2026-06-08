@@ -89,6 +89,12 @@ services:
       WECHAT_CORP_BOT_ID: ${WECHAT_CORP_BOT_ID}
       WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
 
+      WX_BOT_ENABLE: ${WX_BOT_ENABLE:-false}
+      WX_BOT_TOKEN: ${WX_BOT_TOKEN}
+      WX_BOT_BASE_URL: ${WX_BOT_BASE_URL}
+      WX_BOT_BOT_ID: ${WX_BOT_BOT_ID}
+      WX_BOT_NICKNAME: ${WX_BOT_NICKNAME:-微信机器人}
+
       JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx2048m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
     volumes:
       - qq_files:/data/qq_files/

@@ -52,9 +52,17 @@ wechat:
   corp:
     stoken: ${WECHAT_CORP_STOKEN:}
     sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY:}
-    botName: ${WECHAT_CORP_BOT_NAME:企业内部机器人}
+    botName: ${WECHAT_CORP_BOT_NAME:企业内部服务机器人}
 #    botId: ${WECHAT_CORP_BOT_ID:}
 #    secret: ${WECHAT_CORP_SECRET:}
+
+wx:
+  bot:
+    enable: ${WX_BOT_ENABLE:false}
+    bot-token: ${WX_BOT_TOKEN:}
+    base-url: ${WX_BOT_BASE_URL:}
+    bot-id: ${WX_BOT_BOT_ID:}
+    nickname: ${WX_BOT_NICKNAME:微信机器人}
 
 chat:
   max-turns-per-session: 20

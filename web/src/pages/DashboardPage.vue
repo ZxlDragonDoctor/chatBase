@@ -85,6 +85,13 @@
                   {{ overview?.bots?.wecomEnabled ? '运行中' : '未启用' }}
                 </span>
               </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="anime-badge purple">微信</span>
+                <span style="color: var(--anime-text-primary);">{{ overview?.bots?.wxNickname || '个人号' }}</span>
+                <span class="anime-badge" :class="overview?.bots?.wxEnabled ? 'green' : 'muted'">
+                  {{ overview?.bots?.wxEnabled ? '运行中' : '未启用' }}
+                </span>
+              </div>
             </div>
           </div>
 

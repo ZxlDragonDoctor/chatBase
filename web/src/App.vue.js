@@ -141,6 +141,38 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.
     ...{ class: "anime-star" },
     ...{ style: {} },
 });
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-star" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-star" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "anime-sakura" },
+    ...{ style: {} },
+});
 if (__VLS_ctx.isLoginPage) {
     const __VLS_0 = {}.RouterView;
     /** @type {[typeof __VLS_components.RouterView, ]} */ ;
@@ -667,6 +699,14 @@ else {
 /** @type {__VLS_StyleScopedClasses['anime-star']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-star']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-star']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-star']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-star']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
+/** @type {__VLS_StyleScopedClasses['anime-sakura']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-app']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav']} */ ;
 /** @type {__VLS_StyleScopedClasses['anime-nav-brand']} */ ;

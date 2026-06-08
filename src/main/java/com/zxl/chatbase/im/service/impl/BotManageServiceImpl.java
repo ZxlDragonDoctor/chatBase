@@ -32,6 +32,7 @@ public class BotManageServiceImpl implements BotManageService {
     private final ImGroupMapper imGroupMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final RestTemplate restTemplate;
+    private final com.zxl.chatbase.wx.config.WxProperties wxProperties;
 
     @Override
     public List<BotInfoVO> listBots(String userId) {
@@ -44,6 +45,7 @@ public class BotManageServiceImpl implements BotManageService {
         List<BotInfoVO> bots = new ArrayList<>();
         bots.add(buildQqBot(userGroupIds));
         bots.add(buildWeComBot(userGroupIds));
+        bots.add(buildWxBot(userGroupIds));
         return bots;
     }
 
@@ -70,6 +72,20 @@ public class BotManageServiceImpl implements BotManageService {
                 .todayMessages(groupIds.isEmpty() ? 0 : botManageMapper.countTodayMessages("wecom", groupIds))
                 .totalMessages(groupIds.isEmpty() ? 0 : botManageMapper.countTotalMessages("wecom", groupIds))
                 .lastActiveTime(groupIds.isEmpty() ? null : botManageMapper.getLastActiveTime("wecom", groupIds))
+                .build();
+    }
+
+    private BotInfoVO buildWxBot(List<String> groupIds) {
+        boolean online = "1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online"));
+        return BotInfoVO.builder()
+                .platform("wx")
+                .name(wxProperties.getNickname())
+                .botId(wxProperties.getBotId())
+                .online(online)
+                .groupCount(groupIds.isEmpty() ? 0 : botManageMapper.countGroups("wx", groupIds))
+                .todayMessages(groupIds.isEmpty() ? 0 : botManageMapper.countTodayMessages("wx", groupIds))
+                .totalMessages(groupIds.isEmpty() ? 0 : botManageMapper.countTotalMessages("wx", groupIds))
+                .lastActiveTime(groupIds.isEmpty() ? null : botManageMapper.getLastActiveTime("wx", groupIds))
                 .build();
     }
 

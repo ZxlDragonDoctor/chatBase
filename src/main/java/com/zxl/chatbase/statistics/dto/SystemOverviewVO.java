@@ -23,5 +23,7 @@ public class SystemOverviewVO {
         private String qqSelfId;
         private Boolean wecomEnabled;
         private String wecomCallbackPath;
+        private Boolean wxEnabled;
+        private String wxNickname;
     }
 }

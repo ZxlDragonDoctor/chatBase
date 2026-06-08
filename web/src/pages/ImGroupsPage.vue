@@ -5,7 +5,7 @@
         <div>
           <div class="anime-card-title">群聊采集</div>
           <div class="anime-card-desc">
-            QQ群/企微群消息采集记录 · 应用绑定
+            QQ群/企微群/微信群消息采集记录 · 应用绑定
           </div>
         </div>
         <div class="anime-card-actions">
@@ -157,7 +157,7 @@ const filteredGroups = computed(() => {
   })
 })
 
-const platformTabs = [{ key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }]
+const platformTabs = [{ key: 'qq', label: 'QQ 群' }, { key: 'wecom', label: '企微群' }, { key: 'wx', label: '微信群' }]
 const platform = ref<string | null>(null)
 const scope = ref('all')
 const groupSearch = ref('')
@@ -264,12 +264,13 @@ function togglePlatform(key: string) {
   platform.value = platform.value === key ? null : key
 }
 
-function getPlatformColor(p: string): string { if (p === 'qq') return 'green'; if (p === 'wecom') return 'blue'; return 'purple' }
-function getPlatformLabel(p: string): string { if (p === 'qq') return 'QQ群'; if (p === 'wecom') return '企微群'; return '群聊' }
+function getPlatformColor(p: string): string { if (p === 'qq') return 'green'; if (p === 'wecom') return 'blue'; if (p === 'wx') return 'purple'; return 'purple' }
+function getPlatformLabel(p: string): string { if (p === 'qq') return 'QQ群'; if (p === 'wecom') return '企微群'; if (p === 'wx') return '微信群'; return '群聊' }
 function getGroupName(g: GroupSummary): string {
   if (g.groupName && g.groupName.trim()) return g.groupName.trim()
   if (g.platform === 'qq') return `QQ群`
   if (g.platform === 'wecom') return `企微群`
+  if (g.platform === 'wx') return `微信群`
   return `群聊`
 }
 function formatTime(t: any): string {

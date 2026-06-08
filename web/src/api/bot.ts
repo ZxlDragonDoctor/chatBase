@@ -1,7 +1,7 @@
 import { api } from './client'
 
 export interface BotInfo {
-  platform: 'qq' | 'wecom'
+  platform: 'qq' | 'wecom' | 'wx'
   name: string
   botId: string | null
   online: boolean

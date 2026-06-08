@@ -20,6 +20,7 @@ import com.zxl.chatbase.kb.mapper.KbStatisticsMapper;
 import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import com.zxl.chatbase.statistics.dto.*;
 import com.zxl.chatbase.statistics.service.StatisticsService;
+import com.zxl.chatbase.wx.config.WxProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final KbAppMapper appMapper;
     private final ImGroupMapper imGroupMapper;
     private final SysUserMapper sysUserMapper;
+    private final WxProperties wxProperties;
 
     private boolean isAdmin(String userId) {
         if (userId == null) return true;
@@ -511,6 +513,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         botStatus.setQqSelfId("configured");
         botStatus.setWecomEnabled(true);
         botStatus.setWecomCallbackPath("/intellrobot/callback/handle");
+        botStatus.setWxEnabled(wxProperties.isEnable() &&
+                org.springframework.util.StringUtils.hasText(wxProperties.getBotToken()));
+        botStatus.setWxNickname(wxProperties.getNickname());
 
         SystemOverviewVO vo = new SystemOverviewVO();
         vo.setTotalMessages(totalMessages);

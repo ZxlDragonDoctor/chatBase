@@ -10,6 +10,13 @@ export type BotStatus = {
     callbackPath: string
     note: string
   }
+  wx: {
+    enabled: boolean
+    tokenConfigured: boolean
+    online: boolean
+    nickname: string
+    baseUrlPreview: string | null
+  }
 }
 
 export type ConsoleOverview = {

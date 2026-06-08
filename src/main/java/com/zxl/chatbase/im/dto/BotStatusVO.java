@@ -22,6 +22,16 @@ public class BotStatusVO {
         private String note;
     }
 
+    @Data
+    public static class WxBotVO {
+        private boolean enabled;
+        private boolean tokenConfigured;
+        private boolean online;
+        private String nickname;
+        private String baseUrlPreview;
+    }
+
     private QqBotVO qq;
     private WeComBotVO wecom;
+    private WxBotVO wx;
 }
