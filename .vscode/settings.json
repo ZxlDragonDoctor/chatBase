@@ -1,0 +1,9 @@
+{
+    "http.proxy": "http://127.0.0.1:10809",// 你的代理端口
+    "cursor.general.disableHttp2": true,
+    "http.proxyAuthorization": null,
+    "http.noProxy": [],
+    "window.commandCenter": true,
+    "http.proxySupport": "override",
+    "cursor.general.disableHttp1SSE": true
+}

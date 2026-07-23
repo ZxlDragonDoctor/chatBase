@@ -1,0 +1,87 @@
+server:
+  port: 8080
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  datasource:
+    url: jdbc:mysql://mysql:3306/chat_base?useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    # 允许为空：为空时 Redis 按空密码校验（取决于 Redis 是否设置 requirepass）
+    password: ${SPRING_REDIS_PASSWORD:}
+
+logging:
+  level:
+    root: WARN
+    com.zxl.chatbase: WARN
+    com.zxl.chatbase.dify: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+difyApp:
+  url: https://api.dify.ai/v1
+  apiKey: ${DIFYAPP_API_KEY}
+  datasetApiKey: ${DIFYAPP_DATASET_API_KEY}
+  timeOut: 90
+
+qq:
+  bot:
+    enable: ${QQ_BOT_ENABLE:false}
+    ws-port: 8081
+    access-token: ${QQ_BOT_ACCESS_TOKEN:}
+    file-save-path: /data/qq_files/
+    self-id: ${QQ_BOT_SELF_ID:0}
+    nickname: ${QQ_BOT_NICKNAME:}
+    http-base-url: ${QQ_BOT_HTTP_BASE_URL:http://napcat:3000}
+
+wechat:
+  corp:
+    stoken: ${WECHAT_CORP_STOKEN:}
+    sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY:}
+    botName: ${WECHAT_CORP_BOT_NAME:企业内部服务机器人}
+#    botId: ${WECHAT_CORP_BOT_ID:}
+#    secret: ${WECHAT_CORP_SECRET:}
+
+wx:
+  bot:
+    enable: ${WX_BOT_ENABLE:false}
+    bot-token: ${WX_BOT_TOKEN:}
+    base-url: ${WX_BOT_BASE_URL:}
+    bot-id: ${WX_BOT_BOT_ID:}
+    nickname: ${WX_BOT_NICKNAME:微信机器人}
+
+chat:
+  max-turns-per-session: 20
+  session-ttl-days: 7
+  rate-limit:
+    window-seconds: 5
+    max-requests: 1
+
+# IM消息同步配置
+im:
+  sync:
+    # 是否启用Redis Stream消息队列方案（推荐启用）
+    # true: 使用Stream方案，消息驱动实时处理
+    # false: 使用定时轮询方案（已过时，不推荐）
+    stream:
+      enabled: true
+    # 定时轮询配置（仅当stream.enabled=false时生效）
+    # 已标记为过时，仅作为降级方案保留
+    polling:
+      enabled: false
+      interval: 60000
+      batch-size: 200

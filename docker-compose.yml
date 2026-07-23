@@ -1,0 +1,141 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chatbase-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: chat_base
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--default-authentication-plugin=mysql_native_password"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chatbase-network
+
+  redis:
+    image: redis:7
+    container_name: chatbase-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: >
+      sh -c '
+      if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        redis-server --appendonly yes;
+      fi
+      '
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chatbase-network
+
+  chatbase-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chatbase-backend:latest
+    container_name: chatbase-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      DIFYAPP_API_KEY: ${DIFYAPP_API_KEY}
+      DIFYAPP_DATASET_API_KEY: ${DIFYAPP_DATASET_API_KEY}
+      QQ_BOT_ENABLE: ${QQ_BOT_ENABLE:-false}
+      QQ_BOT_ACCESS_TOKEN: ${QQ_BOT_ACCESS_TOKEN}
+      QQ_BOT_SELF_ID: ${QQ_BOT_SELF_ID}
+      QQ_BOT_HTTP_BASE_URL: ${QQ_BOT_HTTP_BASE_URL:-http://napcat:3000}
+
+      WECHAT_CORP_STOKEN: ${WECHAT_CORP_STOKEN}
+      WECHAT_CORP_S_ENCODING_AES_KEY: ${WECHAT_CORP_S_ENCODING_AES_KEY}
+      WECHAT_CORP_BOT_ID: ${WECHAT_CORP_BOT_ID}
+      WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
+
+      WX_BOT_ENABLE: ${WX_BOT_ENABLE:-false}
+      WX_BOT_TOKEN: ${WX_BOT_TOKEN}
+      WX_BOT_BASE_URL: ${WX_BOT_BASE_URL}
+      WX_BOT_BOT_ID: ${WX_BOT_BOT_ID}
+      WX_BOT_NICKNAME: ${WX_BOT_NICKNAME:-微信机器人}
+
+      JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx2048m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
+    volumes:
+      - qq_files:/data/qq_files/
+    networks:
+      - chatbase-network
+
+  chatbase-frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: chatbase-frontend:latest
+    container_name: chatbase-frontend
+    restart: unless-stopped
+    depends_on:
+      chatbase-backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    networks:
+      - chatbase-network
+
+  napcat:
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:v4.17.46}
+    container_name: chatbase-napcat
+    restart: unless-stopped
+    profiles:
+      - qq
+    ports:
+      - "3000:3000"
+      - "6099:6099"
+    volumes:
+      - napcat_data:/app/.config/QQ
+    networks:
+      - chatbase-network
+
+networks:
+  chatbase-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  qq_files:
+  napcat_data:

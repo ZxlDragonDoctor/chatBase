@@ -1,0 +1,9 @@
+.git
+.idea
+target
+web/node_modules
+web/dist
+node_modules
+.README.md
+*.log
+*.iml
