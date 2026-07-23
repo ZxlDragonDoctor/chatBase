@@ -1,0 +1,16 @@
+package com.zxl.chatbase.im.service;
+
+import com.zxl.chatbase.im.entity.ImGroup;
+
+public interface ImGroupService {
+
+    ImGroup getOrCreateGroup(String platform, String groupId, String groupName);
+
+    void updateGroupInfo(ImGroup group);
+
+    void bindApp(Long id, Long appId, String appName, String userId);
+
+    void unbindApp(Long id, String userId);
+
+    void assignGroup(Long id, String targetUser, String currentUser);
+}
