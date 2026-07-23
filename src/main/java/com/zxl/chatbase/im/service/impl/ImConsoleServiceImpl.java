@@ -1,0 +1,286 @@
+package com.zxl.chatbase.im.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zxl.chatbase.im.dto.BotStatusVO;
+import com.zxl.chatbase.im.dto.ConsoleOverviewVO;
+import com.zxl.chatbase.im.dto.ConversationSummaryVO;
+import com.zxl.chatbase.im.dto.GroupMessageItemVO;
+import com.zxl.chatbase.im.dto.GroupMessagePageVO;
+import com.zxl.chatbase.im.dto.GroupSummaryVO;
+import com.zxl.chatbase.im.entity.GroupMessage;
+import com.zxl.chatbase.im.entity.ImGroup;
+import com.zxl.chatbase.im.mapper.GroupMessageMapper;
+import com.zxl.chatbase.im.mapper.ImConversationMapper;
+import com.zxl.chatbase.im.mapper.ImGroupMapper;
+import com.zxl.chatbase.im.service.ImConsoleService;
+import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.qq.QqBotProperties;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ImConsoleServiceImpl implements ImConsoleService {
+
+    private final GroupMessageMapper groupMessageMapper;
+    private final ImGroupMapper imGroupMapper;
+    private final ImConversationMapper imConversationMapper;
+    private final QqBotProperties qqBotProperties;
+    private final KbAppMapper appMapper;
+    private final com.zxl.chatbase.wx.config.WxProperties wxProperties;
+    private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
+    private List<Long> getUserAppIds(String userId) {
+        if (userId == null) return List.of();
+        return appMapper.selectList(
+                new LambdaQueryWrapper<KbApp>()
+                        .eq(KbApp::getCreateBy, userId)
+                        .select(KbApp::getId)
+        ).stream().map(KbApp::getId).collect(Collectors.toList());
+    }
+
+    private List<String> getAccessibleGroupIds(String userId) {
+        if (userId == null) return List.of();
+        LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<ImGroup>()
+                .and(w -> w.isNull(ImGroup::getCreatedBy)
+                        .or().eq(ImGroup::getCreatedBy, userId))
+                .select(ImGroup::getGroupId);
+        return imGroupMapper.selectList(wrapper).stream()
+                .map(ImGroup::getGroupId)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public ConsoleOverviewVO overview(String userId) {
+        ConsoleOverviewVO vo = new ConsoleOverviewVO();
+        List<String> userGroupIds = getAccessibleGroupIds(userId);
+
+        if (userGroupIds.isEmpty()) {
+            vo.setTotalMessages(0L);
+            vo.setDistinctGroups(0);
+            vo.setMessageCountByPlatform(new HashMap<>());
+            vo.setGroupCountByPlatform(new HashMap<>());
+        } else {
+            long total = groupMessageMapper.selectCount(
+                    new LambdaQueryWrapper<GroupMessage>()
+                            .in(GroupMessage::getGroupId, userGroupIds)
+                            .and(w -> w.isNull(GroupMessage::getConversationType)
+                                    .or().eq(GroupMessage::getConversationType, "group"))
+            );
+            vo.setTotalMessages(total);
+            List<GroupSummaryVO> summaries = groupMessageMapper.selectGroupSummariesByGroups(userGroupIds);
+            vo.setDistinctGroups(summaries.size());
+            buildPlatformStats(vo, summaries);
+        }
+
+        long totalPrivate = groupMessageMapper.countAllPrivateMessages();
+        vo.setTotalPrivateMessages(totalPrivate);
+        List<String> privateConvIds = groupMessageMapper.selectDistinctPrivateConversations();
+        vo.setDistinctPrivateConversations(privateConvIds.size());
+
+        vo.setBots(buildBots());
+        return vo;
+    }
+
+    private void buildPlatformStats(ConsoleOverviewVO vo, List<GroupSummaryVO> summaries) {
+        Map<String, Long> msgByPlat = new HashMap<>();
+        Map<String, Integer> grpByPlat = new HashMap<>();
+        for (GroupSummaryVO s : summaries) {
+            String p = s.getPlatform() == null ? "unknown" : s.getPlatform();
+            long cnt = s.getMessageCount() == null ? 0L : s.getMessageCount();
+            msgByPlat.merge(p, cnt, Long::sum);
+            grpByPlat.merge(p, 1, Integer::sum);
+        }
+        vo.setMessageCountByPlatform(msgByPlat);
+        vo.setGroupCountByPlatform(grpByPlat);
+    }
+
+    @Override
+    public List<GroupSummaryVO> listGroups(String platform, String userId, String scope) {
+        List<String> accessibleIds = getAccessibleGroupIds(userId);
+        if (accessibleIds.isEmpty()) return List.of();
+
+        List<String> filteredGroupIds = accessibleIds;
+        if ("unassigned".equals(scope)) {
+            filteredGroupIds = imGroupMapper.selectList(
+                    new LambdaQueryWrapper<ImGroup>()
+                            .in(ImGroup::getGroupId, accessibleIds)
+                            .isNull(ImGroup::getCreatedBy)
+                            .select(ImGroup::getGroupId)
+            ).stream().map(ImGroup::getGroupId).collect(Collectors.toList());
+        } else if ("bound".equals(scope)) {
+            List<Long> appIds = getUserAppIds(userId);
+            LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<ImGroup>()
+                    .in(ImGroup::getGroupId, accessibleIds)
+                    .and(w -> {
+                        w.eq(ImGroup::getCreatedBy, userId);
+                        if (!appIds.isEmpty()) {
+                            w.or().in(ImGroup::getAppId, appIds);
+                        }
+                    })
+                    .select(ImGroup::getGroupId);
+            filteredGroupIds = imGroupMapper.selectList(wrapper).stream()
+                    .map(ImGroup::getGroupId).collect(Collectors.toList());
+        }
+
+        if (filteredGroupIds.isEmpty()) return List.of();
+
+        List<GroupSummaryVO> all = groupMessageMapper.selectGroupSummariesByGroups(filteredGroupIds);
+        if (!StringUtils.hasText(platform) || "all".equalsIgnoreCase(platform)) {
+            return all;
+        }
+        return all.stream().filter(s -> platformMatches(s.getPlatform(), platform)).collect(Collectors.toList());
+    }
+
+    @Override
+    public GroupMessagePageVO pageMessages(String platform, String groupId, int page, int size, String keyword, String userId) {
+        List<String> accessibleIds = getAccessibleGroupIds(userId);
+
+        if (!StringUtils.hasText(groupId)) {
+            return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
+        }
+
+        if (!accessibleIds.contains(groupId)) {
+            return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
+        }
+
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 200) size = 200;
+
+        Page<GroupMessage> mp = new Page<>(page + 1L, size);
+        LambdaQueryWrapper<GroupMessage> w = new LambdaQueryWrapper<GroupMessage>()
+                .eq(GroupMessage::getGroupId, groupId);
+        if (StringUtils.hasText(platform) && !"all".equalsIgnoreCase(platform)) {
+            if ("wecom".equalsIgnoreCase(platform) || "wx".equalsIgnoreCase(platform)) {
+                w.eq(GroupMessage::getPlatform, "wecom");
+            } else {
+                w.eq(GroupMessage::getPlatform, platform);
+            }
+        }
+        if (StringUtils.hasText(keyword)) {
+            w.and(wrapper -> wrapper
+                    .like(GroupMessage::getRawMessage, keyword)
+                    .or()
+                    .like(GroupMessage::getUserId, keyword)
+            );
+        }
+        w.orderByDesc(GroupMessage::getMessageTime);
+
+        IPage<GroupMessage> result = groupMessageMapper.selectPage(mp, w);
+        List<GroupMessageItemVO> items = result.getRecords().stream()
+                .map(this::toItem)
+                .collect(Collectors.toList());
+        return new GroupMessagePageVO(items, result.getTotal(), page, size);
+    }
+
+    @Override
+    public List<ConversationSummaryVO> listConversations(String userId) {
+        return imConversationMapper.selectAccessibleConversations(userId);
+    }
+
+    @Override
+    public GroupMessagePageVO pagePrivateMessages(String conversationId, int page, int size, String keyword, String userId) {
+        if (!StringUtils.hasText(conversationId)) {
+            return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
+        }
+
+        if (page < 0) page = 0;
+        if (size < 1) size = 20;
+        if (size > 200) size = 200;
+
+        Page<GroupMessage> mp = new Page<>(page + 1L, size);
+        LambdaQueryWrapper<GroupMessage> w = new LambdaQueryWrapper<GroupMessage>()
+                .eq(GroupMessage::getConversationType, "single")
+                .eq(GroupMessage::getConversationId, conversationId);
+
+        if (StringUtils.hasText(keyword)) {
+            w.and(wrapper -> wrapper
+                    .like(GroupMessage::getRawMessage, keyword)
+                    .or()
+                    .like(GroupMessage::getUserId, keyword)
+            );
+        }
+        w.orderByDesc(GroupMessage::getMessageTime);
+
+        IPage<GroupMessage> result = groupMessageMapper.selectPage(mp, w);
+        List<GroupMessageItemVO> items = result.getRecords().stream()
+                .map(this::toItem)
+                .collect(Collectors.toList());
+        return new GroupMessagePageVO(items, result.getTotal(), page, size);
+    }
+
+    private static boolean platformMatches(String actual, String filter) {
+        if (!StringUtils.hasText(filter) || "all".equalsIgnoreCase(filter)) {
+            return true;
+        }
+        String a = actual == null ? "" : actual;
+        if (filter.equalsIgnoreCase(a)) {
+            return true;
+        }
+        return ("wecom".equalsIgnoreCase(filter) || "wx".equalsIgnoreCase(filter)) && "wecom".equalsIgnoreCase(a);
+    }
+
+    private GroupMessageItemVO toItem(GroupMessage m) {
+        GroupMessageItemVO v = new GroupMessageItemVO();
+        v.setId(m.getId());
+        v.setPlatform(m.getPlatform());
+        v.setConversationType(m.getConversationType());
+        v.setGroupId(m.getGroupId());
+        v.setConversationId(m.getConversationId());
+        v.setUserId(m.getUserId());
+        v.setMessageType(m.getMessageType());
+        v.setRawMessage(m.getRawMessage());
+        v.setMessageTime(m.getMessageTime());
+        v.setSynced(m.getSynced());
+        return v;
+    }
+
+    private BotStatusVO buildBots() {
+        BotStatusVO vo = new BotStatusVO();
+        BotStatusVO.QqBotVO qq = new BotStatusVO.QqBotVO();
+        qq.setEnabled(qqBotProperties.isEnable());
+        qq.setSelfId(qqBotProperties.getSelfId());
+        qq.setWsPort(qqBotProperties.getWsPort());
+        String http = qqBotProperties.getHttpBaseUrl();
+        qq.setHttpConfigured(StringUtils.hasText(http));
+        qq.setHttpBaseUrlPreview(shortenUrl(http));
+        vo.setQq(qq);
+
+        BotStatusVO.WeComBotVO we = new BotStatusVO.WeComBotVO();
+        we.setCallbackPath("/intellrobot/callback/handle");
+        we.setNote("企业微信智能机器人回调；需在企微后台配置可公网访问的 URL，并与此路径一致。");
+        vo.setWecom(we);
+
+        BotStatusVO.WxBotVO wx = new BotStatusVO.WxBotVO();
+        wx.setEnabled(wxProperties.isEnable());
+        wx.setTokenConfigured(org.springframework.util.StringUtils.hasText(wxProperties.getBotToken()));
+        wx.setOnline("1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online")));
+        wx.setNickname(wxProperties.getNickname());
+        wx.setBaseUrlPreview(shortenUrl(wxProperties.getBaseUrl()));
+        vo.setWx(wx);
+
+        return vo;
+    }
+
+    private static String shortenUrl(String url) {
+        if (!StringUtils.hasText(url)) {
+            return null;
+        }
+        String t = url.trim();
+        if (t.length() <= 64) {
+            return t;
+        }
+        return t.substring(0, 32) + "…" + t.substring(t.length() - 24);
+    }
+}
