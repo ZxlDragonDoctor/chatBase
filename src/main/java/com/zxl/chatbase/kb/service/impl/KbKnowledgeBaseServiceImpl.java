@@ -1,0 +1,306 @@
+package com.zxl.chatbase.kb.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.zxl.chatbase.dify.model.response.DifyDatasetResponse;
+import com.zxl.chatbase.dify.model.response.DifyDocumentResponse;
+import com.zxl.chatbase.dify.server.DifyService;
+import com.zxl.chatbase.kb.entity.KbDocument;
+import com.zxl.chatbase.kb.entity.KbKnowledgeBase;
+import com.zxl.chatbase.kb.mapper.KbDocumentMapper;
+import com.zxl.chatbase.kb.mapper.KbKnowledgeBaseMapper;
+import com.zxl.chatbase.kb.service.IKbDocumentService;
+import com.zxl.chatbase.kb.service.IKbKnowledgeBaseService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class KbKnowledgeBaseServiceImpl extends ServiceImpl<KbKnowledgeBaseMapper, KbKnowledgeBase> implements IKbKnowledgeBaseService {
+
+    private final IKbDocumentService documentService;
+    private final DifyService difyService;
+
+    @Override
+    public boolean canViewKb(Long kbId, String userId) {
+        KbKnowledgeBase kb = getById(kbId);
+        if (kb == null) return false;
+        return Boolean.TRUE.equals(kb.getIsPublic()) || (userId != null && userId.equals(kb.getCreateBy()));
+    }
+
+    @Override
+    public boolean canModifyKb(Long kbId, String userId) {
+        KbKnowledgeBase kb = getById(kbId);
+        if (kb == null) return false;
+        return userId != null && userId.equals(kb.getCreateBy());
+    }
+
+    @Override
+    public Page<KbKnowledgeBase> pageList(Long categoryId, String name, Integer pageNum, Integer pageSize, String userId) {
+        Page<KbKnowledgeBase> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
+        wrapper.and(w -> w.eq(KbKnowledgeBase::getIsPublic, true)
+                .or().eq(KbKnowledgeBase::getCreateBy, userId));
+        if (categoryId != null) {
+            wrapper.eq(KbKnowledgeBase::getCategoryId, categoryId);
+        }
+        if (StringUtils.hasText(name)) {
+            wrapper.like(KbKnowledgeBase::getName, name);
+        }
+        wrapper.orderByDesc(KbKnowledgeBase::getCreateTime);
+        return page(page, wrapper);
+    }
+
+    @Override
+    public Page<KbKnowledgeBase> pageAllForAdmin(Long categoryId, String name, Integer pageNum, Integer pageSize) {
+        Page<KbKnowledgeBase> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
+        if (categoryId != null) {
+            wrapper.eq(KbKnowledgeBase::getCategoryId, categoryId);
+        }
+        if (StringUtils.hasText(name)) {
+            wrapper.like(KbKnowledgeBase::getName, name);
+        }
+        wrapper.orderByDesc(KbKnowledgeBase::getCreateTime);
+        return page(page, wrapper);
+    }
+
+    @Override
+    @Transactional
+    public boolean createKnowledgeBase(KbKnowledgeBase knowledgeBase, String userId) {
+        String difyDatasetId = difyService.createDataset(
+                knowledgeBase.getName(),
+                knowledgeBase.getDescription()
+        );
+
+        if (difyDatasetId == null) {
+            log.warn("Dify知识库创建失败，仅保存本地记录");
+        }
+
+        knowledgeBase.setDifyDatasetId(difyDatasetId);
+        knowledgeBase.setCreateBy(userId);
+        knowledgeBase.setCreateTime(LocalDateTime.now());
+        knowledgeBase.setUpdateTime(LocalDateTime.now());
+        knowledgeBase.setDocCount(0);
+        knowledgeBase.setChunkCount(0);
+        if (knowledgeBase.getSourceType() == null) {
+            knowledgeBase.setSourceType("manual");
+        }
+        if (knowledgeBase.getStatus() == null) {
+            knowledgeBase.setStatus(true);
+        }
+        if (knowledgeBase.getIsPublic() == null) {
+            knowledgeBase.setIsPublic(true);
+        }
+
+        boolean saved = save(knowledgeBase);
+        if (saved && difyDatasetId != null) {
+            log.info("知识库创建成功，本地ID={}, Dify Dataset ID={}", knowledgeBase.getId(), difyDatasetId);
+        }
+        return saved;
+    }
+
+    @Override
+    public boolean updateKnowledgeBase(KbKnowledgeBase knowledgeBase, String userId) {
+        if (!canModifyKb(knowledgeBase.getId(), userId)) {
+            throw new RuntimeException("无权修改此知识库");
+        }
+        knowledgeBase.setUpdateTime(LocalDateTime.now());
+        return updateById(knowledgeBase);
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteKnowledgeBase(Long id, String userId) {
+        if (!canModifyKb(id, userId)) {
+            throw new RuntimeException("无权删除此知识库");
+        }
+        KbKnowledgeBase kb = getById(id);
+        if (kb == null) {
+            log.warn("知识库不存在: id={}", id);
+            return false;
+        }
+
+        LambdaQueryWrapper<KbDocument> docWrapper = new LambdaQueryWrapper<>();
+        docWrapper.eq(KbDocument::getKnowledgeBaseId, id);
+        List<KbDocument> documents = documentService.list(docWrapper);
+
+        for (KbDocument doc : documents) {
+            if (kb.getDifyDatasetId() != null && doc.getDifyDocumentId() != null) {
+                try {
+                    difyService.deleteDatasetDocument(kb.getDifyDatasetId(), doc.getDifyDocumentId());
+                    log.info("删除Dify文档: datasetId={}, documentId={}", kb.getDifyDatasetId(), doc.getDifyDocumentId());
+                } catch (Exception e) {
+                    log.warn("删除Dify文档失败: documentId={}", doc.getDifyDocumentId(), e);
+                }
+            }
+            documentService.removeById(doc.getId());
+        }
+
+        if (kb.getDifyDatasetId() != null) {
+            try {
+                boolean difyDeleted = difyService.deleteDataset(kb.getDifyDatasetId());
+                if (difyDeleted) {
+                    log.info("删除Dify知识库成功: datasetId={}", kb.getDifyDatasetId());
+                } else {
+                    log.warn("删除Dify知识库失败: datasetId={}", kb.getDifyDatasetId());
+                }
+            } catch (Exception e) {
+                log.warn("删除Dify知识库异常: datasetId={}", kb.getDifyDatasetId(), e);
+            }
+        }
+
+        boolean removed = removeById(id);
+        if (removed) {
+            log.info("知识库删除成功: id={}, name={}", id, kb.getName());
+        }
+        return removed;
+    }
+
+    @Override
+    @Transactional
+    public boolean syncDocumentsToDify(Long knowledgeBaseId) {
+        KbKnowledgeBase kb = getById(knowledgeBaseId);
+        if (kb == null) {
+            return false;
+        }
+
+        LambdaQueryWrapper<KbDocument> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(KbDocument::getKnowledgeBaseId, knowledgeBaseId);
+        wrapper.eq(KbDocument::getSyncStatus, false);
+        var documents = documentService.list(wrapper);
+
+        int successCount = 0;
+        for (KbDocument doc : documents) {
+            if (documentService.syncToDify(doc.getId())) {
+                successCount++;
+            }
+        }
+
+        LambdaUpdateWrapper<KbKnowledgeBase> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(KbKnowledgeBase::getId, knowledgeBaseId)
+                .set(KbKnowledgeBase::getDocCount, documents.size())
+                .set(KbKnowledgeBase::getUpdateTime, LocalDateTime.now());
+        update(updateWrapper);
+
+        return successCount > 0;
+    }
+
+    @Override
+    public List<DifyDatasetResponse> listDifyDatasets() {
+        return difyService.listDatasets();
+    }
+
+    @Override
+    @Transactional
+    public int syncFromDify() {
+        List<DifyDatasetResponse> difyDatasets = difyService.listDatasets();
+        if (difyDatasets.isEmpty()) {
+            log.info("Dify中没有知识库数据");
+            return 0;
+        }
+
+        int syncCount = 0;
+        for (DifyDatasetResponse dataset : difyDatasets) {
+            LambdaQueryWrapper<KbKnowledgeBase> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(KbKnowledgeBase::getDifyDatasetId, dataset.getId())
+                    .last("LIMIT 1");
+            KbKnowledgeBase existing = getOne(wrapper);
+
+            if (existing == null) {
+                KbKnowledgeBase newKb = new KbKnowledgeBase();
+                newKb.setName(dataset.getName());
+                newKb.setDescription(dataset.getDescription());
+                newKb.setDifyDatasetId(dataset.getId());
+                newKb.setSourceType("dify_sync");
+                newKb.setDocCount(dataset.getDocumentCount() != null ? dataset.getDocumentCount() : 0);
+                newKb.setChunkCount(dataset.getWordCount() != null ? dataset.getWordCount() : 0);
+                newKb.setStatus(true);
+                newKb.setIsPublic(true);
+                newKb.setCreateTime(LocalDateTime.now());
+                newKb.setUpdateTime(LocalDateTime.now());
+
+                boolean saved = save(newKb);
+                if (saved) {
+                    syncCount++;
+                    log.info("同步Dify知识库到本地成功: difyId={}, name={}", dataset.getId(), dataset.getName());
+                    syncDocumentsFromDify(newKb.getId());
+                }
+            } else {
+                existing.setDocCount(dataset.getDocumentCount() != null ? dataset.getDocumentCount() : existing.getDocCount());
+                existing.setChunkCount(dataset.getWordCount() != null ? dataset.getWordCount() : existing.getChunkCount());
+                existing.setUpdateTime(LocalDateTime.now());
+                updateById(existing);
+                syncCount++;
+                log.info("更新本地知识库: difyId={}, name={}", dataset.getId(), dataset.getName());
+                syncDocumentsFromDify(existing.getId());
+            }
+        }
+
+        log.info("Dify知识库同步完成，共处理 {} 个", syncCount);
+        return syncCount;
+    }
+
+    @Override
+    @Transactional
+    public int syncDocumentsFromDify(Long knowledgeBaseId) {
+        KbKnowledgeBase kb = getById(knowledgeBaseId);
+        if (kb == null || kb.getDifyDatasetId() == null) {
+            log.warn("知识库不存在或未关联Dify: id={}", knowledgeBaseId);
+            return 0;
+        }
+
+        List<DifyDocumentResponse> difyDocuments = difyService.listDatasetDocuments(kb.getDifyDatasetId());
+        if (difyDocuments.isEmpty()) {
+            log.info("Dify知识库中没有文档: datasetId={}", kb.getDifyDatasetId());
+            return 0;
+        }
+
+        int syncCount = 0;
+        for (DifyDocumentResponse difyDoc : difyDocuments) {
+            LambdaQueryWrapper<KbDocument> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(KbDocument::getDifyDocumentId, difyDoc.getId())
+                    .last("LIMIT 1");
+            KbDocument existing = documentService.getOne(wrapper);
+
+            if (existing == null) {
+                KbDocument newDoc = new KbDocument();
+                newDoc.setKnowledgeBaseId(knowledgeBaseId);
+                newDoc.setTitle(difyDoc.getName());
+                newDoc.setDifyDocumentId(difyDoc.getId());
+                newDoc.setSource("dify_sync");
+                newDoc.setSyncStatus(1);
+                newDoc.setDifyStatus(difyDoc.getIndexingStatus() != null ? difyDoc.getIndexingStatus() : "completed");
+                newDoc.setDifyChunkCount(difyDoc.getWordCount() != null ? difyDoc.getWordCount() : 0);
+                newDoc.setStatus(difyDoc.getEnabled() != null ? difyDoc.getEnabled() : true);
+                newDoc.setCreateTime(LocalDateTime.now());
+                newDoc.setUpdateTime(LocalDateTime.now());
+
+                boolean saved = documentService.save(newDoc);
+                if (saved) {
+                    syncCount++;
+                    log.info("同步Dify文档到本地: docId={}, name={}", difyDoc.getId(), difyDoc.getName());
+                }
+            } else {
+                existing.setDifyChunkCount(difyDoc.getWordCount() != null ? difyDoc.getWordCount() : existing.getDifyChunkCount());
+                existing.setDifyStatus(difyDoc.getIndexingStatus() != null ? difyDoc.getIndexingStatus() : existing.getDifyStatus());
+                existing.setStatus(difyDoc.getEnabled() != null ? difyDoc.getEnabled() : existing.getStatus());
+                existing.setUpdateTime(LocalDateTime.now());
+                documentService.updateById(existing);
+                syncCount++;
+            }
+        }
+
+        log.info("Dify文档同步完成: knowledgeBaseId={}, syncCount={}", knowledgeBaseId, syncCount);
+        return syncCount;
+    }
+}
