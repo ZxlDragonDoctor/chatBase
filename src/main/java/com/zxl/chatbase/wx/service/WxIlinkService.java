@@ -1,0 +1,410 @@
+package com.zxl.chatbase.wx.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zxl.chatbase.chat.service.ChatService;
+import com.zxl.chatbase.dify.model.request.FileInfo;
+import com.zxl.chatbase.dify.model.response.DifyChatResponse;
+import com.zxl.chatbase.dify.server.DifyService;
+import com.zxl.chatbase.im.entity.ImGroup;
+import com.zxl.chatbase.im.mapper.ImGroupMapper;
+import com.zxl.chatbase.im.service.GroupMessageSyncService;
+import com.zxl.chatbase.im.service.ImConversationService;
+import com.zxl.chatbase.im.service.ImGroupService;
+import com.zxl.chatbase.im.service.ImUserService;
+import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.wx.config.WxProperties;
+import com.zxl.chatbase.wx.model.WxInboundMessage;
+import com.zxl.chatbase.wx.model.WxMediaInfo;
+import com.zxl.chatbase.wx.model.WxOutboundMessage;
+import com.zxl.chatbase.wx.util.WxCryptoUtil;
+import com.zxl.chatbase.wx.util.WxIlinkUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class WxIlinkService {
+
+    private final WxProperties wxProperties;
+    private final WxIlinkUtil wxIlinkUtil;
+    private final ObjectMapper objectMapper;
+    private final GroupMessageSyncService groupMessageSyncService;
+    private final ImGroupService imGroupService;
+    private final ImUserService imUserService;
+    private final ChatService chatService;
+    private final DifyService difyService;
+    private final ImGroupMapper imGroupMapper;
+    private final KbAppMapper kbAppMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final RestTemplate restTemplate;
+    private final ImConversationService imConversationService;
+
+    private static final String REDIS_UPDATES_BUF_KEY = "bot:wx:get_updates_buf";
+    private static final String REDIS_ONLINE_KEY = "bot:wx:online";
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void startPolling() {
+        if (!wxProperties.isEnable()) {
+            log.info("微信 ilink 机器人未启用，跳过启动");
+            return;
+        }
+        if (!StringUtils.hasText(wxProperties.getBotToken())) {
+            log.warn("微信 ilink 机器人未配置 bot-token，跳过启动");
+            return;
+        }
+        if (!StringUtils.hasText(wxProperties.getBaseUrl())) {
+            log.warn("微信 ilink 机器人未配置 base-url，跳过启动");
+            return;
+        }
+
+        log.info("微信 ilink 机器人启动，baseUrl={}, nickname={}", wxProperties.getBaseUrl(), wxProperties.getNickname());
+        Thread thread = new Thread(this::pollingLoop, "wx-ilink-poll");
+        thread.setDaemon(false);
+        thread.start();
+    }
+
+    private void pollingLoop() {
+        String getUpdatesBuf = loadGetUpdatesBuf();
+        int consecutiveErrors = 0;
+
+        while (true) {
+            try {
+                List<WxInboundMessage> messages = wxIlinkUtil.getUpdates(
+                        wxProperties.getBaseUrl(), wxProperties.getBotToken(), getUpdatesBuf);
+
+                if (messages == null) {
+                    consecutiveErrors++;
+                    if (consecutiveErrors >= 3) {
+                        log.warn("微信 ilink 连续 {} 次轮询失败，{}s 后重试",
+                                consecutiveErrors, wxProperties.getReconnectDelaySec());
+                    }
+                    sleep(wxProperties.getReconnectDelaySec() * 1000L);
+                    continue;
+                }
+                consecutiveErrors = 0;
+
+                markOnline();
+
+                for (WxInboundMessage msg : messages) {
+                    try {
+                        processMessage(msg);
+                    } catch (Exception e) {
+                        log.error("处理微信消息失败: msgId={}", msg.getMsgId(), e);
+                    }
+                }
+
+                if (messages.isEmpty()) {
+                    String newBuf = wxIlinkUtil.getUpdatesBuf(
+                            wxProperties.getBaseUrl(), wxProperties.getBotToken(), getUpdatesBuf);
+                    if (newBuf != null && !newBuf.equals(getUpdatesBuf)) {
+                        getUpdatesBuf = newBuf;
+                        saveGetUpdatesBuf(getUpdatesBuf);
+                    }
+                }
+
+                sleep(1000);
+            } catch (Exception e) {
+                log.error("微信 ilink 轮询异常", e);
+                sleep(wxProperties.getReconnectDelaySec() * 1000L);
+            }
+        }
+    }
+
+    private void processMessage(WxInboundMessage msg) {
+
+        Integer messageType = msg.getMessageType();
+        if (messageType == null || messageType != 1) {
+            log.debug("跳过非用户消息: messageType={}", messageType);
+            return;
+        }
+
+        String fromUser = msg.getFromUserId();
+        String fromGroup = msg.getFromGroupId();
+        if (!StringUtils.hasText(fromUser)) {
+            log.warn("消息缺少 from_user_id，跳过");
+            return;
+        }
+
+        String textContent = msg.getTextContent();
+        String msgType = msg.getContentType();
+        String rawMessage = textContent;
+        String fileUrl = null;
+        String fileName = null;
+        List<FileInfo> fileInfos = new ArrayList<>();
+
+        boolean isGroup = msg.isGroupChat();
+        boolean isPrivate = msg.isPrivateChat();
+
+        String conversationId = null;
+        if (isPrivate) {
+            conversationId = "single:wx:" + fromUser;
+        }
+
+        if (isGroup && !StringUtils.hasText(fromGroup)) {
+            fromGroup = fromUser;
+        }
+
+        String effectiveGroupId = isGroup ? fromGroup : fromUser;
+        String displayGroupId = isGroup ? fromGroup : conversationId;
+
+        // 媒体文件处理：图片/文件
+        if (msg.isImage() || msg.isFile()) {
+            try {
+                WxInboundMessage.MediaItem media = msg.getFirstMedia();
+                if (media != null) {
+                    WxMediaInfo mediaInfo = null;
+                    if (StringUtils.hasText(media.getCdnUrl())) {
+                        WxMediaInfo info = new WxMediaInfo();
+                        info.setCdnUrl(media.getCdnUrl());
+                        info.setAesKey(media.getAesKey());
+                        info.setFileName(media.getFileName());
+                        info.setFileSize(media.getFileSize());
+                        mediaInfo = info;
+                    } else if (StringUtils.hasText(media.getMediaKey())) {
+                        mediaInfo = wxIlinkUtil.getUploadUrl(
+                                wxProperties.getBaseUrl(), wxProperties.getBotToken(),
+                                msg.getMsgId(), media.getMediaKey());
+                    }
+
+                    if (mediaInfo != null && StringUtils.hasText(mediaInfo.getCdnUrl())) {
+                        byte[] encryptedData = wxIlinkUtil.downloadFromCdn(mediaInfo.getCdnUrl());
+                        if (encryptedData != null) {
+                            byte[] decryptedData;
+                            if (StringUtils.hasText(mediaInfo.getAesKey())) {
+                                decryptedData = WxCryptoUtil.decryptMedia(encryptedData, mediaInfo.getAesKey());
+                            } else {
+                                decryptedData = encryptedData;
+                            }
+
+                            String mediaFileName = StringUtils.hasText(mediaInfo.getFileName())
+                                    ? mediaInfo.getFileName()
+                                    : (msg.isImage() ? "image_" + System.currentTimeMillis() + ".jpg" : "file_" + System.currentTimeMillis());
+
+                            java.io.File tempFile = java.io.File.createTempFile("wx_media_", "_" + mediaFileName);
+                            tempFile.deleteOnExit();
+                            java.nio.file.Files.write(tempFile.toPath(), decryptedData);
+
+                            org.springframework.web.multipart.MultipartFile multipartFile =
+                                    new ByteArrayMultipartFile("file", mediaFileName, decryptedData);
+
+                            var difyFile = difyService.uploadFile(multipartFile);
+                            if (difyFile != null && difyFile.getId() != null) {
+                                String difyFileId = difyFile.getId().toString();
+                                FileInfo fi = new FileInfo();
+                                fi.setType("image");
+                                fi.setTransferMethod("local_file");
+                                fi.setUploadFileId(difyFileId);
+                                fileInfos.add(fi);
+
+                                fileUrl = "dify://" + difyFileId;
+                                fileName = mediaFileName;
+                            }
+
+                            tempFile.delete();
+                        }
+                    }
+
+                    if (!StringUtils.hasText(textContent)) {
+                        rawMessage = msg.isImage() ? "[图片消息]" : "[文件消息]";
+                    }
+                }
+            } catch (Exception e) {
+                log.error("媒体文件处理失败: msgId={}", msg.getMsgId(), e);
+                if (!StringUtils.hasText(textContent)) {
+                    rawMessage = msg.isImage() ? "[图片消息]" : "[文件消息]";
+                }
+            }
+        }
+
+        if (!StringUtils.hasText(rawMessage)) {
+            log.debug("跳过空消息: msgId={}", msg.getMsgId());
+            return;
+        }
+
+        if (isGroup) {
+            String botNickname = wxProperties.getNickname();
+            String atMention = "@" + botNickname;
+            if (!rawMessage.contains(atMention)) {
+                log.debug("群聊消息未 @机器人，仅采集: groupId={}", fromGroup);
+                groupMessageSyncService.saveGroupMessage("wx", msg.getMsgId(), fromGroup,
+                        fromUser, rawMessage, msgType, msg.getTimestamp() != null ? msg.getTimestamp() : System.currentTimeMillis() / 1000,
+                        fileUrl, fileName);
+                imGroupService.getOrCreateGroup("wx", fromGroup, null);
+                imUserService.getOrCreateUser("wx", fromUser, fromGroup, fromUser);
+                return;
+            }
+            rawMessage = rawMessage.replace(atMention, "").trim();
+        }
+
+        if (isPrivate) {
+            groupMessageSyncService.savePrivateMessage("wx", msg.getMsgId(), fromUser,
+                    rawMessage, msgType, msg.getTimestamp() != null ? msg.getTimestamp() : System.currentTimeMillis() / 1000,
+                    conversationId, fileUrl, fileName);
+            imConversationService.getOrCreateConversation("wx", fromUser, fromUser, null);
+            imConversationService.updateLastMessage(conversationId, rawMessage, fromUser, "wx");
+        } else {
+            groupMessageSyncService.saveGroupMessage("wx", msg.getMsgId(), fromGroup,
+                    fromUser, rawMessage, msgType, msg.getTimestamp() != null ? msg.getTimestamp() : System.currentTimeMillis() / 1000,
+                    fileUrl, fileName);
+            imGroupService.getOrCreateGroup("wx", fromGroup, null);
+        }
+        imUserService.getOrCreateUser("wx", fromUser, isGroup ? fromGroup : null, fromUser);
+
+        // Dify 问答
+        try {
+            Long appId = isPrivate ? getDefaultAppId() : getAppIdForGroup(fromGroup);
+            log.info("微信消息开始问答: msgId={}, fromUser={}, groupId={}, appId={}",
+                    msg.getMsgId(), fromUser, isPrivate ? conversationId : fromGroup, appId);
+
+            DifyChatResponse response = chatService.chat(
+                    appId, "wx", fromUser, displayGroupId, rawMessage);
+
+            String answer = response != null ? response.getAnswer() : "";
+            answer = filterThinkingContent(answer);
+
+            if (StringUtils.hasText(answer) && StringUtils.hasText(msg.getContextToken())) {
+                WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                        fromUser, msg.getContextToken(), answer);
+                int ret = wxIlinkUtil.sendMessage(
+                        wxProperties.getBaseUrl(), wxProperties.getBotToken(), reply);
+                if (ret == -14) {
+                    log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                    markOffline();
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                log.info("微信回复发送成功: msgId={}, toUser={}", msg.getMsgId(), fromUser);
+            }
+        } catch (Exception e) {
+            log.error("微信消息问答失败: msgId={}", msg.getMsgId(), e);
+        }
+    }
+
+    private Long getAppIdForGroup(String groupId) {
+        try {
+            LambdaQueryWrapper<ImGroup> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(ImGroup::getGroupId, groupId)
+                    .eq(ImGroup::getStatus, true);
+            ImGroup group = imGroupMapper.selectOne(wrapper);
+
+            if (group != null && group.getAppId() != null) {
+                KbApp app = kbAppMapper.selectById(group.getAppId());
+                if (app != null && app.getStatus()) {
+                    return app.getId();
+                }
+            }
+
+            LambdaQueryWrapper<KbApp> appWrapper = new LambdaQueryWrapper<>();
+            appWrapper.eq(KbApp::getStatus, true)
+                    .eq(KbApp::getIsDefault, true)
+                    .last("LIMIT 1");
+            KbApp defaultApp = kbAppMapper.selectOne(appWrapper);
+            return defaultApp != null ? defaultApp.getId() : null;
+        } catch (Exception e) {
+            log.error("获取微信群组应用失败: groupId={}", groupId, e);
+            return null;
+        }
+    }
+
+    private Long getDefaultAppId() {
+        try {
+            LambdaQueryWrapper<KbApp> appWrapper = new LambdaQueryWrapper<>();
+            appWrapper.eq(KbApp::getStatus, true)
+                    .eq(KbApp::getIsDefault, true)
+                    .last("LIMIT 1");
+            KbApp defaultApp = kbAppMapper.selectOne(appWrapper);
+            return defaultApp != null ? defaultApp.getId() : null;
+        } catch (Exception e) {
+            log.error("获取默认应用失败", e);
+            return null;
+        }
+    }
+
+    private String filterThinkingContent(String text) {
+        if (text == null) return "";
+        String filtered = text.replaceAll("(?s)<think>.*?</think>", "").trim();
+        return filtered.isEmpty() ? text : filtered;
+    }
+
+    private void markOnline() {
+        stringRedisTemplate.opsForValue().set(REDIS_ONLINE_KEY, "1", 30, TimeUnit.SECONDS);
+    }
+
+    private void markOffline() {
+        stringRedisTemplate.delete(REDIS_ONLINE_KEY);
+    }
+
+    private String loadGetUpdatesBuf() {
+        String buf = stringRedisTemplate.opsForValue().get(REDIS_UPDATES_BUF_KEY);
+        return buf != null ? buf : "";
+    }
+
+    private void saveGetUpdatesBuf(String buf) {
+        if (buf != null) {
+            stringRedisTemplate.opsForValue().set(REDIS_UPDATES_BUF_KEY, buf, Duration.ofDays(7));
+        }
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static class ByteArrayMultipartFile implements org.springframework.web.multipart.MultipartFile {
+        private final String name;
+        private final String originalFilename;
+        private final byte[] content;
+
+        ByteArrayMultipartFile(String name, String originalFilename, byte[] content) {
+            this.name = name;
+            this.originalFilename = originalFilename;
+            this.content = content;
+        }
+
+        @Override
+        public String getName() { return name; }
+
+        @Override
+        public String getOriginalFilename() { return originalFilename; }
+
+        @Override
+        public String getContentType() { return null; }
+
+        @Override
+        public boolean isEmpty() { return content == null || content.length == 0; }
+
+        @Override
+        public long getSize() { return content != null ? content.length : 0; }
+
+        @Override
+        public byte[] getBytes() { return content; }
+
+        @Override
+        public InputStream getInputStream() { return new ByteArrayInputStream(content); }
+
+        @Override
+        public void transferTo(java.io.File dest) throws IOException {
+            java.nio.file.Files.write(dest.toPath(), content);
+        }
+    }
+}
