@@ -214,4 +214,62 @@ public class WxIlinkUtil {
             return null;
         }
     }
+
+    public Map<String, Object> getBotQrCode(String apiBaseUrl) {
+        String url = apiBaseUrl + "/ilink/bot/get_bot_qrcode?bot_type=3";
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("AuthorizationType", "ilink_bot_token");
+        headers.set("Authorization", "Bearer ");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<String> resp = pollingRestTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class);
+            String body = resp.getBody();
+            if (body == null) return null;
+            JsonNode root = objectMapper.readTree(body);
+            int ret = root.path("ret").asInt(0);
+            if (ret != 0) {
+                log.warn("getBotQrCode 返回错误: ret={}, err_msg={}", ret, root.path("err_msg").asText());
+                return null;
+            }
+            String imgContent = root.path("qrcode_img_content").asText();
+            String qrcode = root.path("qrcode").asText();
+            Map<String, Object> result = new HashMap<>();
+            result.put("qrcode_img_content", imgContent);
+            result.put("qrcode", qrcode);
+            return result;
+        } catch (Exception e) {
+            log.error("getBotQrCode 请求异常", e);
+            return null;
+        }
+    }
+
+    public Map<String, Object> getQrCodeStatus(String apiBaseUrl, String qrcode) {
+        String url = apiBaseUrl + "/ilink/bot/get_qrcode_status?qrcode=" + qrcode;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("AuthorizationType", "ilink_bot_token");
+        headers.set("Authorization", "Bearer ");
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<String> resp = pollingRestTemplate.exchange(
+                    url, HttpMethod.GET, entity, String.class);
+            String body = resp.getBody();
+            if (body == null) return null;
+            JsonNode root = objectMapper.readTree(body);
+            int ret = root.path("ret").asInt(0);
+            if (ret != 0) {
+                log.warn("getQrCodeStatus 返回错误: ret={}, err_msg={}", ret, root.path("err_msg").asText());
+                return null;
+            }
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", root.path("status").asText());
+            result.put("bot_token", root.path("bot_token").asText());
+            result.put("baseurl", root.path("baseurl").asText());
+            result.put("nickname", root.path("nickname").asText());
+            return result;
+        } catch (Exception e) {
+            log.error("getQrCodeStatus 请求异常", e);
+            return null;
+        }
+    }
 }

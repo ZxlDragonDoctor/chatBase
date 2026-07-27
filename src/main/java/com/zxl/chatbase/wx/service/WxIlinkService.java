@@ -29,13 +29,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -58,36 +62,114 @@ public class WxIlinkService {
 
     private static final String REDIS_UPDATES_BUF_KEY = "bot:wx:get_updates_buf";
     private static final String REDIS_ONLINE_KEY = "bot:wx:online";
+    private static final String REDIS_CREDENTIALS_KEY = "bot:wx:credentials";
+    private static final String ILINK_API_BASE = "https://ilinkai.weixin.qq.com";
+
+    private volatile String activeBaseUrl;
+    private volatile String activeBotToken;
+    private volatile String activeNickname;
+    private volatile Thread pollingThread;
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
     @EventListener(ApplicationReadyEvent.class)
     public void startPolling() {
-        if (!wxProperties.isEnable()) {
-            log.info("微信 ilink 机器人未启用，跳过启动");
-            return;
+        String savedCreds = stringRedisTemplate.opsForValue().get(REDIS_CREDENTIALS_KEY);
+        if (StringUtils.hasText(savedCreds)) {
+            try {
+                Map<String, String> creds = objectMapper.readValue(savedCreds,
+                        new TypeReference<Map<String, String>>() {});
+                activeBaseUrl = creds.get("baseUrl");
+                activeBotToken = creds.get("botToken");
+                activeNickname = creds.get("nickname");
+                log.info("从 Redis 恢复微信 ilink 凭证");
+            } catch (Exception e) {
+                log.warn("恢复微信 ilink 凭证失败", e);
+                stringRedisTemplate.delete(REDIS_CREDENTIALS_KEY);
+            }
         }
-        if (!StringUtils.hasText(wxProperties.getBotToken())) {
-            log.warn("微信 ilink 机器人未配置 bot-token，跳过启动");
-            return;
-        }
-        if (!StringUtils.hasText(wxProperties.getBaseUrl())) {
-            log.warn("微信 ilink 机器人未配置 base-url，跳过启动");
+
+        String baseUrl = resolveBaseUrl();
+        String botToken = resolveBotToken();
+        if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(botToken)) {
+            if (wxProperties.isEnable()) {
+                log.warn("微信 ilink 机器人配置不完整，跳过启动");
+            }
             return;
         }
 
-        log.info("微信 ilink 机器人启动，baseUrl={}, nickname={}", wxProperties.getBaseUrl(), wxProperties.getNickname());
-        Thread thread = new Thread(this::pollingLoop, "wx-ilink-poll");
-        thread.setDaemon(false);
-        thread.start();
+        log.info("微信 ilink 机器人启动，baseUrl={}, nickname={}", baseUrl, getNickname());
+        startPollingThread();
+    }
+
+    private void startPollingThread() {
+        if (running.get()) return;
+        running.set(true);
+        pollingThread = new Thread(this::pollingLoop, "wx-ilink-poll");
+        pollingThread.setDaemon(false);
+        pollingThread.start();
+    }
+
+    public void login(String baseUrl, String botToken, String nickname) {
+        this.activeBaseUrl = baseUrl;
+        this.activeBotToken = botToken;
+        this.activeNickname = nickname;
+        try {
+            Map<String, String> creds = new HashMap<>();
+            creds.put("baseUrl", baseUrl);
+            creds.put("botToken", botToken);
+            creds.put("nickname", nickname);
+            stringRedisTemplate.opsForValue().set(REDIS_CREDENTIALS_KEY,
+                    objectMapper.writeValueAsString(creds), Duration.ofDays(30));
+        } catch (Exception e) {
+            log.warn("保存微信 ilink 凭证失败", e);
+        }
+        startPollingThread();
+    }
+
+    public void logout() {
+        running.set(false);
+        if (pollingThread != null) {
+            pollingThread.interrupt();
+            pollingThread = null;
+        }
+        activeBaseUrl = null;
+        activeBotToken = null;
+        activeNickname = null;
+        stringRedisTemplate.delete(REDIS_CREDENTIALS_KEY);
+        markOffline();
+    }
+
+    public boolean isOnline() {
+        return "1".equals(stringRedisTemplate.opsForValue().get(REDIS_ONLINE_KEY));
+    }
+
+    public String getNickname() {
+        return activeNickname != null ? activeNickname : wxProperties.getNickname();
+    }
+
+    private String resolveBaseUrl() {
+        return activeBaseUrl != null ? activeBaseUrl : wxProperties.getBaseUrl();
+    }
+
+    private String resolveBotToken() {
+        return activeBotToken != null ? activeBotToken : wxProperties.getBotToken();
     }
 
     private void pollingLoop() {
         String getUpdatesBuf = loadGetUpdatesBuf();
         int consecutiveErrors = 0;
 
-        while (true) {
+        while (running.get()) {
             try {
+                String baseUrl = resolveBaseUrl();
+                String botToken = resolveBotToken();
+                if (!StringUtils.hasText(baseUrl) || !StringUtils.hasText(botToken)) {
+                    log.warn("微信 ilink 凭证缺失，停止轮询");
+                    break;
+                }
+
                 List<WxInboundMessage> messages = wxIlinkUtil.getUpdates(
-                        wxProperties.getBaseUrl(), wxProperties.getBotToken(), getUpdatesBuf);
+                        baseUrl, botToken, getUpdatesBuf);
 
                 if (messages == null) {
                     consecutiveErrors++;
@@ -112,7 +194,7 @@ public class WxIlinkService {
 
                 if (messages.isEmpty()) {
                     String newBuf = wxIlinkUtil.getUpdatesBuf(
-                            wxProperties.getBaseUrl(), wxProperties.getBotToken(), getUpdatesBuf);
+                            baseUrl, botToken, getUpdatesBuf);
                     if (newBuf != null && !newBuf.equals(getUpdatesBuf)) {
                         getUpdatesBuf = newBuf;
                         saveGetUpdatesBuf(getUpdatesBuf);
@@ -125,6 +207,8 @@ public class WxIlinkService {
                 sleep(wxProperties.getReconnectDelaySec() * 1000L);
             }
         }
+        log.info("微信 ilink 轮询已停止");
+        markOffline();
     }
 
     private void processMessage(WxInboundMessage msg) {
@@ -179,7 +263,7 @@ public class WxIlinkService {
                         mediaInfo = info;
                     } else if (StringUtils.hasText(media.getMediaKey())) {
                         mediaInfo = wxIlinkUtil.getUploadUrl(
-                                wxProperties.getBaseUrl(), wxProperties.getBotToken(),
+                                resolveBaseUrl(), resolveBotToken(),
                                 msg.getMsgId(), media.getMediaKey());
                     }
 
@@ -239,7 +323,7 @@ public class WxIlinkService {
         }
 
         if (isGroup) {
-            String botNickname = wxProperties.getNickname();
+            String botNickname = getNickname();
             String atMention = "@" + botNickname;
             if (!rawMessage.contains(atMention)) {
                 log.debug("群聊消息未 @机器人，仅采集: groupId={}", fromGroup);
@@ -283,7 +367,7 @@ public class WxIlinkService {
                 WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
                         fromUser, msg.getContextToken(), answer);
                 int ret = wxIlinkUtil.sendMessage(
-                        wxProperties.getBaseUrl(), wxProperties.getBotToken(), reply);
+                        resolveBaseUrl(), resolveBotToken(), reply);
                 if (ret == -14) {
                     log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
                     markOffline();

@@ -90,6 +90,16 @@
                     </div>
                   </div>
                 </div>
+                <div class="bot-card-actions" v-if="bot.platform === 'wx'">
+                  <button v-if="bot.online" class="anime-btn xs danger" @click="handleDisconnect">
+                    <LogOut :size="14" />
+                    <span>断开</span>
+                  </button>
+                  <button v-else class="anime-btn xs primary" @click="handleQrLogin">
+                    <QrCode :size="14" />
+                    <span>扫码登录</span>
+                  </button>
+                </div>
               </div>
               <div class="bot-card-stats">
                 <div class="bot-s-item">
@@ -114,13 +124,62 @@
         </template>
       </div>
     </section>
+
+    <!-- QR Code Login Modal -->
+    <Teleport to="body">
+      <div v-if="showQrModal" class="anime-modal-overlay" @click.self="closeQrModal">
+        <div class="anime-modal qr-modal">
+          <div class="anime-modal-header">
+            <div class="anime-modal-title">微信扫码登录</div>
+            <button class="anime-modal-close" @click="closeQrModal">✕</button>
+          </div>
+          <div class="qr-modal-body">
+            <div v-if="qrFetching" class="qr-loading">
+              <span class="anime-loader-spinner" style="width:36px;height:36px"></span>
+              <div class="qr-hint">获取二维码中...</div>
+            </div>
+            <div v-else-if="qrError" class="qr-error">
+              <div class="qr-error-icon">⚠️</div>
+              <div class="qr-error-text">{{ qrError }}</div>
+              <button class="anime-btn sm" @click="fetchQrCode">重试</button>
+            </div>
+            <template v-else>
+              <div class="qr-image-wrapper">
+                <canvas ref="qrCanvasRef" class="qr-canvas"></canvas>
+              </div>
+              <div class="qr-status">
+                <span v-if="qrStatus === 'pending'" class="qr-status-text">
+                  请使用微信扫描二维码登录
+                </span>
+                <span v-else-if="qrStatus === 'confirmed'" class="qr-status-text success">
+                  登录成功！机器人已上线
+                </span>
+                <span v-else-if="qrStatus === 'expired'" class="qr-status-text error">
+                  二维码已过期，请重新获取
+                </span>
+              </div>
+              <div class="qr-hint" v-if="qrStatus === 'pending'">
+                <span class="qr-dot-pulse"></span>
+                等待扫码中... ({{ pollCount }}s)
+              </div>
+            </template>
+          </div>
+          <div class="anime-modal-footer">
+            <button class="anime-btn" @click="closeQrModal" :disabled="qrStatus === 'confirmed' ? false : false">
+              关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { RefreshCw, Cpu, Activity, MessageCircle, Database } from 'lucide-vue-next'
-import { listBots, type BotInfo } from '../api/bot'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { RefreshCw, Cpu, Activity, MessageCircle, Database, LogOut, QrCode } from 'lucide-vue-next'
+import { listBots, getWxQrCode, pollWxQrCodeStatus, getWxBotStatus, disconnectWxBot, type BotInfo } from '../api/bot'
+import QRCode from 'qrcode'
 
 const bots = ref<BotInfo[]>([])
 const loading = ref(false)
@@ -154,6 +213,103 @@ function formatDate(dateStr: string): string {
 }
 
 onMounted(() => { loadBots() })
+
+const showQrModal = ref(false)
+const qrFetching = ref(false)
+const qrError = ref('')
+const qrCanvasRef = ref<HTMLCanvasElement | null>(null)
+const qrCodeKey = ref('')
+const qrStatus = ref<'pending' | 'confirmed' | 'expired' | ''>('')
+const pollCount = ref(0)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function closeQrModal() {
+  showQrModal.value = false
+  stopPolling()
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+async function renderQrToCanvas(text: string) {
+  const canvas = qrCanvasRef.value
+  if (!canvas) throw new Error('Canvas 未就绪')
+  await QRCode.toCanvas(canvas, text, { width: 220, margin: 2 })
+}
+
+async function fetchQrCode() {
+  qrFetching.value = true
+  qrError.value = ''
+  qrCodeKey.value = ''
+  qrStatus.value = ''
+  pollCount.value = 0
+  try {
+    const data = await getWxQrCode()
+    if (!data.qrcode_img_content) {
+      throw new Error('二维码数据为空')
+    }
+    qrCodeKey.value = data.qrcode
+    qrStatus.value = 'pending'
+    qrFetching.value = false
+    await nextTick()
+    await renderQrToCanvas(data.qrcode_img_content)
+    startPolling()
+  } catch (e: any) {
+    qrError.value = e?.message || '获取二维码失败'
+    qrFetching.value = false
+  }
+}
+
+function startPolling() {
+  stopPolling()
+  pollTimer = setInterval(async () => {
+    if (!qrCodeKey.value) return
+    pollCount.value++
+    try {
+      const data = await pollWxQrCodeStatus(qrCodeKey.value)
+      if (data.error) {
+        qrError.value = data.error
+        stopPolling()
+        return
+      }
+      if (data.status === 'confirmed') {
+        qrStatus.value = 'confirmed'
+        stopPolling()
+        setTimeout(() => {
+          closeQrModal()
+          loadBots()
+        }, 1500)
+      } else if (data.status === 'expired') {
+        qrStatus.value = 'expired'
+        stopPolling()
+      }
+    } catch {
+      pollCount.value++
+    }
+  }, 2000)
+}
+
+async function handleQrLogin() {
+  showQrModal.value = true
+  await fetchQrCode()
+}
+
+async function handleDisconnect() {
+  try {
+    await disconnectWxBot()
+    loadBots()
+  } catch (e: any) {
+    error.value = e?.response?.data?.message || '断开连接失败'
+  }
+}
+
+onUnmounted(() => {
+  stopPolling()
+})
 </script>
 
 <style scoped>
@@ -165,7 +321,6 @@ onMounted(() => { loadBots() })
   padding: 48px;
 }
 
-/* Stat Grid */
 .bot-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -214,7 +369,6 @@ onMounted(() => { loadBots() })
   margin-top: 2px;
 }
 
-/* Bot Cards */
 .bot-list {
   display: flex;
   flex-direction: column;
@@ -238,6 +392,9 @@ onMounted(() => { loadBots() })
 .bot-card-header {
   padding: 18px 22px;
   border-bottom: 1px solid var(--anime-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .bot-card-identity {
@@ -308,6 +465,13 @@ onMounted(() => { loadBots() })
   color: var(--anime-text-muted);
 }
 
+.bot-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
 .bot-card-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -340,6 +504,86 @@ onMounted(() => { loadBots() })
 
 .animate-spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.qr-modal {
+  max-width: 380px;
+  width: 90vw;
+}
+
+.qr-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 32px;
+  gap: 16px;
+}
+
+.qr-loading, .qr-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+}
+
+.qr-error-icon {
+  font-size: 36px;
+}
+
+.qr-error-text {
+  color: var(--anime-text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.qr-image-wrapper {
+  background: #fff;
+  border-radius: var(--anime-radius);
+  padding: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: 1px solid var(--anime-border);
+}
+
+.qr-canvas {
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: 8px;
+}
+
+.qr-status {
+  text-align: center;
+}
+
+.qr-status-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--anime-text-muted);
+}
+
+.qr-status-text.success { color: #388e3c; }
+.qr-status-text.error { color: #e53935; }
+
+.qr-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--anime-text-muted);
+}
+
+.qr-dot-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4fc3f7;
+  animation: qr-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes qr-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
 
 @media (max-width: 768px) {
   .bot-stat-grid { grid-template-columns: repeat(2, 1fr); }

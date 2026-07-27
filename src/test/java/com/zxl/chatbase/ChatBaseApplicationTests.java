@@ -38,7 +38,7 @@ class ChatBaseApplicationTests {
         httpPost.setHeader("Authorization", "Bearer app-x4pDm1oSxDVu9fRLChTGdoFi");
         httpPost.setHeader("Content-Type", "application/json");
         String test = ("{\n  \"inputs\": {\n    \"name\": \"dify\"\n  },\n  \"query\": " +
-                "\"iPhone 13 Pro Max 的规格是什么？\",\n  \"response_mode\": \"blocking\",\n  " +
+                "\"iPhone 13 Pro Max features\",\n  \"response_mode\": \"blocking\",\n  " +
                 "\"user\": " +
                 "\"abc-123\",\n  \"files\": [\n    {\n      \"type\": \"image\",\n     " +
                 " \"transfer_method\": \"remote_url\",\n      " +
@@ -57,11 +57,11 @@ class ChatBaseApplicationTests {
     void testSendMessage(){
         DifyChatRequest difyChatRequest = new DifyChatRequest();
         difyChatRequest.setQuery("My name is zhuxiaolong");
-        difyChatRequest.setUser("abc-123"); //默认用户
+        difyChatRequest.setUser("abc-123"); //榛樿鐢ㄦ埛
         difyChatRequest.setInputs(new HashMap<>());
         DifyChatResponse difyChatResponse = difyService.sendChatMessage(difyChatRequest);
         System.out.println(difyChatResponse.getAnswer());
-        //连续对话
+        //缁х画瀵硅瘽
         difyChatRequest.setConversationId(difyChatResponse.getConversationId());
         difyChatRequest.setQuery("What's My name? " );
         DifyChatResponse difyChatResponse1 = difyService.sendChatMessage(difyChatRequest);
