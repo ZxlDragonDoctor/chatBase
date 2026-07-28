@@ -52,3 +52,34 @@ export async function getWxBotStatus(): Promise<WxBotStatus> {
 export async function disconnectWxBot(): Promise<void> {
   await api.post('/wx/bot/disconnect')
 }
+
+export interface QqQrCodeResponse {
+  qrcode_img?: string
+  qrcode_url?: string
+  error?: string
+}
+
+export interface QqLoginStatus {
+  isLogin: boolean
+  isOffline: boolean
+  loginError?: string
+}
+
+export async function getQqQrCode(): Promise<QqQrCodeResponse> {
+  const resp = await api.get<QqQrCodeResponse>('/qq-bot/qrcode')
+  return resp.data
+}
+
+export async function getQqQrCodeStatus(): Promise<QqLoginStatus> {
+  const resp = await api.get<QqLoginStatus>('/qq-bot/qrcode/status')
+  return resp.data
+}
+
+export async function refreshQqQrCode(): Promise<void> {
+  await api.post('/qq-bot/qrcode/refresh')
+}
+
+export async function getQqLoginInfo(): Promise<{ online: boolean; uin?: string; nick?: string }> {
+  const resp = await api.get('/qq-bot/status')
+  return resp.data
+}

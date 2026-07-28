@@ -46,5 +46,15 @@ public class QqBotProperties {
      * NapCat HTTP 请求的 Base URL
      */
     private String httpBaseUrl;
+
+    /**
+     * NapCat WebUI 的 Base URL
+     */
+    private String webuiBaseUrl = "http://localhost:6099";
+
+    /**
+     * NapCat WebUI 的访问 token
+     */
+    private String webuiToken;
 }
 

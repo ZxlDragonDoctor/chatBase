@@ -47,6 +47,8 @@ qq:
     self-id: ${QQ_BOT_SELF_ID:0}
     nickname: ${QQ_BOT_NICKNAME:}
     http-base-url: ${QQ_BOT_HTTP_BASE_URL:http://napcat:3000}
+    webui-base-url: ${QQ_BOT_WEBUI_BASE_URL:http://napcat:6099}
+    webui-token: ${QQ_BOT_WEBUI_TOKEN:}
 
 wechat:
   corp:

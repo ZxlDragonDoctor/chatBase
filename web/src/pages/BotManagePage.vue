@@ -83,19 +83,20 @@
                       </span>
                     </div>
                     <div class="bot-card-detail">
-                      <span v-if="bot.platform === 'qq' && bot.botId">QQ: {{ bot.botId }}</span>
+                      <span v-if="bot.platform === 'qq' && bot.botId">QQ: {{ bot.botId }} · NapCat</span>
+                      <span v-else-if="bot.platform === 'qq'">QQ · NapCat</span>
                       <span v-else-if="bot.platform === 'wecom'">企业微信 · 回调模式</span>
                       <span v-else-if="bot.platform === 'wx'">微信个人号 · ilink 协议</span>
                       <span v-else>-</span>
                     </div>
                   </div>
                 </div>
-                <div class="bot-card-actions" v-if="bot.platform === 'wx'">
-                  <button v-if="bot.online" class="anime-btn xs danger" @click="handleDisconnect">
+                <div class="bot-card-actions" v-if="bot.platform === 'wx' || bot.platform === 'qq'">
+                  <button v-if="bot.online" class="anime-btn xs danger">
                     <LogOut :size="14" />
                     <span>断开</span>
                   </button>
-                  <button v-else class="anime-btn xs primary" @click="handleQrLogin">
+                  <button v-else class="anime-btn xs primary" @click="handleQrLogin(bot.platform)">
                     <QrCode :size="14" />
                     <span>扫码登录</span>
                   </button>
@@ -130,7 +131,7 @@
       <div v-if="showQrModal" class="anime-modal-overlay" @click.self="closeQrModal">
         <div class="anime-modal qr-modal">
           <div class="anime-modal-header">
-            <div class="anime-modal-title">微信扫码登录</div>
+            <div class="anime-modal-title">{{ qrPlatform === 'wx' ? '微信' : 'QQ' }}扫码登录</div>
             <button class="anime-modal-close" @click="closeQrModal">✕</button>
           </div>
           <div class="qr-modal-body">
@@ -139,23 +140,23 @@
               <div class="qr-hint">获取二维码中...</div>
             </div>
             <div v-else-if="qrError" class="qr-error">
-              <div class="qr-error-icon">⚠️</div>
               <div class="qr-error-text">{{ qrError }}</div>
               <button class="anime-btn sm" @click="fetchQrCode">重试</button>
             </div>
             <template v-else>
               <div class="qr-image-wrapper">
-                <canvas ref="qrCanvasRef" class="qr-canvas"></canvas>
+                <canvas v-if="qrPlatform === 'wx'" ref="qrCanvasRef" class="qr-canvas"></canvas>
+                <img v-else :src="qrQrImg" class="qr-canvas" alt="QQ登录二维码" />
               </div>
               <div class="qr-status">
                 <span v-if="qrStatus === 'pending'" class="qr-status-text">
-                  请使用微信扫描二维码登录
+                  请使用{{ qrPlatform === 'wx' ? '微信' : 'QQ' }}扫描二维码登录
                 </span>
                 <span v-else-if="qrStatus === 'confirmed'" class="qr-status-text success">
                   登录成功！机器人已上线
                 </span>
                 <span v-else-if="qrStatus === 'expired'" class="qr-status-text error">
-                  二维码已过期，请重新获取
+                  二维码已过期
                 </span>
               </div>
               <div class="qr-hint" v-if="qrStatus === 'pending'">
@@ -165,7 +166,7 @@
             </template>
           </div>
           <div class="anime-modal-footer">
-            <button class="anime-btn" @click="closeQrModal" :disabled="qrStatus === 'confirmed' ? false : false">
+            <button class="anime-btn" @click="closeQrModal">
               关闭
             </button>
           </div>
@@ -178,7 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { RefreshCw, Cpu, Activity, MessageCircle, Database, LogOut, QrCode } from 'lucide-vue-next'
-import { listBots, getWxQrCode, pollWxQrCodeStatus, getWxBotStatus, disconnectWxBot, type BotInfo } from '../api/bot'
+import { listBots, getWxQrCode, pollWxQrCodeStatus, getWxBotStatus, disconnectWxBot, getQqQrCode, getQqQrCodeStatus, type BotInfo } from '../api/bot'
 import QRCode from 'qrcode'
 
 const bots = ref<BotInfo[]>([])
@@ -215,10 +216,12 @@ function formatDate(dateStr: string): string {
 onMounted(() => { loadBots() })
 
 const showQrModal = ref(false)
+const qrPlatform = ref<'wx' | 'qq'>('wx')
 const qrFetching = ref(false)
 const qrError = ref('')
 const qrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const qrCodeKey = ref('')
+const qrQrImg = ref('')
 const qrStatus = ref<'pending' | 'confirmed' | 'expired' | ''>('')
 const pollCount = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -245,18 +248,32 @@ async function fetchQrCode() {
   qrFetching.value = true
   qrError.value = ''
   qrCodeKey.value = ''
+  qrQrImg.value = ''
   qrStatus.value = ''
   pollCount.value = 0
   try {
-    const data = await getWxQrCode()
-    if (!data.qrcode_img_content) {
-      throw new Error('二维码数据为空')
+    if (qrPlatform.value === 'wx') {
+      const data = await getWxQrCode()
+      if (!data.qrcode_img_content) {
+        throw new Error('二维码数据为空')
+      }
+      qrCodeKey.value = data.qrcode
+      qrStatus.value = 'pending'
+      qrFetching.value = false
+      await nextTick()
+      await renderQrToCanvas(data.qrcode_img_content)
+    } else {
+      const data = await getQqQrCode()
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      if (!data.qrcode_img) {
+        throw new Error('二维码数据为空')
+      }
+      qrQrImg.value = data.qrcode_img
+      qrStatus.value = 'pending'
+      qrFetching.value = false
     }
-    qrCodeKey.value = data.qrcode
-    qrStatus.value = 'pending'
-    qrFetching.value = false
-    await nextTick()
-    await renderQrToCanvas(data.qrcode_img_content)
     startPolling()
   } catch (e: any) {
     qrError.value = e?.message || '获取二维码失败'
@@ -267,25 +284,40 @@ async function fetchQrCode() {
 function startPolling() {
   stopPolling()
   pollTimer = setInterval(async () => {
-    if (!qrCodeKey.value) return
     pollCount.value++
     try {
-      const data = await pollWxQrCodeStatus(qrCodeKey.value)
-      if (data.error) {
-        qrError.value = data.error
-        stopPolling()
-        return
-      }
-      if (data.status === 'confirmed') {
-        qrStatus.value = 'confirmed'
-        stopPolling()
-        setTimeout(() => {
-          closeQrModal()
-          loadBots()
-        }, 1500)
-      } else if (data.status === 'expired') {
-        qrStatus.value = 'expired'
-        stopPolling()
+      if (qrPlatform.value === 'wx') {
+        if (!qrCodeKey.value) return
+        const data = await pollWxQrCodeStatus(qrCodeKey.value)
+        if (data.error) {
+          qrError.value = data.error
+          stopPolling()
+          return
+        }
+        if (data.status === 'confirmed') {
+          qrStatus.value = 'confirmed'
+          stopPolling()
+          setTimeout(() => {
+            closeQrModal()
+            loadBots()
+          }, 1500)
+        } else if (data.status === 'expired') {
+          qrStatus.value = 'expired'
+          stopPolling()
+        }
+      } else {
+        const data = await getQqQrCodeStatus()
+        if (data.isLogin) {
+          qrStatus.value = 'confirmed'
+          stopPolling()
+          setTimeout(() => {
+            closeQrModal()
+            loadBots()
+          }, 1500)
+        } else if (data.isOffline || data.loginError) {
+          qrStatus.value = 'expired'
+          stopPolling()
+        }
       }
     } catch {
       pollCount.value++
@@ -293,7 +325,8 @@ function startPolling() {
   }, 2000)
 }
 
-async function handleQrLogin() {
+async function handleQrLogin(platform: 'wx' | 'qq' = 'wx') {
+  qrPlatform.value = platform
   showQrModal.value = true
   await fetchQrCode()
 }
