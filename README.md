@@ -23,8 +23,9 @@
 
 | 平台 | 接入方式 | 功能 |
 |------|----------|------|
-| **QQ 群聊** | NapCat 反向 WebSocket | 消息收集、智能回复、在线监控 |
+| **QQ 群聊** | NapCat 反向 WebSocket | 扫码登录、消息收集、智能回复、在线监控 |
 | **企业微信** | 回调模式 | 消息收集、智能回复、加解密 |
+| **微信个人号** | iLink 协议 | 扫码登录、消息收集、智能回复 |
 
 ### 数据分析
 
@@ -36,7 +37,8 @@
 
 ### 机器人管理
 
-- 多机器人状态监控（QQ / 企业微信）
+- 多机器人状态监控（QQ / 企业微信 / 微信个人号）
+- 扫码登录（微信 ilink / QQ NapCat WebUI 代理）
 - 在线状态实时检测（Redis 心跳）
 - 消息统计（今日/总计）
 - QQ 昵称自动获取（OneBot API）
@@ -126,6 +128,8 @@ cd web && npm install && npm run dev
 | `QQ_BOT_ACCESS_TOKEN` | NapCat Token | - |
 | `QQ_BOT_SELF_ID` | 机器人 QQ 号 | - |
 | `QQ_BOT_HTTP_BASE_URL` | NapCat HTTP 地址 | `http://napcat:3000` |
+| `QQ_BOT_WEBUI_BASE_URL` | NapCat WebUI 地址 | `http://napcat:6099` |
+| `QQ_BOT_WEBUI_TOKEN` | NapCat WebUI token | - |
 | `WECHAT_CORP_STOKEN` | 企业微信 Token | - |
 | `WECHAT_CORP_S_ENCODING_AES_KEY` | 企业微信 EncodingAESKey | - |
 | `JAVA_OPTS` | JVM 参数 | `-Xms512m -Xmx2048m` |
@@ -161,7 +165,7 @@ cd web && npm install && npm run dev
 | **dify** | `com.zxl.chatbase.dify` | Dify API 集成、对话、文件上传 |
 | **kb** | `com.zxl.chatbase.kb` | 知识库、分类、文档、FAQ、应用、关键词 |
 | **im** | `com.zxl.chatbase.im` | IM 消息采集、群组管理、机器人管理 |
-| **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket 处理 |
+| **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket + WebUI 扫码登录代理 |
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词 |
 | **user** | `com.zxl.chatbase.user` | 用户注册、登录、信息管理 |
@@ -203,9 +207,10 @@ cd web && npm install && npm run dev
 docker-compose --profile qq up -d
 ```
 
-### 2. 扫码登录
+### 2. 扫码登录（WebUI 代理模式）
 
-访问 http://\<server\>:6099，使用小号扫码登录。
+在「机器人管理」页面点击 QQ 卡片「扫码登录」，后端代理 NapCat WebUI API，一键扫码。
+也可直接访问 http://\<server\>:6099 手动登录。
 
 ⚠️ **务必使用小号，防止封禁。**
 
@@ -378,7 +383,7 @@ chatBase/
 │   ├── dify/           # Dify API 集成
 │   ├── kb/             # 知识库管理
 │   ├── im/             # IM 消息收集
-│   ├── qq/             # QQ Bot WebSocket
+│   ├── qq/             # QQ Bot（WebSocket + WebUI 扫码登录代理）
 │   ├── wxroboot/       # 企业微信机器人
 │   ├── statistics/     # 统计分析
 │   ├── feedback/       # 用户反馈
@@ -418,4 +423,4 @@ MIT License
 - **数据隔离**：所有业务数据通过 `created_by` 字段按用户维度过滤。普通用户仅看自己的数据，admin 可在统计页切换 scope=all/mine。
 - **前端路由**：admin 菜单项（反馈管理、应用管理、知识库管理、用户管理）在登录后自动显示，基于 `localStorage.getItem('chatbase_role')`。
 
-*最后更新：2026-05-09*
+*最后更新：2026-07-30*
