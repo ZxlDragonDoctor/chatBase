@@ -48,7 +48,8 @@ chatBase/
 │   │   ├── BotManageController.java     # /api/bot/**
 │   │   ├── DatasetController.java       # /api/dify/datasets/**
 │   │   ├── UploadProgressController.java# /api/upload/** (SSE progress)
-│   │   └── IntelligentRobotController.java # /intellrobot/**
+│   │   ├── IntelligentRobotController.java # /intellrobot/**
+│   │   └── QqBotController.java         # /api/qq-bot/** (QQ扫码)
 │   │
 │   ├── chat/                        # Chat service (web + IM)
 │   │   ├── service/
@@ -129,8 +130,11 @@ chatBase/
 │   │       ├── service/IntelligentRobotService.java
 │   │       └── util/WeChatUtil.java, HttpUtils.java
 │   │
-│   └── qq/                          # QQ Bot WebSocket handler
-│       └── QqBotWebSocketHandler.java
+│   └── qq/                          # QQ Bot 模块
+│       ├── QqBotProperties.java         # QQ机器人配置（NapCat地址、WebUI等）
+│       ├── QqBotWebSocketHandler.java   # QQ消息WebSocket
+│       ├── QqWebSocketConfig.java       # WebSocket配置
+│       └── NapCatService.java          # NapCat WebUI API代理服务（扫码登录）
 │
 └── web/                             # Vue 3 frontend
     ├── src/
@@ -238,6 +242,12 @@ Implemented via query-time filtering in all service layers:
 - **Apps/Knowledge Bases**: Filtered by `created_by = currentUser`
 
 ## Data Flow
+
+### QQ Bot QR Login (NapCat WebUI 代理)
+1. 前端点击「扫码登录」→ `QqBotController` → `NapCatService` 代理到 NapCat WebUI API
+2. NapCat 返回 QQ 登录二维码图片（从 ptlogin2.qq.com 拉取），后端以 base64 返回前端
+3. 前端 `<img>` 渲染二维码 + 2s 轮询 NapCat `CheckLoginStatus`
+4. 用户手机 QQ 扫码 → NapCat 检测到 `isLogin=true` → 前端关闭弹窗、刷新列表
 
 ### QQ Group Message Collection
 1. NapCat/go-cqhttp → WebSocket `/qq/ws` → `QqBotWebSocketHandler`
@@ -412,6 +422,11 @@ Most endpoints support `scope=all` (admin view all) / `scope=mine` (view own dat
 | GET | `/api/upload/progress/{taskId}` | UploadProgressController | Get upload progress |
 | GET | `/api/upload/progress/{taskId}/sse` | UploadProgressController | SSE progress stream |
 | GET/POST | `/intellrobot/callback/handle` | IntelligentRobotController | WeChat Work callback |
+| GET | `/api/qq-bot/qrcode` | QqBotController | Get QQ QR code (base64 image) |
+| GET | `/api/qq-bot/qrcode/status` | QqBotController | Poll QQ login status |
+| POST | `/api/qq-bot/qrcode/refresh` | QqBotController | Refresh QR code |
+| GET | `/api/qq-bot/status` | QqBotController | Get QQ login info |
+| GET | `/api/qq-bot/available` | QqBotController | Check NapCat WebUI availability |
 
 ## Database Tables
 
@@ -452,6 +467,8 @@ Robot QQ number configured in `application.yaml`:
 qq:
   bot:
     self-id: YOUR_ROBOT_QQ_NUMBER
+    webui-base-url: "http://localhost:6099"   # NapCat WebUI 地址
+    webui-token: ""                            # NapCat WebUI token
 ```
 
 ## Frontend Pages & Routes
