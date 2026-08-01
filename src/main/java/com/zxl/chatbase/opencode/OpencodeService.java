@@ -19,6 +19,8 @@ import org.springframework.web.client.RestTemplate;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 本地 opencode serve 集成服务
@@ -34,6 +36,12 @@ public class OpencodeService {
 
     private static final String SESSION_KEY_PREFIX = "opencode:session:";
     private static final String PROMPT_KEY_PREFIX = "opencode:prompt:";
+
+    /**
+     * 每个会话的串行锁：同一 conversationId 的消息必须按顺序处理，
+     * 避免并发向同一 opencode session 发多个 prompt 导致回答错乱/丢失
+     */
+    private final ConcurrentHashMap<String, Object> conversationLocks = new ConcurrentHashMap<>();
 
     private final OpencodeProperties properties;
     private final RestTemplate restTemplate;
@@ -57,6 +65,13 @@ public class OpencodeService {
             return "请输入要执行的任务或问题。";
         }
 
+        Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
+        synchronized (lock) {
+            return doChat(conversationId, query, userId, channel);
+        }
+    }
+
+    private String doChat(String conversationId, String query, String userId, String channel) {
         String sessionId = getOrCreateSession(conversationId);
         long promptSentAt = System.currentTimeMillis();
         sendPrompt(sessionId, query);

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -61,6 +62,7 @@ public class WxIlinkService {
     private final RestTemplate restTemplate;
     private final ImConversationService imConversationService;
     private final OpencodeService opencodeService;
+    private final ThreadPoolExecutor threadPool;
 
     private static final String REDIS_UPDATES_BUF_KEY = "bot:wx:get_updates_buf";
     private static final String REDIS_ONLINE_KEY = "bot:wx:online";
@@ -187,11 +189,13 @@ public class WxIlinkService {
                 markOnline();
 
                 for (WxInboundMessage msg : messages) {
-                    try {
-                        processMessage(msg);
-                    } catch (Exception e) {
-                        log.error("处理微信消息失败: msgId={}", msg.getMsgId(), e);
-                    }
+                    threadPool.submit(() -> {
+                        try {
+                            processMessage(msg);
+                        } catch (Exception e) {
+                            log.error("处理微信消息失败: msgId={}", msg.getMsgId(), e);
+                        }
+                    });
                 }
 
                 String newBuf = wxIlinkUtil.getNextUpdatesBuf();
