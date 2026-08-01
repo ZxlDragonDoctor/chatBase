@@ -73,9 +73,12 @@ public class OpencodeService {
 
     private String doChat(String conversationId, String query, String userId, String channel) {
         String sessionId = getOrCreateSession(conversationId);
-        long promptSentAt = System.currentTimeMillis();
+        if (!StringUtils.hasText(sessionId)) {
+            return "【opencode未返回结果】可能是执行超时或出错，请检查本地 opencode 状态。";
+        }
+        int baseCount = countMessages(sessionId);
         sendPrompt(sessionId, query);
-        String answer = pollAnswer(sessionId, promptSentAt);
+        String answer = pollAnswer(sessionId, baseCount);
         if (!StringUtils.hasText(answer)) {
             answer = "【opencode未返回结果】可能是执行超时或出错，请检查本地 opencode 状态。";
         }
@@ -141,9 +144,11 @@ public class OpencodeService {
     }
 
     /**
-     * 轮询消息，直到出现晚于 prompt 发送时刻的 assistant 文本回复
+     * 轮询消息，直到出现本次 prompt 之后新增的 assistant 文本回复
+     *
+     * @param baseCount 发送 prompt 前的消息总数，用于区分本次 prompt 前后的消息
      */
-    private String pollAnswer(String sessionId, long promptSentAt) {
+    private String pollAnswer(String sessionId, int baseCount) {
         if (!StringUtils.hasText(sessionId)) {
             return null;
         }
@@ -151,7 +156,7 @@ public class OpencodeService {
         long pollInterval = 2000;
         try {
             while (System.currentTimeMillis() < deadline) {
-                String answer = fetchLatestAssistantAnswer(sessionId, promptSentAt);
+                String answer = fetchLatestAssistantAnswer(sessionId, baseCount);
                 if (answer != null) {
                     return answer;
                 }
@@ -163,7 +168,15 @@ public class OpencodeService {
         return null;
     }
 
-    private String fetchLatestAssistantAnswer(String sessionId, long promptSentAt) {
+    /**
+     * 拉取会话消息，返回本次 prompt 之后新增的最新一条含文本的 assistant 消息。
+     *
+     * opencode 的 message 数组按时间倒序排列（最新消息在数组头部），
+     * 因此发送 prompt 后新增的消息位于数组头部 data.size() - baseCount 个。
+     * 不用时间戳判断新旧（assistant 消息 created 时间戳不可靠），
+     * 而是用消息数量基线，避免把历史回复误当成本次回复。
+     */
+    private String fetchLatestAssistantAnswer(String sessionId, int baseCount) {
         try {
             String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/message";
             HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
@@ -174,20 +187,18 @@ public class OpencodeService {
             JsonNode root = objectMapper.readTree(resp.getBody());
             JsonNode data = root.isArray() ? root : root.path("data");
 
-            String fallbackText = null;
-            long fallbackCreated = -1;
             String lastText = null;
-            long lastCreated = -1;
             if (data.isArray()) {
-                for (JsonNode msg : data) {
+                // 新增消息在数组头部：索引 [0, data.size() - baseCount)
+                int newCount = data.size() - baseCount;
+                for (int i = 0; i < newCount && i < data.size(); i++) {
+                    JsonNode msg = data.get(i);
                     if (!"assistant".equals(msg.path("type").asText())) {
                         continue;
                     }
-                    long created = msg.path("time").path("created").asLong(0);
                     JsonNode content = msg.path("content");
-                    String text = null;
+                    StringBuilder sb = new StringBuilder();
                     if (content.isArray()) {
-                        StringBuilder sb = new StringBuilder();
                         for (JsonNode part : content) {
                             if ("text".equals(part.path("type").asText())) {
                                 String t = part.path("text").asText("");
@@ -196,32 +207,36 @@ public class OpencodeService {
                                 }
                             }
                         }
-                        if (sb.length() > 0) {
-                            text = sb.toString();
-                        }
                     }
-                    if (text == null) {
-                        continue;
-                    }
-                    // 记录所有含文本的 assistant 消息中最新的一条作为兜底
-                    if (created > fallbackCreated) {
-                        fallbackCreated = created;
-                        fallbackText = text;
-                    }
-                    // 优先返回晚于 prompt 发送时刻的回复
-                    if (created > promptSentAt && created > lastCreated) {
-                        lastCreated = created;
-                        lastText = text;
+                    if (sb.length() > 0) {
+                        lastText = sb.toString();
                     }
                 }
             }
-            if (lastText != null) {
-                return lastText;
-            }
-            return fallbackText;
+            return lastText;
         } catch (Exception e) {
             log.warn("opencode 轮询消息异常: sessionId={}", sessionId, e);
             return null;
+        }
+    }
+
+    /**
+     * 统计当前会话消息总数（用于建立消息序号基线）
+     */
+    private int countMessages(String sessionId) {
+        try {
+            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/message";
+            HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            if (!resp.getStatusCode().is2xxSuccessful()) {
+                return 0;
+            }
+            JsonNode root = objectMapper.readTree(resp.getBody());
+            JsonNode data = root.isArray() ? root : root.path("data");
+            return data.isArray() ? data.size() : 0;
+        } catch (Exception e) {
+            log.warn("opencode 统计消息数异常: sessionId={}", sessionId, e);
+            return 0;
         }
     }
 
