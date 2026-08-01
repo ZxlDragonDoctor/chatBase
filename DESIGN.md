@@ -1220,6 +1220,7 @@ web/
 | `/console/dashboard` | DashboardPage | 系统概览 | 登录 |
 | `/console/statistics` | StatisticsPage | 数据统计 | 登录（admin 可切换 scope） |
 | `/console/im` | ImGroupsPage | 群聊采集管理 | 登录 |
+| `/console/im/single` | ImSingleChatPage | 私聊采集管理（会话级应用绑定 + opencode 绑定，opencode 仅 admin） | 登录 |
 | `/console/knowledge` | KnowledgePage | 知识库管理 | 登录 |
 | `/console/app` | AppPage | 应用管理 | 登录 |
 | `/console/bots` | BotManagePage | 机器人管理 | 登录 |

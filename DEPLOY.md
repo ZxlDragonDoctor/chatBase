@@ -88,6 +88,68 @@ docker-compose logs -f chatbase-backend
 - `WECHAT_CORP_STOKEN`
 - `WECHAT_CORP_S_ENCODING_AES_KEY`
 
+### 本地 opencode serve（可选）
+
+> 通过私聊会话远程驱动开发者**本机**的 opencode，实现"人在服务器、代理在本机"的远程编码代理。
+
+#### 1. 架构
+
+```
+服务器 ChatBase ──frp 反向隧道──▶ 开发者本机 opencode serve (127.0.0.1:4096)
+```
+
+- opencode serve 只绑定本机 127.0.0.1，不暴露公网
+- 服务器通过 frp 将本机 4096 端口映射为内网可访问的隧道地址
+- 请求路径：私聊消息 → ChatBase 判断会话绑定（appId=-1）→ OpencodeService → frp → 本机 opencode
+
+#### 2. 本机启动 opencode serve
+
+```bash
+# Windows PowerShell / macOS / Linux 均可
+export OPENCODE_SERVER_PASSWORD="your-strong-password"   # 必设，Basic Auth
+opencode serve --port 4096
+```
+
+- 用户名固定为 `opencode`（除非设置 `OPENCODE_SERVER_USERNAME`）
+- 密码 `OPENCODE_PASSWORD` 必须与此处的 `OPENCODE_SERVER_PASSWORD` 一致
+
+#### 3. frp 反向隧道（可选，生产环境必配）
+
+在**开发者本机**运行 frp 客户端，将本机 opencode serve 暴露给服务器：
+
+```ini
+# frpc.ini（本机）
+[opencode-serve]
+type = tcp
+local_ip = 127.0.0.1
+local_port = 4096
+remote_port = 4096
+```
+
+服务器需在 frps 中开放对应 `remote_port` 并设置 token。
+
+> 若服务器与 opencode 在同一台机器，可省略 frp，直接将 `OPENCODE_BASE_URL` 指向本机地址。
+
+#### 4. 服务器配置环境变量
+
+在 `.env` 中添加：
+
+```env
+OPENCODE_ENABLED=true
+OPENCODE_BASE_URL=http://<frp隧道地址>:4096   # 或本机 http://127.0.0.1:4096
+OPENCODE_PASSWORD=your-strong-password
+OPENCODE_DEFAULT_DIRECTORY=/path/to/project    # 本机项目根目录（可选）
+OPENCODE_TIMEOUT_SECONDS=300
+```
+
+#### 5. 使用
+
+1. 以 **admin** 登录 Web 控制台 → 「私聊采集」`/console/im/single`
+2. 在会话详情「应用绑定」下拉中选择 **🖥️ 本地opencode** 并保存
+3. 通过该平台私聊消息，即可远程驱动本机 opencode（回复写入 `kb_conversation` 审计）
+
+⚠️ 只有 admin 用户能看到并绑定「本地opencode」选项。
+
 ## 常用命令
 
 ```bash
@@ -205,6 +267,7 @@ docker-compose logs napcat
 3. **数据库备份**：设置定时备份任务
 4. **监控告警**：配置 Prometheus + Grafana
 5. **日志收集**：配置 ELK 或 Loki
+6. **opencode 安全**：本机 serve 必须设置 `OPENCODE_SERVER_PASSWORD`；frp 隧道仅限可信主机；服务器侧 `OPENCODE_PASSWORD` 与之一致
 
 ## 目录结构
 
@@ -217,6 +280,9 @@ chatBase/
 │   └ init-schema.sql      # 数据库初始化脚本
 │   └── add-cost-fields.sql # 增量更新脚本（可选）
 ├── src/                    # 后端源码
+│   └── main/java/com/zxl/chatbase/
+│       ├── opencode/       # 本地 opencode serve 集成
+│       └── ...             # 其余业务模块
 └── web/
     ├── Dockerfile          # 前端镜像
     ├── nginx.conf          # Nginx 配置

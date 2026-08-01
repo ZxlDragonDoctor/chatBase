@@ -61,6 +61,13 @@ vim .env
 | `WECHAT_CORP_SECRET` | 否 | 企业微信机器人 Secret | `your-secret` |
 | `JAVA_OPTS` | 否 | JVM 参数 | `-Xms512m -Xmx2048m` |
 | `NAPCAT_IMAGE` | 否 | NapCat 镜像名称 | `mlikiowa/napcat-docker:v4.17.46` |
+| `OPENCODE_ENABLED` | 否 | 启用本地 opencode 集成（true/false） | `false` |
+| `OPENCODE_BASE_URL` | 否 | opencode serve 地址（经 frp 隧道访问本机） | `http://127.0.0.1:4096` |
+| `OPENCODE_PASSWORD` | 否 | opencode serve 密码（Basic Auth，与本机 `OPENCODE_SERVER_PASSWORD` 一致） | `your-password` |
+| `OPENCODE_USERNAME` | 否 | opencode Basic Auth 用户名 | `opencode` |
+| `OPENCODE_DEFAULT_DIRECTORY` | 否 | 本机项目根目录（创建会话时指定） | `/path/to/project` |
+| `OPENCODE_DEFAULT_AGENT` | 否 | opencode agent 名称 | `build` |
+| `OPENCODE_TIMEOUT_SECONDS` | 否 | 等待 opencode 回复超时（秒） | `300` |
 
 ### 2.4 启动服务
 
@@ -134,11 +141,13 @@ mysql -u root -pzxl123 chat_base < sql/init-schema.sql
 # 配置 application-local.yaml
 # 确保数据库连接信息正确
 
-# 启动 Spring Boot
-mvn spring-boot:run
+# 启动 Spring Boot（local profile）
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 
-# 或使用 IDE 运行 ChatBaseApplication.java
+# 或使用 IDE 运行 ChatBaseApplication.java，并在启动参数中指定 profile=local
 ```
+
+> **⚠️ 注意**：`application-local.yaml` 被 `.gitignore` 忽略，属本地私有配置，需自行创建/维护（参考 `application.yaml` 结构）。
 
 > **⚠️ 注意**：`pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 注解会抛出 `Name not specified` 异常。如果遇到此错误，请检查 pom.xml 中的编译插件配置。
 
@@ -228,6 +237,17 @@ wechat:
     stoken: "your-token"          # 企业微信 Token
     sEncodingAESKey: "your-aes-key"  # EncodingAESKey
     botName: "企业内部机器人"      # 机器人显示名称
+
+# 本地 opencode serve 集成配置（可选）
+# 指向本机运行的 opencode serve；生产环境经 frp 隧道访问
+opencode:
+  enabled: true                   # 启用（默认 false）
+  base-url: "http://127.0.0.1:4096"  # opencode serve 地址
+  password: "your-password"       # 与本机 OPENCODE_SERVER_PASSWORD 一致
+  username: "opencode"            # Basic Auth 用户名（默认 opencode）
+  default-directory: "D:\\idea_java_project\\chatBase"  # 本机项目根目录
+  default-agent: "build"          # opencode agent 名称
+  timeout-seconds: 300            # 等待回复超时（秒）
 ```
 
 ### 4.4 生产配置（application-prod.yaml）
@@ -248,6 +268,16 @@ wechat:
   corp:
     stoken: ${WECHAT_CORP_STOKEN}
     sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY}
+
+# 本地 opencode 集成（经 frp 隧道访问本机，默认关闭）
+opencode:
+  enabled: ${OPENCODE_ENABLED:false}
+  base-url: ${OPENCODE_BASE_URL:http://127.0.0.1:4096}
+  password: ${OPENCODE_PASSWORD:}
+  username: ${OPENCODE_USERNAME:opencode}
+  default-directory: ${OPENCODE_DEFAULT_DIRECTORY:}
+  default-agent: ${OPENCODE_DEFAULT_AGENT:build}
+  timeout-seconds: ${OPENCODE_TIMEOUT_SECONDS:300}
 ```
 
 ---
@@ -589,6 +619,32 @@ WECHAT_CORP_SECRET=your-secret
    - 发送时间
    - 同步状态
 
+### 7.6.5 私聊采集管理（含 opencode 远程控制）
+
+#### 查看私聊会话
+
+1. 点击左侧菜单「群聊采集」→ 切换到「私聊」标签（路由 `/console/im/single`）
+2. 左侧显示私聊会话列表（平台：QQ/企微/微信）
+3. 点击会话查看详情与消息
+
+#### 绑定应用（Dify 或 本地opencode）
+
+1. 点击会话查看详情
+2. 在「应用绑定」区域选择应用：
+   - **Dify 应用**：所有用户可见
+   - **🖥️ 本地opencode**：仅 **admin** 可见（远程驱动本机 opencode）
+3. 点击「保存」
+4. 该会话后续私聊消息将使用绑定应用处理
+
+> ⚠️ 绑定「本地opencode」需要服务器已启用 `opencode.enabled=true` 且本机 opencode serve 经 frp 隧道可达，否则私聊回复为「【本地opencode未启用】…」。
+> 部署细节见 [DEPLOY.md](./DEPLOY.md)。
+
+#### 解绑应用
+
+1. 在详情面板点击「解绑」
+2. 确认操作
+3. 会话恢复使用默认应用
+
 ### 7.7 机器人管理
 
 #### 7.7.1 查看机器人列表
@@ -871,9 +927,52 @@ docker-compose logs chatbase-frontend
    - 前端显示进度条
    - SSE 实时推送
 
----
+### 10.6 私聊绑定 opencode 后无回复/回复异常
 
-## 11. 性能调优
+**排查步骤**：
+
+1. 确认服务器已启用 opencode
+   ```bash
+   # 检查 application-prod.yaml / .env
+   # OPENCODE_ENABLED=true
+   ```
+
+2. 检查本机 opencode serve 是否运行
+   ```bash
+   # 开发者本机执行
+   curl http://127.0.0.1:4096/                 # 返回 opencode 信息即正常
+   ```
+
+3. 检查 frp 隧道连通性
+   ```bash
+   # 服务器上执行
+   curl http://<frp隧道地址>:4096/             # 能通到本机 opencode 即正常
+   ```
+
+4. 检查密码是否匹配
+   - 本机启动命令的 `OPENCODE_SERVER_PASSWORD`
+   - 服务器配置 `OPENCODE_PASSWORD`
+   - 两者必须一致，否则 401
+
+5. 查看后端日志
+   ```bash
+   docker-compose logs chatbase-backend | grep "opencode"
+   # 关键字：创建会话成功 / 消息已发送 / 轮询 / 未返回结果
+   ```
+
+6. 确认会话已绑定 opencode
+   - 需 admin 在「私聊采集」页面选择 **🖥️ 本地opencode** 保存
+   - 仅 admin 可见该选项
+
+**常见提示**：
+
+| 私聊回复 | 原因 |
+|----------|------|
+| 【本地opencode未启用】… | 服务器未开启 `opencode.enabled=true` |
+| 【opencode未返回结果】… | 超时或执行出错，检查本机 serve 状态、隧道连通、密码 |
+| 空回复 | 中文内容在控制台显示乱码属编码问题，实际已写入 `kb_conversation` |
+
+---
 
 ### 11.1 JVM 参数
 
@@ -1031,7 +1130,10 @@ A：TXT、PDF、DOCX、MD、HTML 等文本格式，不支持图片、视频。
 A：修改 `web/src/styles/cyberpunk.css`，或添加新样式文件。
 
 **Q：能否对接其他 AI 平台？**
-A：当前仅支持 Dify，可扩展 `dify` 模块适配其他平台。
+A：当前支持 Dify，另支持通过「本地opencode」集成驱动本机 opencode；可扩展 `dify`/`opencode` 模块适配其他平台。
+
+**Q：如何远程控制本机 opencode？**
+A：需满足：① 本机启动 `opencode serve --port 4096`（设置 `OPENCODE_SERVER_PASSWORD`）；② 服务器经 frp 隧道访问本机并配置 `OPENCODE_ENABLED=true`、`OPENCODE_BASE_URL`、`OPENCODE_PASSWORD`；③ admin 在「私聊采集」页面将会话绑定 **🖥️ 本地opencode**。详见 [DEPLOY.md](./DEPLOY.md)。
 
 **Q：是否支持多语言？**
 A：当前仅支持中文，可扩展 i18n 支持多语言。
@@ -1044,6 +1146,7 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 |------|------|----------|
 | v1.0 | 2026-05-07 | 初始版本，完整功能 |
 | v1.1 | 2026-05-09 | 新增用户数据隔离、scope 切换支持、pom.xml 编译参数说明 |
+| v1.2 | 2026-08-01 | 新增私聊采集页面、会话级应用绑定、本地 opencode 远程控制集成 |
 
 ---
 
@@ -1055,5 +1158,5 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 
 ---
 
-*文档版本：v1.1*
-*最后更新：2026-05-09*
+*文档版本：v1.2*
+*最后更新：2026-08-01*

@@ -66,10 +66,14 @@ chatBase/
 │   │   │   ├── ImGroupService.java / ImGroupServiceImpl.java
 │   │   │   ├── ImSyncService.java / ImSyncServiceImpl.java
 │   │   │   ├── ImUserService.java / ImUserServiceImpl.java
+│   │   │   ├── ImConversationService.java / ImConversationServiceImpl.java
 │   │   │   ├── BotManageService.java / BotManageServiceImpl.java
 │   │   │   └── GroupMessageSyncService.java / GroupMessageSyncServiceImpl.java
 │   │   ├── consumer/GroupMessageConsumer.java
 │   │   └── dto/
+│   │
+│   ├── opencode/                    # 本地 opencode serve 集成
+│   │   └── service/OpencodeService.java   # 远程驱动本机 opencode（会话映射/轮询）
 │   │
 │   ├── kb/                          # Knowledge Base module
 │   │   ├── service/
@@ -163,6 +167,7 @@ chatBase/
     │   │   ├── DashboardPage.vue    # /console/dashboard
     │   │   ├── StatisticsPage.vue   # /console/statistics
     │   │   ├── ImGroupsPage.vue     # /console/im
+    │   │   ├── ImSingleChatPage.vue # /console/im/single (私聊采集+opencode绑定)
     │   │   ├── KnowledgePage.vue    # /console/knowledge
     │   │   ├── AppPage.vue          # /console/app
     │   │   ├── BotManagePage.vue    # /console/bots
@@ -219,6 +224,7 @@ npm run build  # TypeScript check via vue-tsc before build
 | Redis | `localhost:6379` (optional password via `SPRING_REDIS_PASSWORD`) |
 | File upload | 100MB max |
 | Dify API | configured via `difyApp.*` properties |
+| opencode | `opencode.enabled=false`; local overrides in `application-local.yaml` (git-ignored); prod via `OPENCODE_*` env vars |
 
 ## Auth & Permission Model
 
@@ -262,6 +268,15 @@ Implemented via query-time filtering in all service layers:
    - Calls Dify API via `DifyService`
    - Saves conversation to `kb_conversation` table
 4. Supports web chat (with sessions) and IM bot chat
+
+### Private Chat → Local Opencode (远程驱动本机 opencode)
+1. 私聊消息到达 QQ/企微/微信处理器后，先经 `ImConversationService.isOpencodeBound(conversationId)` 判断是否绑定 opencode（`appId == -1L`）
+2. 若绑定 → `OpencodeService.chat()` 走 opencode 通道；否则走原 Dify 链路
+3. `OpencodeService`: Redis 中 `opencode:session:<conversationId>` 映射 opencode sessionId（TTL 7 天）
+   - `POST /api/session` 创建会话（directory/agent）→ `POST /api/session/{id}/prompt` 发消息 → 每 2s 轮询 `GET /api/session/{id}/message` 取最新 assistant 文本
+   - Basic Auth（username=opencode / OPENCODE_SERVER_PASSWORD）
+4. 回复写入 `kb_conversation`（appId=-1, appName=本地opencode），再回发私聊
+5. 绑定「本地opencode」仅 admin 可用（`ImConversationServiceImpl.isAdmin()` 校验 SysUser.role=="admin"）
 
 ### File Upload
 1. Files uploaded to Dify `/files/upload` API, then synced to dataset
@@ -479,6 +494,7 @@ qq:
 | `/console/dashboard` | DashboardPage | System dashboard overview | No |
 | `/console/statistics` | StatisticsPage | Usage statistics with scope toggle | No |
 | `/console/im` | ImGroupsPage | Group chat management | No |
+| `/console/im/single` | ImSingleChatPage | Private chat collection + Dify/opencode binding (opencode admin only) | No |
 | `/console/knowledge` | KnowledgePage | Knowledge base management | No |
 | `/console/app` | AppPage | App management | No |
 | `/console/bots` | BotManagePage | Robot/bot management | No |
