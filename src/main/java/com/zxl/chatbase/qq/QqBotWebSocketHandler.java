@@ -30,6 +30,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import com.zxl.chatbase.im.service.ImConversationService;
 import com.zxl.chatbase.im.service.ImUserService;
+import com.zxl.chatbase.opencode.OpencodeService;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,6 +65,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
     private final ThreadPoolExecutor threadPool;
     private final ImConversationService imConversationService;
     private final ImUserService imUserService;
+    private final OpencodeService opencodeService;
 
     private static final String RATE_KEY_PREFIX = "chat:rate:im:";
 
@@ -219,7 +221,23 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 3. 获取会话绑定的应用（未绑定则用默认应用）
+        // 3. 会话绑定本地 opencode 时走 opencode 通道
+        if (imConversationService.isOpencodeBound(conversationId)) {
+            CompletableFuture.supplyAsync(() -> opencodeService.chat(
+                            conversationId, rawMessage, String.valueOf(userId), "qq"
+                    ), threadPool)
+                    .orTimeout(300, TimeUnit.SECONDS)
+                    .exceptionally(e -> {
+                        log.error("QQ私聊opencode任务执行失败，userId={}", userId, e);
+                        return "【系统繁忙】opencode 执行超时，请稍后再试";
+                    })
+                    .thenAccept(answer -> {
+                        sendPrivateMessage(session, userId, answer);
+                    });
+            return;
+        }
+
+        // 4. 获取会话绑定的应用（未绑定则用默认应用）
         Long appId = imConversationService.getAppIdForConversation(conversationId);
 
         // 4. 异步回答

@@ -6,7 +6,9 @@ import com.zxl.chatbase.im.entity.ImConversation;
 import com.zxl.chatbase.im.mapper.ImConversationMapper;
 import com.zxl.chatbase.im.service.ImConversationService;
 import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.entity.SysUser;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.kb.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     private final ImConversationMapper imConversationMapper;
     private final KbAppMapper kbAppMapper;
+    private final SysUserMapper sysUserMapper;
 
     private static String buildConversationId(String platform, String userId) {
         return "single:" + platform + ":" + userId;
@@ -73,6 +76,22 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     @Override
+    public boolean isOpencodeBound(String conversationId) {
+        if (!StringUtils.hasText(conversationId)) return false;
+        try {
+            ImConversation conv = imConversationMapper.selectOne(
+                    new LambdaQueryWrapper<ImConversation>()
+                            .eq(ImConversation::getConversationId, conversationId)
+                            .last("LIMIT 1")
+            );
+            return conv != null && OPENCODE_APP_ID.equals(conv.getAppId());
+        } catch (Exception e) {
+            log.error("判断opencode绑定失败: conversationId={}", conversationId, e);
+            return false;
+        }
+    }
+
+    @Override
     public void bindApp(Long id, Long appId, String appName, String userId) {
         ImConversation conv = imConversationMapper.selectById(id);
         if (conv == null) {
@@ -81,6 +100,21 @@ public class ImConversationServiceImpl implements ImConversationService {
         if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
             throw new RuntimeException("无权绑定应用：非会话归属用户");
         }
+
+        // 绑定本地 opencode：仅管理员可用
+        if (OPENCODE_APP_ID.equals(appId)) {
+            if (!isAdmin(userId)) {
+                throw new RuntimeException("无权绑定本地opencode：仅管理员可用");
+            }
+            conv.setCreatedBy(userId);
+            conv.setAppId(OPENCODE_APP_ID);
+            conv.setAppName(OPENCODE_APP_NAME);
+            conv.setUpdateTime(LocalDateTime.now());
+            imConversationMapper.updateById(conv);
+            log.info("会话绑定本地opencode: conversationId={}, userId={}", conv.getConversationId(), userId);
+            return;
+        }
+
         conv.setCreatedBy(userId);
         conv.setAppId(appId);
         conv.setAppName(appName);
@@ -116,6 +150,10 @@ public class ImConversationServiceImpl implements ImConversationService {
                             .last("LIMIT 1")
             );
             if (conv != null && conv.getAppId() != null) {
+                // 本地 opencode 特殊绑定，不属于 Dify 应用，直接返回 null（由调用方走 opencode 通道）
+                if (OPENCODE_APP_ID.equals(conv.getAppId())) {
+                    return null;
+                }
                 KbApp app = kbAppMapper.selectById(conv.getAppId());
                 if (app != null && Boolean.TRUE.equals(app.getStatus())) {
                     return app.getId();
@@ -131,6 +169,22 @@ public class ImConversationServiceImpl implements ImConversationService {
         } catch (Exception e) {
             log.error("获取会话应用失败: conversationId={}", conversationId, e);
             return null;
+        }
+    }
+
+    private boolean isAdmin(String userId) {
+        if (!StringUtils.hasText(userId)) return false;
+        try {
+            SysUser user = sysUserMapper.selectOne(
+                    new LambdaQueryWrapper<SysUser>()
+                            .eq(SysUser::getUsername, userId)
+                            .eq(SysUser::getStatus, true)
+                            .last("LIMIT 1")
+            );
+            return user != null && "admin".equals(user.getRole());
+        } catch (Exception e) {
+            log.error("查询管理员状态失败: userId={}", userId, e);
+            return false;
         }
     }
 }

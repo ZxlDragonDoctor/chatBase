@@ -46,4 +46,14 @@ im:
     polling:
       enabled: false
 
+# 本地 opencode serve 集成配置
+opencode:
+  enabled: false
+  base-url: "http://127.0.0.1:4096"
+  password: ""
+  username: "opencode"
+  default-directory: ""
+  default-agent: "build"
+  timeout-seconds: 300
+
 

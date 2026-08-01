@@ -15,6 +15,7 @@ import com.zxl.chatbase.im.service.ImGroupService;
 import com.zxl.chatbase.im.service.ImUserService;
 import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.opencode.OpencodeService;
 import com.zxl.chatbase.wxroboot.webhook.config.WXBizJsonMsgCryptConfig;
 import com.zxl.chatbase.wxroboot.webhook.entity.DutyChatGroup;
 import com.zxl.chatbase.wxroboot.webhook.entity.intelligentBot.IntelligentBotMsg;
@@ -68,6 +69,8 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     private StringRedisTemplate stringRedisTemplate;
     @Resource
     private ImConversationService imConversationService;
+    @Resource
+    private OpencodeService opencodeService;
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
@@ -219,6 +222,18 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
         imConversationService.updateLastMessage(conversationId, query, userId, "wecom");
         imUserService.getOrCreateUser("wecom", userId, null, nickname);
 
+        String replyContent;
+        // 会话绑定本地 opencode 时走 opencode 通道
+        if (imConversationService.isOpencodeBound(conversationId)) {
+            replyContent = opencodeService.chat(conversationId, query, userId, "wecom");
+            log.info("企微单聊opencode回复生成完成: userId={}, reply={}", userId, replyContent);
+            if (msg.getResponse_url() != null && !msg.getResponse_url().isEmpty()) {
+                WeChatUtil.sendMarkdown(msg.getResponse_url(), replyContent);
+                log.info("企微单聊opencode回复发送成功: userId={}", userId);
+            }
+            return;
+        }
+
         Long appId = imConversationService.getAppIdForConversation(conversationId);
         log.info("企微单聊: userId={}, appId={}", userId, appId);
 
@@ -226,7 +241,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 appId, "wecom", userId, conversationId, query
         );
 
-        String replyContent = decodeUnicode(difyChatResponse.getAnswer());
+        replyContent = decodeUnicode(difyChatResponse.getAnswer());
         log.info("企微单聊回复生成完成: userId={}, reply={}", userId, replyContent);
         replyContent = filterThinkingContent(replyContent);
 

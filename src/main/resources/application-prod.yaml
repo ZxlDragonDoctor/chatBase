@@ -66,6 +66,16 @@ wx:
     bot-id: ${WX_BOT_BOT_ID:}
     nickname: ${WX_BOT_NICKNAME:微信机器人}
 
+# 本地 opencode serve 集成配置（经 frp 隧道访问本机 opencode）
+opencode:
+  enabled: ${OPENCODE_ENABLED:false}
+  base-url: ${OPENCODE_BASE_URL:http://127.0.0.1:4096}
+  password: ${OPENCODE_PASSWORD:}
+  username: ${OPENCODE_USERNAME:opencode}
+  default-directory: ${OPENCODE_DEFAULT_DIRECTORY:}
+  default-agent: ${OPENCODE_DEFAULT_AGENT:build}
+  timeout-seconds: ${OPENCODE_TIMEOUT_SECONDS:300}
+
 chat:
   max-turns-per-session: 20
   session-ttl-days: 7

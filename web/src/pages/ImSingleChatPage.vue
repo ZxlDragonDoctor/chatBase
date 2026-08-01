@@ -81,6 +81,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                   <select v-model="bindAppId" class="anime-app-select" style="min-width: 200px;">
                     <option value="">不绑定应用</option>
+                    <option v-if="isAdmin" value="-1">🖥️ 本地opencode</option>
                     <option v-for="app in appList" :key="app.id" :value="app.id">{{ app.icon || '🤖' }} {{ app.name }}</option>
                   </select>
                   <button class="anime-btn primary" @click="saveBindApp" :disabled="bindSaving">
@@ -90,6 +91,9 @@
                 </div>
                 <div v-if="selected.appName" style="margin-top: 10px; font-size: 13px; color: var(--anime-text-muted);">
                   当前绑定: <span style="color: var(--anime-blue);">{{ selected.appName }}</span>
+                </div>
+                <div v-if="selected.appId === -1" style="margin-top: 8px; font-size: 12px; color: var(--anime-pink);">
+                  该会话已绑定本地 opencode：发消息将由本地电脑上的 opencode 执行，仅管理员可见此选项。
                 </div>
               </div>
 
@@ -150,6 +154,7 @@ interface KbApp {
 }
 
 const currentUserName = computed(() => localStorage.getItem('chatbase_original_username') || localStorage.getItem('chatbase_user') || '')
+const isAdmin = computed(() => localStorage.getItem('chatbase_role') === 'admin')
 
 const filteredConversations = computed(() => {
   const q = convSearch.value.trim().toLowerCase()
@@ -256,16 +261,17 @@ async function saveBindApp() {
   if (!selected.value) return
   bindSaving.value = true
   try {
-    const appId = bindAppId.value ? Number(bindAppId.value) : null
-    const appName = appId ? appList.value.find(a => a.id === appId)?.name : null
-    if (appId) {
-      await api.put(`/console/conversations/${selected.value.id}/app`, { appId, appName })
-      selected.value.appId = appId
-      selected.value.appName = appName
-    } else {
+    const bindVal = bindAppId.value === '' || bindAppId.value === null ? null : bindAppId.value
+    if (bindVal == null) {
       await api.delete(`/console/conversations/${selected.value.id}/app`)
       selected.value.appId = null
       selected.value.appName = null
+    } else {
+      const appId = Number(bindVal)
+      const appName = appId === -1 ? '本地opencode' : (appList.value.find(a => a.id === appId)?.name || null)
+      await api.put(`/console/conversations/${selected.value.id}/app`, { appId, appName })
+      selected.value.appId = appId
+      selected.value.appName = appName
     }
     reload()
   } catch (e: any) {

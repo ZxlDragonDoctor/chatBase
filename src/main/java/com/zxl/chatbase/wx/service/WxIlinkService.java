@@ -14,6 +14,7 @@ import com.zxl.chatbase.im.service.ImGroupService;
 import com.zxl.chatbase.im.service.ImUserService;
 import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
+import com.zxl.chatbase.opencode.OpencodeService;
 import com.zxl.chatbase.wx.config.WxProperties;
 import com.zxl.chatbase.wx.model.WxInboundMessage;
 import com.zxl.chatbase.wx.model.WxMediaInfo;
@@ -59,6 +60,7 @@ public class WxIlinkService {
     private final StringRedisTemplate stringRedisTemplate;
     private final RestTemplate restTemplate;
     private final ImConversationService imConversationService;
+    private final OpencodeService opencodeService;
 
     private static final String REDIS_UPDATES_BUF_KEY = "bot:wx:get_updates_buf";
     private static final String REDIS_ONLINE_KEY = "bot:wx:online";
@@ -355,6 +357,28 @@ public class WxIlinkService {
 
         // Dify 问答
         try {
+            if (isPrivate && imConversationService.isOpencodeBound(conversationId)) {
+                String opencodeAnswer = opencodeService.chat(conversationId, rawMessage, fromUser, "wx");
+                opencodeAnswer = filterThinkingContent(opencodeAnswer);
+                if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
+                    WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                            fromUser, msg.getContextToken(), opencodeAnswer);
+                    int ret = wxIlinkUtil.sendMessage(
+                            resolveBaseUrl(), resolveBotToken(), reply);
+                    if (ret == -14) {
+                        log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                        markOffline();
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    log.info("微信opencode回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
+                } else {
+                    log.warn("微信opencode问答结果为空或缺少context_token，未发送回复: msgId={}, hasAnswer={}, hasContextToken={}",
+                            msg.getMsgId(), StringUtils.hasText(opencodeAnswer), StringUtils.hasText(msg.getContextToken()));
+                }
+                return;
+            }
+
             Long appId = isPrivate ? imConversationService.getAppIdForConversation(conversationId) : getAppIdForGroup(fromGroup);
             log.info("微信消息开始问答: msgId={}, fromUser={}, groupId={}, appId={}",
                     msg.getMsgId(), fromUser, isPrivate ? conversationId : fromGroup, appId);
