@@ -18,7 +18,7 @@ public class QqBotController {
 
     @GetMapping("/qrcode")
     public Map<String, Object> getQrCode() {
-        return napCatService.getQrCodeImage();
+        return napCatService.getQrCode();
     }
 
     @GetMapping("/qrcode/status")

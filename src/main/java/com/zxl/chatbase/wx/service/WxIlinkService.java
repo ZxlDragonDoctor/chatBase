@@ -192,13 +192,10 @@ public class WxIlinkService {
                     }
                 }
 
-                if (messages.isEmpty()) {
-                    String newBuf = wxIlinkUtil.getUpdatesBuf(
-                            baseUrl, botToken, getUpdatesBuf);
-                    if (newBuf != null && !newBuf.equals(getUpdatesBuf)) {
-                        getUpdatesBuf = newBuf;
-                        saveGetUpdatesBuf(getUpdatesBuf);
-                    }
+                String newBuf = wxIlinkUtil.getNextUpdatesBuf();
+                if (newBuf != null && !newBuf.equals(getUpdatesBuf)) {
+                    getUpdatesBuf = newBuf;
+                    saveGetUpdatesBuf(getUpdatesBuf);
                 }
 
                 sleep(1000);
@@ -215,7 +212,8 @@ public class WxIlinkService {
 
         Integer messageType = msg.getMessageType();
         if (messageType == null || messageType != 1) {
-            log.debug("跳过非用户消息: messageType={}", messageType);
+            log.info("跳过非用户消息: messageType={}, fromUser={}, fromGroup={}, text={}",
+                    messageType, msg.getFromUserId(), msg.getFromGroupId(), truncate(msg.getTextContent(), 50));
             return;
         }
 
@@ -235,6 +233,8 @@ public class WxIlinkService {
 
         boolean isGroup = msg.isGroupChat();
         boolean isPrivate = msg.isPrivateChat();
+        log.info("收到微信消息: msgId={}, messageType={}, isGroup={}, isPrivate={}, fromUser={}, fromGroup={}, text=[{}]",
+                msg.getMsgId(), messageType, isGroup, isPrivate, fromUser, fromGroup, truncate(rawMessage, 100));
 
         String conversationId = null;
         if (isPrivate) {
@@ -326,7 +326,8 @@ public class WxIlinkService {
             String botNickname = getNickname();
             String atMention = "@" + botNickname;
             if (!rawMessage.contains(atMention)) {
-                log.debug("群聊消息未 @机器人，仅采集: groupId={}", fromGroup);
+                log.info("群聊消息未 @机器人({}), 仅采集: groupId={}, msg=[{}]",
+                        atMention, fromGroup, truncate(rawMessage, 100));
                 groupMessageSyncService.saveGroupMessage("wx", msg.getMsgId(), fromGroup,
                         fromUser, rawMessage, msgType, msg.getTimestamp() != null ? msg.getTimestamp() : System.currentTimeMillis() / 1000,
                         fileUrl, fileName);
@@ -335,6 +336,7 @@ public class WxIlinkService {
                 return;
             }
             rawMessage = rawMessage.replace(atMention, "").trim();
+            log.info("群聊消息触发 @机器人 问答: groupId={}, 去除@后=[{}]", fromGroup, truncate(rawMessage, 100));
         }
 
         if (isPrivate) {
@@ -374,7 +376,10 @@ public class WxIlinkService {
                     Thread.currentThread().interrupt();
                     return;
                 }
-                log.info("微信回复发送成功: msgId={}, toUser={}", msg.getMsgId(), fromUser);
+                log.info("微信回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
+            } else {
+                log.warn("微信问答结果为空或缺少context_token，未发送回复: msgId={}, hasAnswer={}, hasContextToken={}",
+                        msg.getMsgId(), StringUtils.hasText(answer), StringUtils.hasText(msg.getContextToken()));
             }
         } catch (Exception e) {
             log.error("微信消息问答失败: msgId={}", msg.getMsgId(), e);
@@ -452,6 +457,11 @@ public class WxIlinkService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static String truncate(String text, int max) {
+        if (text == null) return "";
+        return text.length() <= max ? text : text.substring(0, max) + "...";
     }
 
     private static class ByteArrayMultipartFile implements org.springframework.web.multipart.MultipartFile {

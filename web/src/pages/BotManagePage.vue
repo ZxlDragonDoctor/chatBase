@@ -146,7 +146,7 @@
             <template v-else>
               <div class="qr-image-wrapper">
                 <canvas v-if="qrPlatform === 'wx'" ref="qrCanvasRef" class="qr-canvas"></canvas>
-                <img v-else :src="qrQrImg" class="qr-canvas" alt="QQ登录二维码" />
+                <canvas v-else ref="qqQrCanvasRef" class="qr-canvas"></canvas>
               </div>
               <div class="qr-status">
                 <span v-if="qrStatus === 'pending'" class="qr-status-text">
@@ -220,8 +220,10 @@ const qrPlatform = ref<'wx' | 'qq'>('wx')
 const qrFetching = ref(false)
 const qrError = ref('')
 const qrCanvasRef = ref<HTMLCanvasElement | null>(null)
+const qqQrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const qrCodeKey = ref('')
 const qrQrImg = ref('')
+const qqQrUrl = ref('')
 const qrStatus = ref<'pending' | 'confirmed' | 'expired' | ''>('')
 const pollCount = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -240,6 +242,12 @@ function stopPolling() {
 
 async function renderQrToCanvas(text: string) {
   const canvas = qrCanvasRef.value
+  if (!canvas) throw new Error('Canvas 未就绪')
+  await QRCode.toCanvas(canvas, text, { width: 220, margin: 2 })
+}
+
+async function renderQqQrToCanvas(text: string) {
+  const canvas = qqQrCanvasRef.value
   if (!canvas) throw new Error('Canvas 未就绪')
   await QRCode.toCanvas(canvas, text, { width: 220, margin: 2 })
 }
@@ -267,12 +275,14 @@ async function fetchQrCode() {
       if (data.error) {
         throw new Error(data.error)
       }
-      if (!data.qrcode_img) {
+      if (!data.qrcode_url) {
         throw new Error('二维码数据为空')
       }
-      qrQrImg.value = data.qrcode_img
+      qqQrUrl.value = data.qrcode_url
       qrStatus.value = 'pending'
       qrFetching.value = false
+      await nextTick()
+      await renderQqQrToCanvas(data.qrcode_url)
     }
     startPolling()
   } catch (e: any) {
@@ -314,7 +324,7 @@ function startPolling() {
             closeQrModal()
             loadBots()
           }, 1500)
-        } else if (data.isOffline || data.loginError) {
+        } else if (data.isOffline || (data.qrcode_url && qqQrUrl.value && data.qrcode_url !== qqQrUrl.value)) {
           qrStatus.value = 'expired'
           stopPolling()
         }

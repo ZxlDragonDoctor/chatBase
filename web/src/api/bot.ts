@@ -63,6 +63,7 @@ export interface QqLoginStatus {
   isLogin: boolean
   isOffline: boolean
   loginError?: string
+  qrcode_url?: string
 }
 
 export async function getQqQrCode(): Promise<QqQrCodeResponse> {

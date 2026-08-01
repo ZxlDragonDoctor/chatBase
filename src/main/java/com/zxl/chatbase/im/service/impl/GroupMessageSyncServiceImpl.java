@@ -491,6 +491,7 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             gm.setMessageId(messageId);
             gm.setConversationType("single");
             gm.setConversationId(conversationId);
+            gm.setGroupId("single");
             gm.setUserId(userId);
             gm.setPlatform(platform);
             gm.setMessageType(messageType);

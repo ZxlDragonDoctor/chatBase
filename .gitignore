@@ -18,6 +18,10 @@ Thumbs.db
 *.log
 logs/
 
+web/src/**/*.vue.js
+web/src/*.vue.js
+web/npm-dev.err
+
 uploads/*
 !uploads/.gitkeep
 

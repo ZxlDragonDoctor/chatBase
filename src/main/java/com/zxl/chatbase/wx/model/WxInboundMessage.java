@@ -8,17 +8,14 @@ import java.util.List;
 @Data
 public class WxInboundMessage {
 
-    @JsonProperty("msg_id")
+    @JsonProperty("message_id")
     private String msgId;
 
     @JsonProperty("from_user_id")
     private String fromUserId;
 
-    @JsonProperty("from_group_id")
+    @JsonProperty("group_id")
     private String fromGroupId;
-
-    @JsonProperty("chat_type")
-    private Integer chatType;
 
     @JsonProperty("context_token")
     private String contextToken;
@@ -63,11 +60,11 @@ public class WxInboundMessage {
     }
 
     public boolean isGroupChat() {
-        return chatType != null && chatType == 2;
+        return fromGroupId != null && !fromGroupId.isEmpty();
     }
 
     public boolean isPrivateChat() {
-        return chatType == null || chatType == 1;
+        return !isGroupChat();
     }
 
     public boolean isText() {

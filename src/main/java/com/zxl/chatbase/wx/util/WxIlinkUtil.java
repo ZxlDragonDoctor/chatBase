@@ -11,6 +11,7 @@ import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.http.converter.StringHttpMessageConverter;
 
 import java.io.IOException;
 import java.net.URI;
@@ -24,6 +25,7 @@ public class WxIlinkUtil {
     private final ObjectMapper objectMapper;
     private final RestTemplate pollingRestTemplate;
     private final RestTemplate downloadRestTemplate;
+    private volatile String nextUpdatesBuf;
 
     public WxIlinkUtil(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -35,7 +37,13 @@ public class WxIlinkUtil {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(connectTimeout);
         factory.setReadTimeout(readTimeout);
-        return new RestTemplate(factory);
+        RestTemplate restTemplate = new RestTemplate(factory);
+        restTemplate.getMessageConverters().forEach(converter -> {
+            if (converter instanceof StringHttpMessageConverter) {
+                ((StringHttpMessageConverter) converter).setDefaultCharset(StandardCharsets.UTF_8);
+            }
+        });
+        return restTemplate;
     }
 
     public HttpHeaders buildHeaders(String token) {
@@ -63,6 +71,7 @@ public class WxIlinkUtil {
     }
 
     public List<WxInboundMessage> getUpdates(String baseUrl, String token, String getUpdatesBuf) {
+        nextUpdatesBuf = null;
         String url = baseUrl + "/ilink/bot/getupdates";
         HttpHeaders headers = buildHeaders(token);
 
@@ -94,12 +103,22 @@ public class WxIlinkUtil {
                 return Collections.emptyList();
             }
 
+            if (msgsNode.size() > 0) {
+                log.info("getUpdates 收到 {} 条消息: {}", msgsNode.size(), msgsNode.toString());
+            }
+
             List<WxInboundMessage> messages = new ArrayList<>();
             for (JsonNode msgNode : msgsNode) {
                 WxInboundMessage msg = objectMapper.treeToValue(msgNode, WxInboundMessage.class);
                 if (msg != null && msg.getMsgId() != null) {
                     messages.add(msg);
+                } else {
+                    log.warn("getUpdates 消息解析失败或缺少msg_id: {}", msgNode.toString());
                 }
+            }
+
+            if (root.has("get_updates_buf")) {
+                nextUpdatesBuf = root.path("get_updates_buf").asText(null);
             }
 
             return messages;
@@ -109,36 +128,8 @@ public class WxIlinkUtil {
         }
     }
 
-    public String getUpdatesBuf(String baseUrl, String token, String getUpdatesBuf) {
-        String url = baseUrl + "/ilink/bot/getupdates";
-        HttpHeaders headers = buildHeaders(token);
-
-        Map<String, Object> body = new HashMap<>();
-        if (getUpdatesBuf != null && !getUpdatesBuf.isEmpty()) {
-            body.put("get_updates_buf", getUpdatesBuf);
-        }
-
-        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<String> response = pollingRestTemplate.exchange(
-                    url, HttpMethod.POST, requestEntity, String.class);
-            String responseBody = response.getBody();
-            if (responseBody == null || responseBody.trim().isEmpty()) {
-                return getUpdatesBuf;
-            }
-
-            JsonNode root = objectMapper.readTree(responseBody);
-            int ret = root.path("ret").asInt(0);
-            if (ret != 0) {
-                return getUpdatesBuf;
-            }
-
-            return root.path("get_updates_buf").asText(getUpdatesBuf);
-        } catch (Exception e) {
-            log.warn("getUpdatesBuf 获取失败: {}", e.getMessage());
-            return getUpdatesBuf;
-        }
+    public String getNextUpdatesBuf() {
+        return nextUpdatesBuf;
     }
 
     public int sendMessage(String baseUrl, String token, WxOutboundMessage message) {
