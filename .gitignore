@@ -20,6 +20,8 @@ logs/
 
 web/src/**/*.vue.js
 web/src/*.vue.js
+web/src/**/*.js
+web/src/*.js
 web/npm-dev.err
 
 uploads/*

@@ -219,7 +219,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
         imConversationService.updateLastMessage(conversationId, query, userId, "wecom");
         imUserService.getOrCreateUser("wecom", userId, null, nickname);
 
-        Long appId = getDefaultAppId();
+        Long appId = imConversationService.getAppIdForConversation(conversationId);
         log.info("企微单聊: userId={}, appId={}", userId, appId);
 
         DifyChatResponse difyChatResponse = chatService.chat(

@@ -5,9 +5,12 @@ import com.zxl.chatbase.im.dto.ConversationSummaryVO;
 import com.zxl.chatbase.im.entity.ImConversation;
 import com.zxl.chatbase.im.mapper.ImConversationMapper;
 import com.zxl.chatbase.im.service.ImConversationService;
+import com.zxl.chatbase.kb.entity.KbApp;
+import com.zxl.chatbase.kb.mapper.KbAppMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +21,7 @@ import java.util.List;
 public class ImConversationServiceImpl implements ImConversationService {
 
     private final ImConversationMapper imConversationMapper;
+    private final KbAppMapper kbAppMapper;
 
     private static String buildConversationId(String platform, String userId) {
         return "single:" + platform + ":" + userId;
@@ -66,5 +70,67 @@ public class ImConversationServiceImpl implements ImConversationService {
     public List<ConversationSummaryVO> listAccessibleConversations(String userId) {
         if (userId == null) return List.of();
         return imConversationMapper.selectAccessibleConversations(userId);
+    }
+
+    @Override
+    public void bindApp(Long id, Long appId, String appName, String userId) {
+        ImConversation conv = imConversationMapper.selectById(id);
+        if (conv == null) {
+            throw new RuntimeException("会话不存在");
+        }
+        if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权绑定应用：非会话归属用户");
+        }
+        conv.setCreatedBy(userId);
+        conv.setAppId(appId);
+        conv.setAppName(appName);
+        conv.setUpdateTime(LocalDateTime.now());
+        imConversationMapper.updateById(conv);
+        log.info("会话绑定应用: conversationId={}, appId={}, appName={}, userId={}", conv.getConversationId(), appId, appName, userId);
+    }
+
+    @Override
+    public void unbindApp(Long id, String userId) {
+        ImConversation conv = imConversationMapper.selectById(id);
+        if (conv == null) {
+            throw new RuntimeException("会话不存在");
+        }
+        if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权解绑应用：非会话归属用户");
+        }
+        conv.setCreatedBy(null);
+        conv.setAppId(null);
+        conv.setAppName(null);
+        conv.setUpdateTime(LocalDateTime.now());
+        imConversationMapper.updateById(conv);
+        log.info("会话解除应用绑定: conversationId={}, userId={}", conv.getConversationId(), userId);
+    }
+
+    @Override
+    public Long getAppIdForConversation(String conversationId) {
+        if (!StringUtils.hasText(conversationId)) return null;
+        try {
+            ImConversation conv = imConversationMapper.selectOne(
+                    new LambdaQueryWrapper<ImConversation>()
+                            .eq(ImConversation::getConversationId, conversationId)
+                            .last("LIMIT 1")
+            );
+            if (conv != null && conv.getAppId() != null) {
+                KbApp app = kbAppMapper.selectById(conv.getAppId());
+                if (app != null && Boolean.TRUE.equals(app.getStatus())) {
+                    return app.getId();
+                }
+            }
+            KbApp defaultApp = kbAppMapper.selectOne(
+                    new LambdaQueryWrapper<KbApp>()
+                            .eq(KbApp::getStatus, true)
+                            .eq(KbApp::getIsDefault, true)
+                            .last("LIMIT 1")
+            );
+            return defaultApp != null ? defaultApp.getId() : null;
+        } catch (Exception e) {
+            log.error("获取会话应用失败: conversationId={}", conversationId, e);
+            return null;
+        }
     }
 }

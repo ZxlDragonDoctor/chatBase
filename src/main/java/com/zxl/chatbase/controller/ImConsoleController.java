@@ -5,6 +5,7 @@ import com.zxl.chatbase.im.dto.ConversationSummaryVO;
 import com.zxl.chatbase.im.dto.GroupMessagePageVO;
 import com.zxl.chatbase.im.dto.GroupSummaryVO;
 import com.zxl.chatbase.im.service.ImConsoleService;
+import com.zxl.chatbase.im.service.ImConversationService;
 import com.zxl.chatbase.im.service.ImGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +32,7 @@ public class ImConsoleController {
 
     private final ImConsoleService imConsoleService;
     private final ImGroupService imGroupService;
+    private final ImConversationService imConversationService;
 
     @GetMapping("/overview")
     public ConsoleOverviewVO overview(@RequestAttribute("currentUser") String userId) {
@@ -72,6 +74,23 @@ public class ImConsoleController {
             @RequestParam(required = false) String keyword,
             @RequestAttribute("currentUser") String userId) {
         return imConsoleService.pagePrivateMessages(conversationId, page, size, keyword, userId);
+    }
+
+    @PutMapping("/conversations/{id}/app")
+    public void bindConversationApp(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            @RequestAttribute("currentUser") String userId) {
+        Long appId = body.get("appId") != null ? Long.valueOf(body.get("appId").toString()) : null;
+        String appName = body.get("appName") != null ? body.get("appName").toString() : null;
+        imConversationService.bindApp(id, appId, appName, userId);
+    }
+
+    @DeleteMapping("/conversations/{id}/app")
+    public void unbindConversationApp(
+            @PathVariable Long id,
+            @RequestAttribute("currentUser") String userId) {
+        imConversationService.unbindApp(id, userId);
     }
 
     @PutMapping("/groups/{id}/app")

@@ -13,8 +13,8 @@ import java.util.List;
 public interface ImConversationMapper extends BaseMapper<ImConversation> {
 
     @Select("<script>"
-            + "SELECT conversation_id, platform, user_id, user_nickname, title, "
-            + "last_message, last_message_time, message_count, created_by "
+            + "SELECT id, conversation_id, platform, user_id, user_nickname, title, "
+            + "last_message, last_message_time, message_count, created_by, app_id, app_name "
             + "FROM im_conversation "
             + "WHERE status = 1 "
             + "AND conversation_type = 'single' "

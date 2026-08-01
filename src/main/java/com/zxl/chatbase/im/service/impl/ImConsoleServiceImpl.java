@@ -195,6 +195,13 @@ public class ImConsoleServiceImpl implements ImConsoleService {
             return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
         }
 
+        List<String> accessibleConvIds = imConversationMapper.selectAccessibleConversations(userId).stream()
+                .map(ConversationSummaryVO::getConversationId)
+                .collect(Collectors.toList());
+        if (!accessibleConvIds.contains(conversationId)) {
+            return new GroupMessagePageVO(List.of(), 0, Math.max(page, 0), Math.max(size, 1));
+        }
+
         if (page < 0) page = 0;
         if (size < 1) size = 20;
         if (size > 200) size = 200;

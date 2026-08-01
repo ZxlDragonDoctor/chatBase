@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { ConsoleOverview, GroupMessagePage, GroupSummary } from '../types/console'
+import type { ConsoleOverview, ConversationSummary, GroupMessagePage, GroupSummary } from '../types/console'
 
 export async function fetchOverview(): Promise<ConsoleOverview> {
   const resp = await api.get<ConsoleOverview>('/console/overview')
@@ -26,6 +26,32 @@ export async function fetchGroupMessages(params: {
     params: {
       groupId: gid,
       platform: params.platform ?? 'all',
+      page: params.page ?? 0,
+      size: params.size ?? 30,
+      keyword: params.keyword || undefined,
+    },
+  })
+  return resp.data
+}
+
+export async function fetchConversations(): Promise<ConversationSummary[]> {
+  const resp = await api.get<ConversationSummary[]>('/console/conversations')
+  return resp.data
+}
+
+export async function fetchPrivateMessages(params: {
+  conversationId: string
+  page?: number
+  size?: number
+  keyword?: string
+}): Promise<GroupMessagePage> {
+  const cid = params.conversationId != null && String(params.conversationId).trim() !== '' ? String(params.conversationId) : ''
+  if (!cid) {
+    return { records: [], total: 0, page: params.page ?? 0, size: params.size ?? 30 }
+  }
+  const resp = await api.get<GroupMessagePage>('/console/conversations/messages', {
+    params: {
+      conversationId: cid,
       page: params.page ?? 0,
       size: params.size ?? 30,
       keyword: params.keyword || undefined,

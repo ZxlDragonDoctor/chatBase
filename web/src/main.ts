@@ -5,6 +5,7 @@ import ChatPage from './pages/ChatPage.vue'
 import DashboardPage from './pages/DashboardPage.vue'
 import StatisticsPage from './pages/StatisticsPage.vue'
 import ImGroupsPage from './pages/ImGroupsPage.vue'
+import ImSingleChatPage from './pages/ImSingleChatPage.vue'
 import KnowledgePage from './pages/KnowledgePage.vue'
 import LoginPage from './pages/LoginPage.vue'
 import FeedbackPage from './pages/FeedbackPage.vue'
@@ -28,6 +29,7 @@ const router = createRouter({
     { path: '/console/dashboard', component: DashboardPage },
     { path: '/console/statistics', component: StatisticsPage },
     { path: '/console/im', component: ImGroupsPage },
+    { path: '/console/im/single', component: ImSingleChatPage },
     { path: '/console/knowledge', component: KnowledgePage },
     { path: '/console/app', component: AppPage },
     { path: '/console/bots', component: BotManagePage },

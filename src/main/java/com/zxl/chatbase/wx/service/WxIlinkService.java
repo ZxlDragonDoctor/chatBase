@@ -355,7 +355,7 @@ public class WxIlinkService {
 
         // Dify 问答
         try {
-            Long appId = isPrivate ? getDefaultAppId() : getAppIdForGroup(fromGroup);
+            Long appId = isPrivate ? imConversationService.getAppIdForConversation(conversationId) : getAppIdForGroup(fromGroup);
             log.info("微信消息开始问答: msgId={}, fromUser={}, groupId={}, appId={}",
                     msg.getMsgId(), fromUser, isPrivate ? conversationId : fromGroup, appId);
 

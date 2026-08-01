@@ -219,8 +219,8 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 3. 获取默认应用
-        Long appId = getDefaultAppId();
+        // 3. 获取会话绑定的应用（未绑定则用默认应用）
+        Long appId = imConversationService.getAppIdForConversation(conversationId);
 
         // 4. 异步回答
         CompletableFuture.supplyAsync(() -> chatService.chat(

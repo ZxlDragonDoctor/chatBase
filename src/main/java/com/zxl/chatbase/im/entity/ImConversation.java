@@ -32,6 +32,10 @@ public class ImConversation {
 
     private String createdBy;
 
+    private Long appId;
+
+    private String appName;
+
     private Boolean status;
 
     private LocalDateTime createTime;

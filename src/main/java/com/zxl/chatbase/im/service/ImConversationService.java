@@ -12,4 +12,10 @@ public interface ImConversationService {
     void updateLastMessage(String conversationId, String message, String userId, String platform);
 
     List<ConversationSummaryVO> listAccessibleConversations(String userId);
+
+    void bindApp(Long id, Long appId, String appName, String userId);
+
+    void unbindApp(Long id, String userId);
+
+    Long getAppIdForConversation(String conversationId);
 }

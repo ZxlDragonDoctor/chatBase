@@ -24,6 +24,8 @@ export type ConsoleOverview = {
   distinctGroups: number
   messageCountByPlatform: Record<string, number>
   groupCountByPlatform: Record<string, number>
+  totalPrivateMessages: number
+  distinctPrivateConversations: number
   bots: BotStatus
 }
 
@@ -39,10 +41,26 @@ export type GroupSummary = {
   createdBy?: string | null
 }
 
+export type ConversationSummary = {
+  id: number
+  conversationId: string
+  platform: string
+  userId: string
+  userNickname?: string | null
+  title?: string | null
+  lastMessage?: string | null
+  lastMessageTime: string | null
+  messageCount: number
+  createdBy?: string | null
+  appId?: number | null
+  appName?: string | null
+}
+
 export type GroupMessageItem = {
   id: number
   platform: string
   groupId: string
+  conversationId?: string | null
   userId: string
   messageType: string
   rawMessage: string

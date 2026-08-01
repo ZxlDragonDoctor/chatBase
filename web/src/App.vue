@@ -49,6 +49,10 @@
           <Users class="anime-nav-icon" :size="20" />
           <span>群聊</span>
         </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/im/single" active-class="active">
+          <MessageSquare class="anime-nav-icon" :size="20" />
+          <span>私聊</span>
+        </RouterLink>
         <RouterLink class="anime-nav-item" to="/console/knowledge" active-class="active">
           <BookOpen class="anime-nav-icon" :size="20" />
           <span>知识库</span>
@@ -126,7 +130,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, LogOut, Bot, ClipboardList, Cpu } from 'lucide-vue-next'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, LogOut, Bot, ClipboardList, Cpu, MessageSquare } from 'lucide-vue-next'
 import UserProfile from './components/UserProfile.vue'
 import { getCurrentUser as fetchUserProfile } from './api/user'
 import type { UserVO } from './api/user'

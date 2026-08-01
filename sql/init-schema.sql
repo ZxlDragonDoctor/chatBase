@@ -443,6 +443,10 @@ CREATE TABLE IF NOT EXISTS `im_conversation` (
   KEY `idx_last_message_time` (`last_message_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IM单聊会话表';
 
+ALTER TABLE `im_conversation` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '绑定应用ID' AFTER `created_by`;
+ALTER TABLE `im_conversation` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT '应用名称（冗余字段）' AFTER `app_id`;
+ALTER TABLE `im_conversation` ADD KEY `idx_app_id` (`app_id`);
+
 -- =============================================
 -- 关键词统计表
 -- =============================================
