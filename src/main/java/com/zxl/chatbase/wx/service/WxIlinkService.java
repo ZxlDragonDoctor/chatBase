@@ -362,8 +362,21 @@ public class WxIlinkService {
         // Dify 问答
         try {
             if (isPrivate && imConversationService.isOpencodeBound(conversationId)) {
+                if (StringUtils.hasText(msg.getContextToken())) {
+                    WxOutboundMessage processing = WxOutboundMessage.createTextMessage(
+                            fromUser, msg.getContextToken(), "正在处理中，请稍候…");
+                    int processingRet = wxIlinkUtil.sendMessage(
+                            resolveBaseUrl(), resolveBotToken(), processing);
+                    if (processingRet == -14) {
+                        log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                        markOffline();
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    log.info("微信opencode处理中提示已发送: msgId={}, toUser={}, ret={}",
+                            msg.getMsgId(), fromUser, processingRet);
+                }
                 String opencodeAnswer = opencodeService.chat(conversationId, rawMessage, fromUser, "wx");
-                opencodeAnswer = filterThinkingContent(opencodeAnswer);
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
                     WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
                             fromUser, msg.getContextToken(), opencodeAnswer);
