@@ -55,7 +55,7 @@ docker compose --profile qq up --build -d
 ### 4. 查看日志
 
 ```bash
-docker-compose logs -f chatbase-backend
+docker compose logs -f chatbase-backend
 ```
 
 ## 服务说明
@@ -76,7 +76,9 @@ docker-compose logs -f chatbase-backend
 
 1. 设置 `QQ_BOT_ENABLE=true`
 2. 配置 `QQ_BOT_SELF_ID`（机器人 QQ 号）
-3. 首次启动需要扫码登录 NapCat
+3. 配置 `QQ_BOT_HTTP_BASE_URL`（默认 `http://chatbase-napcat:3000`，容器网络内服务名）
+4. 配置 `QQ_BOT_WEBUI_BASE_URL`（默认 `http://chatbase-napcat:6099`）与 `QQ_BOT_WEBUI_TOKEN`（NapCat WebUI 的 `webui.json` 中 `token` 值），用于 Web 控制台「机器人管理」页一键扫码登录
+5. 首次启动需要扫码登录 NapCat
 
 登录方式：
 - 访问 `http://<server-ip>:6099` 打开 NapCat WebUI
@@ -117,16 +119,21 @@ opencode serve --port 4096
 
 在**开发者本机**运行 frp 客户端，将本机 opencode serve 暴露给服务器：
 
-```ini
-# frpc.ini（本机）
-[opencode-serve]
-type = tcp
-local_ip = 127.0.0.1
-local_port = 4096
-remote_port = 4096
+```toml
+# frpc.toml（本机，frp v0.58+）
+serverAddr = "<服务器公网IP>"
+serverPort = 7000          # frps 的 bindPort
+auth.token = "<frps 设置的 token>"
+
+[[proxies]]
+name = "opencode-serve"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 4096
+remotePort = 14096         # 服务器上开放的端口（frps allowPorts 需含此端口）
 ```
 
-服务器需在 frps 中开放对应 `remote_port` 并设置 token。
+服务器 frps 需开放 `bindPort`（如 7000）与 `remotePort`（如 14096），并配置相同 token；云服务器还需在安全组放行这两个端口。
 
 > 若服务器与 opencode 在同一台机器，可省略 frp，直接将 `OPENCODE_BASE_URL` 指向本机地址。
 
@@ -136,11 +143,15 @@ remote_port = 4096
 
 ```env
 OPENCODE_ENABLED=true
-OPENCODE_BASE_URL=http://<frp隧道地址>:4096   # 或本机 http://127.0.0.1:4096
+# ⚠️ 后端运行在 Docker 容器内，访问宿主机上的 frps 必须用网桥网关地址 172.17.0.1，
+#    不能用 127.0.0.1（容器内 127.0.0.1 是容器自身）。端口为 frps 映射的 remote_port。
+OPENCODE_BASE_URL=http://172.17.0.1:14096
 OPENCODE_PASSWORD=your-strong-password
 OPENCODE_DEFAULT_DIRECTORY=/path/to/project    # 本机项目根目录（可选）
 OPENCODE_TIMEOUT_SECONDS=300
 ```
+
+> 若在本机直接跑后端（非容器），才使用 `http://127.0.0.1:4096`。
 
 #### 5. 使用
 
@@ -154,25 +165,25 @@ OPENCODE_TIMEOUT_SECONDS=300
 
 ```bash
 # 启动所有服务
-docker-compose up -d
+docker compose up -d
 
 # 停止所有服务
-docker-compose down
+docker compose down
 
 # 重启后端
-docker-compose restart chatbase-backend
+docker compose restart chatbase-backend
 
 # 查看后端日志
-docker-compose logs -f chatbase-backend
+docker compose logs -f chatbase-backend
 
 # 重新构建镜像
-docker-compose build --no-cache
+docker compose build --no-cache
 
 # 进入后端容器
-docker-compose exec chatbase-backend sh
+docker compose exec chatbase-backend sh
 
 # 进入 MySQL 容器
-docker-compose exec mysql mysql -u root -p
+docker compose exec mysql mysql -u root -p
 ```
 
 ## 数据库初始化
@@ -182,8 +193,14 @@ docker-compose exec mysql mysql -u root -p
 如需手动执行：
 
 ```bash
-docker-compose exec mysql mysql -u chatbase -p chat_base < /docker-entrypoint-initdb.d/01-init-schema.sql
+docker compose exec mysql mysql -u chatbase -p chat_base < /docker-entrypoint-initdb.d/01-init-schema.sql
 ```
+
+> ⚠️ 若服务器上的 MySQL 数据卷已存在（非全新初始化），`init-schema.sql` 不会自动执行。此时需手动执行增量升级脚本 `sql/upgrade-existing-db.sql`（幂等，可重复运行），补齐 `im_conversation`、`kb_keyword` 等表及新字段/索引。示例：
+>
+> ```bash
+> docker compose exec -T chatbase-mysql mysql -u root -p"${MYSQL_ROOT_PASSWORD}" chat_base < sql/upgrade-existing-db.sql
+> ```
 
 ## 健康检查
 
@@ -203,11 +220,12 @@ curl http://localhost:80/
 - `redis_data` - Redis 数据
 - `qq_files` - QQ Bot 文件
 - `napcat_data` - NapCat 配置
+- `uploads_data` - 用户上传文件（头像、附件等，挂载到 `/app/uploads`）
 
 备份数据：
 
 ```bash
-docker-compose exec mysql mysqldump -u root -p chat_base > backup.sql
+docker compose exec mysql mysqldump -u root -p chat_base > backup.sql
 ```
 
 ## 更新部署
@@ -217,10 +235,10 @@ docker-compose exec mysql mysqldump -u root -p chat_base > backup.sql
 git pull
 
 # 重新构建并启动
-docker-compose up --build -d
+docker compose up --build -d
 
 # 仅重启后端（修改配置后）
-docker-compose restart chatbase-backend
+docker compose restart chatbase-backend
 ```
 
 ## 故障排查
@@ -229,20 +247,20 @@ docker-compose restart chatbase-backend
 
 ```bash
 # 检查 MySQL 是否运行
-docker-compose ps mysql
+docker compose ps mysql
 
 # 检查 MySQL 日志
-docker-compose logs mysql
+docker compose logs mysql
 ```
 
 ### 后端无法连接 Redis
 
 ```bash
 # 检查 Redis 是否运行
-docker-compose ps redis
+docker compose ps redis
 
 # 测试 Redis 连接
-docker-compose exec redis redis-cli ping
+docker compose exec redis redis-cli ping
 ```
 
 ### 前端无法访问后端 API
@@ -254,7 +272,7 @@ docker-compose exec redis redis-cli ping
 
 ```bash
 # 检查 NapCat 状态
-docker-compose logs napcat
+docker compose logs napcat
 
 # 确认 WebSocket 连接配置
 # NapCat 需配置反向 WebSocket: ws://chatbase-backend:8080/qq/ws
@@ -277,8 +295,8 @@ chatBase/
 ├── docker-compose.yml      # 部署编排
 ├── .env.example            # 环境变量示例
 ├── sql/
-│   └ init-schema.sql      # 数据库初始化脚本
-│   └── add-cost-fields.sql # 增量更新脚本（可选）
+│   ├── init-schema.sql          # 全新初始化脚本（首次挂载 volume 时自动执行）
+│   └── upgrade-existing-db.sql  # 已有库升级脚本（幂等，可重复执行）
 ├── src/                    # 后端源码
 │   └── main/java/com/zxl/chatbase/
 │       ├── opencode/       # 本地 opencode serve 集成

@@ -54,15 +54,22 @@ vim .env
 | `QQ_BOT_ENABLE` | 否 | 启用 QQ 机器人（true/false） | `false` |
 | `QQ_BOT_ACCESS_TOKEN` | 否 | NapCat 访问 Token | `your-token` |
 | `QQ_BOT_SELF_ID` | 否 | 机器人 QQ 号 | `123456789` |
-| `QQ_BOT_HTTP_BASE_URL` | 否 | NapCat HTTP 地址 | `http://napcat:3000` |
+| `QQ_BOT_HTTP_BASE_URL` | 否 | NapCat HTTP 地址 | `http://chatbase-napcat:3000` |
+| `QQ_BOT_WEBUI_BASE_URL` | 否 | NapCat WebUI 地址（后端代理扫码登录用） | `http://chatbase-napcat:6099` |
+| `QQ_BOT_WEBUI_TOKEN` | 否 | NapCat WebUI 鉴权 token（webui.json 中的 "token"） | `your-webui-token` |
 | `WECHAT_CORP_STOKEN` | 否 | 企业微信 Token | `your-token` |
 | `WECHAT_CORP_S_ENCODING_AES_KEY` | 否 | 企业微信 EncodingAESKey | `your-aes-key` |
 | `WECHAT_CORP_BOT_ID` | 否 | 企业微信机器人 ID | `your-bot-id` |
 | `WECHAT_CORP_SECRET` | 否 | 企业微信机器人 Secret | `your-secret` |
 | `JAVA_OPTS` | 否 | JVM 参数 | `-Xms512m -Xmx2048m` |
 | `NAPCAT_IMAGE` | 否 | NapCat 镜像名称 | `mlikiowa/napcat-docker:v4.17.46` |
+| `WX_BOT_ENABLE` | 否 | 启用微信个人号 ilink 机器人（true/false） | `false` |
+| `WX_BOT_TOKEN` | 否 | 微信 ilink token | `your-token` |
+| `WX_BOT_BASE_URL` | 否 | 微信 ilink 服务地址 | `http://<ilink-host>` |
+| `WX_BOT_BOT_ID` | 否 | 微信机器人 ID | `your-bot-id` |
+| `WX_BOT_NICKNAME` | 否 | 微信机器人昵称 | `微信机器人` |
 | `OPENCODE_ENABLED` | 否 | 启用本地 opencode 集成（true/false） | `false` |
-| `OPENCODE_BASE_URL` | 否 | opencode serve 地址（经 frp 隧道访问本机） | `http://127.0.0.1:4096` |
+| `OPENCODE_BASE_URL` | 否 | opencode serve 地址。⚠️ 后端在容器内，访问宿主机 frps 需用网桥网关 `http://172.17.0.1:14096`；仅本机开发用 `http://127.0.0.1:4096` | `http://172.17.0.1:14096` |
 | `OPENCODE_PASSWORD` | 否 | opencode serve 密码（Basic Auth，与本机 `OPENCODE_SERVER_PASSWORD` 一致） | `your-password` |
 | `OPENCODE_USERNAME` | 否 | opencode Basic Auth 用户名 | `opencode` |
 | `OPENCODE_DEFAULT_DIRECTORY` | 否 | 本机项目根目录（创建会话时指定） | `/path/to/project` |
@@ -73,23 +80,23 @@ vim .env
 
 ```bash
 # 构建并启动所有服务
-docker-compose up --build -d
+docker compose up --build -d
 
 # 查看服务状态
-docker-compose ps
+docker compose ps
 
 # 查看后端日志
-docker-compose logs -f chatbase-backend
+docker compose logs -f chatbase-backend
 
 # 查看前端日志
-docker-compose logs -f chatbase-frontend
+docker compose logs -f chatbase-frontend
 ```
 
 ### 2.5 启动 QQ 机器人（可选）
 
 ```bash
 # 启动 NapCat 服务
-docker-compose --profile qq up -d
+docker compose --profile qq up -d
 
 # 访问 NapCat 管理界面
 # http://<服务器IP>:6099
@@ -105,10 +112,10 @@ docker-compose --profile qq up -d
 
 ```bash
 # 停止所有服务
-docker-compose down
+docker compose down
 
 # 停止并删除数据卷（慎用！）
-docker-compose down -v
+docker compose down -v
 ```
 
 ---
@@ -290,7 +297,7 @@ NapCat 是基于 OneBot 协议的 QQ 机器人框架。
 
 **Docker 部署**：
 ```bash
-docker-compose --profile qq up -d
+docker compose --profile qq up -d
 ```
 
 **访问管理界面**：
@@ -322,7 +329,7 @@ qq:
     enable: true
     access-token: "your-napcat-token"  # 与 NapCat 配置一致
     self-id: 123456789                # 你的机器人 QQ 号
-    http-base-url: "http://napcat:3000"  # NapCat HTTP 地址
+    http-base-url: "http://chatbase-napcat:3000"  # NapCat HTTP 地址（容器网络内服务名）
     nickname: "ChatBase"              # 可选，机器人显示名称
 ```
 
@@ -828,7 +835,7 @@ tar -czf uploads_backup_$(date +%Y%m%d).tar.gz uploads/
 
 **检查日志**：
 ```bash
-docker-compose logs chatbase-backend
+docker compose logs chatbase-backend
 ```
 
 **常见问题**：
@@ -844,7 +851,7 @@ docker-compose logs chatbase-backend
 
 **检查日志**：
 ```bash
-docker-compose logs chatbase-frontend
+docker compose logs chatbase-frontend
 ```
 
 **常见问题**：
@@ -861,17 +868,17 @@ docker-compose logs chatbase-frontend
 
 1. 检查 NapCat 是否在线
    ```bash
-   docker-compose ps chatbase-napcat
+   docker compose ps chatbase-napcat
    ```
 
 2. 检查 WebSocket 连接
    ```bash
-   docker-compose logs chatbase-backend | grep "WebSocket"
+   docker compose logs chatbase-backend | grep "WebSocket"
    ```
 
 3. 检查消息是否接收
    ```bash
-   docker-compose logs chatbase-backend | grep "group_message"
+   docker compose logs chatbase-backend | grep "group_message"
    ```
 
 4. 检查是否 @机器人
@@ -897,7 +904,7 @@ docker-compose logs chatbase-frontend
 
 3. 检查后端日志
    ```bash
-   docker-compose logs chatbase-backend | grep "wechat"
+   docker compose logs chatbase-backend | grep "wechat"
    ```
 
 4. 检查分布式锁
@@ -945,8 +952,10 @@ docker-compose logs chatbase-frontend
 
 3. 检查 frp 隧道连通性
    ```bash
-   # 服务器上执行
-   curl http://<frp隧道地址>:4096/             # 能通到本机 opencode 即正常
+   # 服务器上执行（从宿主机到 frps 映射端口，应能连通到本机 opencode）
+   curl http://127.0.0.1:14096/
+   # 后端容器内验证（必须用网桥网关 172.17.0.1，不能用 127.0.0.1）
+   docker compose exec chatbase-backend curl -u opencode:<密码> http://172.17.0.1:14096/
    ```
 
 4. 检查密码是否匹配
@@ -956,7 +965,7 @@ docker-compose logs chatbase-frontend
 
 5. 查看后端日志
    ```bash
-   docker-compose logs chatbase-backend | grep "opencode"
+   docker compose logs chatbase-backend | grep "opencode"
    # 关键字：创建会话成功 / 消息已发送 / 轮询 / 未返回结果
    ```
 
@@ -1075,13 +1084,13 @@ client_max_body_size 100m;
 ### 13.1 部署相关
 
 **Q：Docker 启动后无法访问前端？**
-A：检查前端容器状态 `docker-compose ps`，查看日志 `docker-compose logs chatbase-frontend`。
+A：检查前端容器状态 `docker compose ps`，查看日志 `docker compose logs chatbase-frontend`。
 
 **Q：数据库初始化失败？**
 A：确保 `sql/init-schema.sql` 文件存在，MySQL 容器已完全启动（healthcheck 通过）。
 
 **Q：如何重置数据库？**
-A：`docker-compose down -v` 删除数据卷，然后 `docker-compose up -d` 重新初始化。
+A：`docker compose down -v` 删除数据卷，然后 `docker compose up -d` 重新初始化。
 
 ### 13.2 功能相关
 
@@ -1147,6 +1156,7 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 | v1.0 | 2026-05-07 | 初始版本，完整功能 |
 | v1.1 | 2026-05-09 | 新增用户数据隔离、scope 切换支持、pom.xml 编译参数说明 |
 | v1.2 | 2026-08-01 | 新增私聊采集页面、会话级应用绑定、本地 opencode 远程控制集成 |
+| v1.3 | 2026-08-04 | 部署到服务器：QQ NapCat WebUI 扫码登录、uploads 持久化卷、已有库升级脚本（`sql/upgrade-existing-db.sql`）、opencode 经 frp 隧道（容器内用 `172.17.0.1` 网关地址） |
 
 ---
 
@@ -1158,5 +1168,5 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 
 ---
 
-*文档版本：v1.2*
-*最后更新：2026-08-01*
+*文档版本：v1.3*
+*最后更新：2026-08-04*

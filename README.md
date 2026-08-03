@@ -83,10 +83,10 @@ cp .env.example .env
 vim .env  # 填写必填配置
 
 # 3. 构建并启动
-docker-compose up --build -d
+docker compose up --build -d
 
 # 4. 查看日志
-docker-compose logs -f chatbase-backend
+docker compose logs -f chatbase-backend
 ```
 
 访问 http://localhost 打开前端页面。
@@ -129,7 +129,9 @@ opencode:
   timeout-seconds: 300
 
 # 3. 服务器对接（生产环境）：用 frp 将本机 4096 隧道映射到服务器，
-#    再配置 OPENCODE_ENABLED=true / OPENCODE_BASE_URL=<frp隧道地址> / OPENCODE_PASSWORD=<同密码>
+#    再配置 OPENCODE_ENABLED=true / OPENCODE_BASE_URL=<容器内访问宿主机frps的地址> / OPENCODE_PASSWORD=<同密码>
+#    ⚠️ 后端运行在 Docker 容器内，访问宿主机 frps 必须用网桥网关 172.17.0.1:14096，
+#       不能写成 127.0.0.1（容器内回环是容器自身）。详见 DEPLOY.md
 ```
 
 ## 配置说明
@@ -151,13 +153,13 @@ opencode:
 | `QQ_BOT_ENABLE` | 启用 QQ 机器人 | `false` |
 | `QQ_BOT_ACCESS_TOKEN` | NapCat Token | - |
 | `QQ_BOT_SELF_ID` | 机器人 QQ 号 | - |
-| `QQ_BOT_HTTP_BASE_URL` | NapCat HTTP 地址 | `http://napcat:3000` |
-| `QQ_BOT_WEBUI_BASE_URL` | NapCat WebUI 地址 | `http://napcat:6099` |
+| `QQ_BOT_HTTP_BASE_URL` | NapCat HTTP 地址 | `http://chatbase-napcat:3000` |
+| `QQ_BOT_WEBUI_BASE_URL` | NapCat WebUI 地址 | `http://chatbase-napcat:6099` |
 | `QQ_BOT_WEBUI_TOKEN` | NapCat WebUI token | - |
 | `WECHAT_CORP_STOKEN` | 企业微信 Token | - |
 | `WECHAT_CORP_S_ENCODING_AES_KEY` | 企业微信 EncodingAESKey | - |
 | `OPENCODE_ENABLED` | 启用本地 opencode 集成 | `false` |
-| `OPENCODE_BASE_URL` | opencode serve 地址（经 frp 隧道访问本机） | `http://127.0.0.1:4096` |
+| `OPENCODE_BASE_URL` | opencode serve 地址（经 frp 隧道访问本机） | `http://172.17.0.1:14096` |
 | `OPENCODE_PASSWORD` | opencode serve 密码（Basic Auth，对应 `OPENCODE_SERVER_PASSWORD`） | - |
 | `OPENCODE_DEFAULT_DIRECTORY` | 本机项目根目录（创建会话时指定） | - |
 | `OPENCODE_TIMEOUT_SECONDS` | 等待回复超时（秒） | `300` |
@@ -235,7 +237,7 @@ opencode:
 ### 1. 启动 NapCat
 
 ```bash
-docker-compose --profile qq up -d
+docker compose --profile qq up -d
 ```
 
 ### 2. 扫码登录（WebUI 代理模式）
@@ -264,7 +266,7 @@ qq:
     enable: true
     access-token: "your-napcat-token"
     self-id: 123456789
-    http-base-url: "http://napcat:3000"
+    http-base-url: "http://chatbase-napcat:3000"
     nickname: "ChatBase"  # 可选
 ```
 
@@ -414,7 +416,7 @@ QQ 群消息 → NapCat → WebSocket(/qq/ws)
 | 知识库删除失败 | 检查 Dify API Key 配置 |
 | 统计数据为空 | 调用 `/api/statistics/aggregate` 聚合统计 |
 | Token 费用显示为 0 | 历史数据无费用，新对话正常记录 |
-| Docker 启动后无法访问 | 检查容器状态和日志 `docker-compose logs` |
+| Docker 启动后无法访问 | 检查容器状态和日志 `docker compose logs` |
 
 更多问题请参考 [USER_GUIDE.md](./USER_GUIDE.md#13-常见问题faq)。
 
@@ -446,7 +448,8 @@ chatBase/
 │   └── Dockerfile      # 前端镜像
 │
 ├── sql/                # 数据库脚本
-│   └── init-schema.sql # 初始化脚本
+│   ├── init-schema.sql          # 全新初始化脚本（仅首次挂载 volume 时自动执行）
+│   └── upgrade-existing-db.sql  # 已有库升级脚本（幂等，可重复执行）
 │
 ├── Dockerfile          # 后端镜像
 ├── docker-compose.yml  # 部署编排
@@ -468,4 +471,4 @@ MIT License
 - **数据隔离**：所有业务数据通过 `created_by` 字段按用户维度过滤。普通用户仅看自己的数据，admin 可在统计页切换 scope=all/mine。
 - **前端路由**：admin 菜单项（反馈管理、应用管理、知识库管理、用户管理）在登录后自动显示，基于 `localStorage.getItem('chatbase_role')`。
 
-*最后更新：2026-08-01*
+*最后更新：2026-08-04*

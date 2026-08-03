@@ -82,7 +82,9 @@ services:
       QQ_BOT_ENABLE: ${QQ_BOT_ENABLE:-false}
       QQ_BOT_ACCESS_TOKEN: ${QQ_BOT_ACCESS_TOKEN}
       QQ_BOT_SELF_ID: ${QQ_BOT_SELF_ID}
-      QQ_BOT_HTTP_BASE_URL: ${QQ_BOT_HTTP_BASE_URL:-http://napcat:3000}
+      QQ_BOT_HTTP_BASE_URL: ${QQ_BOT_HTTP_BASE_URL:-http://chatbase-napcat:3000}
+      QQ_BOT_WEBUI_BASE_URL: ${QQ_BOT_WEBUI_BASE_URL:-http://chatbase-napcat:6099}
+      QQ_BOT_WEBUI_TOKEN: ${QQ_BOT_WEBUI_TOKEN:-}
 
       WECHAT_CORP_STOKEN: ${WECHAT_CORP_STOKEN}
       WECHAT_CORP_S_ENCODING_AES_KEY: ${WECHAT_CORP_S_ENCODING_AES_KEY}
@@ -106,6 +108,7 @@ services:
       JAVA_OPTS: ${JAVA_OPTS:-Xms512m -Xmx2048m -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
     volumes:
       - qq_files:/data/qq_files/
+      - uploads_data:/app/uploads
     networks:
       - chatbase-network
 
@@ -147,3 +150,4 @@ volumes:
   redis_data:
   qq_files:
   napcat_data:
+  uploads_data:

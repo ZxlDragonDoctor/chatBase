@@ -1348,7 +1348,9 @@ server {
 | `qq.bot.access-token` | `QQ_BOT_ACCESS_TOKEN` | - | NapCat 访问 Token |
 | `qq.bot.self-id` | `QQ_BOT_SELF_ID` | - | 机器人 QQ 号 |
 | `qq.bot.nickname` | - | - | 机器人显示名称 |
-| `qq.bot.http-base-url` | `QQ_BOT_HTTP_BASE_URL` | http://napcat:3000 | NapCat HTTP 地址 |
+| `qq.bot.http-base-url` | `QQ_BOT_HTTP_BASE_URL` | http://chatbase-napcat:3000 | NapCat HTTP 地址 |
+| `qq.bot.webui-base-url` | `QQ_BOT_WEBUI_BASE_URL` | http://chatbase-napcat:6099 | NapCat WebUI 地址（扫码登录代理） |
+| `qq.bot.webui-token` | `QQ_BOT_WEBUI_TOKEN` | - | NapCat WebUI 鉴权 token |
 | `wechat.corp.stoken` | `WECHAT_CORP_STOKEN` | - | 企业微信 Token |
 | `wechat.corp.sEncodingAESKey` | `WECHAT_CORP_S_ENCODING_AES_KEY` | - | 企业微信 EncodingAESKey |
 | `wechat.corp.botName` | - | 企业内部机器人 | 企业微信机器人名称 |
@@ -1599,5 +1601,5 @@ server {
 
 ---
 
-*文档版本：v1.1*
-*最后更新：2026-05-09*
+*文档版本：v1.3*
+*最后更新：2026-08-04*
