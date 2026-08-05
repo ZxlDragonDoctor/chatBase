@@ -2,6 +2,8 @@ package com.zxl.chatbase.opencode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zxl.chatbase.config.OpencodeProperties;
 import com.zxl.chatbase.kb.service.IKbConversationService;
 import lombok.RequiredArgsConstructor;
@@ -82,13 +84,36 @@ public class OpencodeService {
     }
 
     private String doChat(String conversationId, String query, String userId, String channel) {
+        String trimmed = query.trim();
+        if ("/new".equalsIgnoreCase(trimmed) || "/重置".equals(trimmed)) {
+            stringRedisTemplate.delete(SESSION_KEY_PREFIX + conversationId);
+            return "已重置会话，下一次消息将开启全新对话上下文。";
+        }
+
         String sessionId = getOrCreateSession(conversationId);
         if (!StringUtils.hasText(sessionId)) {
             return "【opencode未返回结果】可能是执行超时或出错，请检查本地 opencode 状态。";
         }
+
+        JsonNode pendingQuestion = fetchPendingQuestion(sessionId);
         String baselineId = getLatestMessageId(sessionId);
-        sendPrompt(sessionId, query);
-        String answer = pollAnswer(sessionId, baselineId);
+
+        boolean handled = false;
+        if (pendingQuestion != null) {
+            handled = submitQuestionAnswer(sessionId, pendingQuestion, query);
+            if (!handled) {
+                log.warn("opencode 提交问题回答失败，按新任务处理: conversationId={}", conversationId);
+            }
+        }
+        if (!handled) {
+            sendPrompt(sessionId, query);
+        }
+
+        PollOutcome outcome = pollAnswer(sessionId, baselineId);
+        if (outcome.isQuestion()) {
+            return outcome.getText();
+        }
+        String answer = outcome.getText();
         if (!StringUtils.hasText(answer)) {
             answer = "【opencode 已执行完任务，但未生成文本回复】可能是任务过复杂或模型没有输出总结，请换个问法再试，或稍后重发。";
         }
@@ -154,25 +179,31 @@ public class OpencodeService {
     }
 
     /**
-     * 轮询消息，直到 agent 完成（出现 finish=stop）或超时。
+     * 轮询消息，直到 agent 完成（出现 finish=stop）、出现待回答问题或超时。
      *
      * 每次轮询都取本次 prompt 之后新增的所有 assistant 内容（思考/工具/中间文本/最终回复）
      * 拼接后作为当前累计回复。只要 agent 未完成就继续轮询，避免中间文本触发提前返回
      * 而导致最终完整回复丢失。
      *
-     * 若 agent 已完成但全程无任何文本内容，则返回 null，不空等到超时。
+     * 若 agent 调用了 question 工具进入待回答状态，则立即返回问题文本（带 isQuestion 标记），
+     * 由上层回发给用户等待回答。
      *
      * @param baselineId 发送 prompt 前最新一条消息的 id，用于区分本次 prompt 前后的消息
      */
-    private String pollAnswer(String sessionId, String baselineId) {
+    private PollOutcome pollAnswer(String sessionId, String baselineId) {
         if (!StringUtils.hasText(sessionId)) {
-            return null;
+            return PollOutcome.finish(null);
         }
         long deadline = System.currentTimeMillis() + properties.getTimeoutSeconds() * 1000L;
         long pollInterval = 2000;
         String accumulated = null;
         try {
             while (System.currentTimeMillis() < deadline) {
+                JsonNode pendingQuestion = fetchPendingQuestion(sessionId);
+                if (pendingQuestion != null) {
+                    log.info("opencode 检测到待回答问题，结束轮询: sessionId={}", sessionId);
+                    return PollOutcome.question(formatQuestionText(pendingQuestion));
+                }
                 PollResult result = fetchLatestAssistantAnswer(sessionId, baselineId);
                 if (StringUtils.hasText(result.answer)) {
                     accumulated = result.answer;
@@ -180,7 +211,7 @@ public class OpencodeService {
                 if (result.finished) {
                     log.info("opencode agent 已完成，结束轮询: sessionId={}, hasAnswer={}",
                             sessionId, StringUtils.hasText(accumulated));
-                    return capTotal(accumulated, MAX_TOTAL_LEN);
+                    return PollOutcome.finish(capTotal(accumulated, MAX_TOTAL_LEN));
                 }
                 Thread.sleep(pollInterval);
             }
@@ -189,9 +220,9 @@ public class OpencodeService {
         }
         if (StringUtils.hasText(accumulated)) {
             log.info("opencode 轮询达到超时，返回已累计内容: sessionId={}", sessionId);
-            return capTotal(accumulated, MAX_TOTAL_LEN);
+            return PollOutcome.finish(capTotal(accumulated, MAX_TOTAL_LEN));
         }
-        return null;
+        return PollOutcome.finish(null);
     }
 
     /**
@@ -303,6 +334,170 @@ public class OpencodeService {
             return sb.toString();
         } catch (Exception e) {
             return "";
+        }
+    }
+
+    /**
+     * 获取会话当前待回答的问题请求（question tool），无则返回 null
+     */
+    private JsonNode fetchPendingQuestion(String sessionId) {
+        try {
+            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/question";
+            HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            if (!resp.getStatusCode().is2xxSuccessful()) {
+                return null;
+            }
+            JsonNode root = objectMapper.readTree(resp.getBody());
+            JsonNode data = root.path("data");
+            if (data.isArray() && data.size() > 0) {
+                return data.get(0);
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("opencode 获取待回答问题异常: sessionId={}", sessionId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 将待回答问题请求格式化为发给 IM 用户的提问文本（含问题与选项）
+     */
+    private String formatQuestionText(JsonNode pendingQuestion) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("【需要您回答】\n");
+        JsonNode questions = pendingQuestion.path("questions");
+        if (questions.isArray()) {
+            for (int i = 0; i < questions.size(); i++) {
+                JsonNode q = questions.get(i);
+                String qText = q.path("question").asText("");
+                String header = q.path("header").asText("");
+                if (StringUtils.hasText(qText)) {
+                    sb.append(qText);
+                } else if (StringUtils.hasText(header)) {
+                    sb.append(header);
+                }
+                sb.append("\n");
+                JsonNode options = q.path("options");
+                if (options.isArray()) {
+                    for (int j = 0; j < options.size(); j++) {
+                        JsonNode opt = options.get(j);
+                        String label = opt.path("label").asText("");
+                        String desc = opt.path("description").asText("");
+                        sb.append(j + 1).append(". ").append(label);
+                        if (StringUtils.hasText(desc)) {
+                            sb.append(" - ").append(desc);
+                        }
+                        sb.append("\n");
+                    }
+                }
+                boolean multiple = q.path("multiple").asBoolean(false);
+                boolean custom = q.path("custom").asBoolean(false);
+                sb.append("请回复").append(multiple ? "选项编号（多个用逗号分隔）" : "选项编号");
+                if (custom) {
+                    sb.append("或直接输入您的回答");
+                }
+                sb.append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * 向 opencode 提交用户对问题请求的回答
+     *
+     * @return 是否提交成功
+     */
+    private boolean submitQuestionAnswer(String sessionId, JsonNode pendingQuestion, String userText) {
+        try {
+            String requestId = pendingQuestion.path("id").asText(null);
+            if (!StringUtils.hasText(requestId)) {
+                return false;
+            }
+            JsonNode questions = pendingQuestion.path("questions");
+            ArrayNode answers = objectMapper.createArrayNode();
+            if (questions.isArray()) {
+                for (int i = 0; i < questions.size(); i++) {
+                    JsonNode q = questions.get(i);
+                    ArrayNode oneAnswer = objectMapper.createArrayNode();
+                    oneAnswer.add(matchAnswerLabel(q, userText));
+                    answers.add(oneAnswer);
+                }
+            }
+            ObjectNode body = objectMapper.createObjectNode();
+            body.set("answers", answers);
+            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/question/" + requestId + "/reply";
+            HttpHeaders headers = buildHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            log.info("opencode 问题回答已提交: sessionId={}, requestId={}, status={}",
+                    sessionId, requestId, resp.getStatusCodeValue());
+            return resp.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.error("opencode 提交问题回答异常: sessionId={}", sessionId, e);
+            return false;
+        }
+    }
+
+    /**
+     * 将用户回答文本匹配到 question 的选项标签：先匹配选项文本/编号，未命中则原样返回作为自定义回答
+     */
+    private String matchAnswerLabel(JsonNode q, String userText) {
+        String text = userText == null ? "" : userText.trim();
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        JsonNode options = q.path("options");
+        if (options.isArray() && options.size() > 0) {
+            for (int i = 0; i < options.size(); i++) {
+                String label = options.get(i).path("label").asText("");
+                if (label.equalsIgnoreCase(text)) {
+                    return label;
+                }
+            }
+            if (text.matches("\\d+")) {
+                int idx = Integer.parseInt(text) - 1;
+                if (idx >= 0 && idx < options.size()) {
+                    return options.get(idx).path("label").asText("");
+                }
+            }
+            for (int i = 0; i < options.size(); i++) {
+                String label = options.get(i).path("label").asText("");
+                if (label.contains(text) || text.contains(label)) {
+                    return label;
+                }
+            }
+        }
+        return text;
+    }
+
+    /**
+     * 轮询结果：text 为回复或问题文本，question 标记是否为待回答问题（需用户回答）
+     */
+    private static class PollOutcome {
+        private final String text;
+        private final boolean question;
+
+        PollOutcome(String text, boolean question) {
+            this.text = text;
+            this.question = question;
+        }
+
+        static PollOutcome finish(String text) {
+            return new PollOutcome(text, false);
+        }
+
+        static PollOutcome question(String text) {
+            return new PollOutcome(text, true);
+        }
+
+        String getText() {
+            return text;
+        }
+
+        boolean isQuestion() {
+            return question;
         }
     }
 
