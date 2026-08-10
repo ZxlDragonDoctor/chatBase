@@ -14,6 +14,11 @@ services:
       - "--character-set-server=utf8mb4"
       - "--collation-server=utf8mb4_unicode_ci"
       - "--default-authentication-plugin=mysql_native_password"
+      - "--innodb-buffer-pool-size=64M"
+      - "--performance_schema=OFF"
+      - "--table_open_cache=1000"
+      - "--max_connections=60"
+    mem_limit: 400m
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql:ro
@@ -33,6 +38,7 @@ services:
       - "6379:6379"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+    mem_limit: 150m
     command: >
       sh -c '
       if [ -n "$$REDIS_PASSWORD" ]; then
@@ -65,6 +71,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    mem_limit: 600m
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1"]
       interval: 30s
@@ -124,6 +131,7 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+    mem_limit: 100m
     networks:
       - chatbase-network
 
@@ -136,6 +144,7 @@ services:
     ports:
       - "3000:3000"
       - "6099:6099"
+    mem_limit: 300m
     volumes:
       - napcat_data:/app/.config/QQ
     networks:
