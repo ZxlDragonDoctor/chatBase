@@ -187,7 +187,61 @@ docker ps --format '{{.Names}}|{{.Status}}'
 
 ---
 
-## 4. 排障速查命令
+## 4. NapCat QQ 进程泄漏（iowait 打满 / 全服务假死）
+
+### 现象
+
+- 服务器负载飙高（`uptime` load 9~13），但所有容器 CPU 占用都不高
+- `top` 中 `%Cpu(s): 83.9 wa` —— **iowait 极高**
+- napcat 容器内 QQ 客户端进程异常：
+  ```
+  PID  USER  %CPU %MEM  VIRT      RES  S  COMMAND
+  24758 root 6.7  6.9  1402.3g   114M D  qq   # 虚拟内存 1402GB、状态 D(不可中断 I/O)
+  24644 root 2.2  3.4  /opt/QQ/qq --no-sandbox
+  ```
+- 现象上等同"服务器又炸了"：后端 API、SSH 全部卡顿无响应，但容器 `docker ps` 显示 healthy
+
+### 根因
+
+- NapCat 是 Electron/Node 封装，QQ 客户端长跑后**进程内存/虚拟内存泄漏**，并疯狂刷盘（状态 D）
+- 1 核 1.6GB 小机上，该失控进程把磁盘 I/O 打满（iowait 83.9%）→ 全系统假死
+- **容器 `restart: unless-stopped` 只对进程退出生效，进程"卡死但不退出"时不会自动重启**，于是泄漏一直累积
+
+### 解决方案（已实施）
+
+① 立即恢复：重启 napcat 容器
+
+```bash
+docker restart chatbase-napcat
+```
+
+② 防复发：`docker-compose.yml` napcat 服务加固
+
+```yaml
+napcat:
+  restart: unless-stopped
+  mem_limit: 400m
+  memswap_limit: 400m     # 禁容器 swap 逃生：超 mem_limit 立即 OOM kill → 自动重启
+  pids_limit: 200          # 限制进程数，防 Electron 无限 fork
+```
+
+- `memswap_limit == mem_limit`：容器无法把内存压进 swap 硬撑，一旦超限内核 OOM killer 击杀进程 → 容器退出 → `unless-stopped` 自动重建
+- 应用后验证：
+  ```bash
+  docker compose --profile qq up -d napcat
+  docker inspect chatbase-napcat --format 'mem={{.HostConfig.Memory}} swap={{.HostConfig.MemorySwap}} pids={{.HostConfig.PidsLimit}}'
+  # mem=419430400 swap=419430400 pids=200
+  ```
+
+### 验证
+
+- 负载回落：`load 13 → 0.75`
+- QQ 恢复在线：`redis-cli MGET bot:qq:online` 返回 `1`
+- napcat 内存回到正常水位（约 200MB/400MB）
+
+---
+
+## 5. 排障速查命令
 
 ### 远程执行（本机 Windows，SSH 偶发 banner 超时，需重试）
 
@@ -233,3 +287,4 @@ grep -iE 'oom|killed process' /var/log/syslog | tail
 | `/api/**` 请求超时 | 容器活着但线程被阻塞（可能 opencode 隧道断 / MySQL 被杀） |
 | 后端 `Connection refused`（172.17.0.1:14096） | opencode frp 隧道断（见第 1 节） |
 | 后端 `Connection refused`（MySQL） | mysqld 被 OOM 击杀（见第 2、3 节） |
+| load 高但容器 CPU 低、iowait 高 | napcat QQ 进程泄漏刷盘（见第 4 节） |
