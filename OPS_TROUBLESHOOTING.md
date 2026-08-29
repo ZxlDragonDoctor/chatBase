@@ -233,6 +233,31 @@ napcat:
   # mem=419430400 swap=419430400 pids=200
   ```
 
+**注意**：`memswap_limit` 对 D 状态（磁盘 I/O 阻塞）进程无效，因此还需要 cron watchdog（见下方）。
+
+### cron watchdog（自动重启）
+
+`memswap_limit` 只对内存超限有效，对磁盘 I/O 风暴（进程 D 状态）无效。加 cron 定时监控负载，load > 3 时自动重启 napcat：
+
+```bash
+# /usr/local/bin/napcat-watchdog.sh（已部署）
+#!/bin/bash
+LOAD=$(awk '{print $1}' /proc/loadavg | cut -d. -f1)
+if [ "$LOAD" -gt 3 ] 2>/dev/null; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [watchdog] load=$LOAD restarting napcat" >> /var/log/napcat-watchdog.log
+    docker restart chatbase-napcat
+fi
+
+# crontab
+*/5 * * * * /usr/local/bin/napcat-watchdog.sh
+```
+
+### CPU 限制
+
+```bash
+docker update --cpus=0.5 chatbase-napcat   # 降低 I/O 争抢
+```
+
 ### 验证
 
 - 负载回落：`load 13 → 0.75`
