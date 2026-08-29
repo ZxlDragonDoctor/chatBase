@@ -35,6 +35,7 @@
 - [功能模块 · Modules](#-功能模块--modules)
 - [数据隔离与权限 · Security & Isolation](#-数据隔离与权限--security--isolation)
 - [多渠道 IM 接入 · IM Integration](#-多渠道-im-接入--im-integration)
+- [机器人命令 · Bot Commands](#-机器人命令--bot-commands)
 - [私聊遥控本机 opencode · Remote opencode](#-私聊遥控本机-opencode--remote-opencode)
 - [定时任务 · Scheduled Tasks](#-定时任务--scheduled-tasks)
 - [数据库表 · Database](#-数据库表--database)
@@ -67,6 +68,7 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 | 🖥️ **远程 opencode / Remote** | 私聊绑定本机 opencode，frp 隧道遥控 | 会话级绑定特殊应用（appId=-1），仅 admin 可用，全程审计落库 |
 | 📊 **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
 | 🧾 **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
+| 🤖 **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
 | 🛡️ **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤，多租户友好 |
 
 ---
@@ -252,6 +254,7 @@ opencode serve --port 4096
 | **dify** | `com.zxl.chatbase.dify` | Dify API 集成、对话、文件上传 |
 | **kb** | `com.zxl.chatbase.kb` | 知识库、分类、文档、FAQ、应用、关键词 |
 | **im** | `com.zxl.chatbase.im` | IM 消息采集、会话绑定、机器人管理 |
+| **command** | `com.zxl.chatbase.command` | 机器人交互命令框架（/help /new /status 等） |
 | **opencode** | `com.zxl.chatbase.opencode` | 本地 opencode serve 集成（远程遥控本机 AI） |
 | **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket + WebUI 扫码登录代理 |
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
@@ -325,6 +328,35 @@ docker compose --profile qq up -d
 - 回调 URL：`http://<server>/intellrobot/callback/handle`
 - 配置 `WECHAT_CORP_STOKEN` / `WECHAT_CORP_S_ENCODING_AES_KEY` / `WECHAT_CORP_BOT_ID` / `WECHAT_CORP_SECRET`
 - 企微要求 5 秒内响应，系统采用异步处理 + Redis 分布式锁防重复
+
+---
+
+## 🤖 机器人命令 / Bot Commands
+
+微信/企微机器人支持交互式命令，以 `/` 开头的消息会被命令分发器拦截处理，不走 Dify/opencode。
+
+| 命令 Command | 别名 Alias | 说明 Description |
+|-------------|-----------|-----------------|
+| `/help` | `/帮助` | 显示所有可用命令列表 |
+| `/new` | `/重置` | 重置会话，开启全新对话上下文 |
+| `/status` | `/状态` | 显示机器人状态、绑定应用、会话信息 |
+| `/history [N]` | `/历史` | 查看最近 N 条对话记录（默认5条，最大20条） |
+| `/feedback <内容>` | `/反馈` | 提交反馈意见 |
+| `/clear` | `/清空` | 清空当前会话上下文 |
+| `/app` | `/应用` | 查看当前绑定的应用信息 |
+| `/stats` | `/统计` | 查看个人使用统计（总对话数、今日对话数） |
+
+**架构**：
+
+```
+消息进入 → BotCommandDispatcher.isCommand(text)
+  ├── true  → CommandHandler.execute() → 直接回复，不走 Dify
+  └── false → 原有 Dify/opencode 流程不变
+```
+
+**扩展方式**：实现 `CommandHandler` 接口并标注 `@Component`，自动注册到命令分发器。
+
+> 命令不区分大小写。企微群聊需 @机器人 后输入命令；微信私聊直接输入。
 
 ---
 
@@ -432,6 +464,10 @@ docker compose --profile qq up -d
 chatBase/
 ├── src/main/java/com/zxl/chatbase/
 │   ├── chat/           # 聊天服务
+│   ├── command/        # 机器人交互命令框架
+│   │   ├── CommandHandler.java        # 命令处理接口
+│   │   ├── BotCommandDispatcher.java  # 命令分发器
+│   │   └── handler/                   # 8 个内置命令
 │   ├── dify/           # Dify API 集成
 │   ├── kb/             # 知识库管理
 │   ├── im/             # IM 消息采集
@@ -481,4 +517,4 @@ MIT License
 
 ---
 
-*最后更新 / Last updated：2026-08-04 · 中文为主 / Chinese-primary, English-mirror*
+*最后更新 / Last updated：2026-08-29 · 中文为主 / Chinese-primary, English-mirror*

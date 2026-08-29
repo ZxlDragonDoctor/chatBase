@@ -72,6 +72,19 @@ chatBase/
 │   │   ├── consumer/GroupMessageConsumer.java
 │   │   └── dto/
 │   │
+│   ├── command/                       # Bot interactive command framework
+│   │   ├── CommandHandler.java        # Command handler interface
+│   │   ├── BotCommandDispatcher.java  # Command registry + dispatcher
+│   │   └── handler/
+│   │       ├── HelpCommand.java       # /help /帮助
+│   │       ├── NewCommand.java        # /new /重置
+│   │       ├── StatusCommand.java     # /status /状态
+│   │       ├── HistoryCommand.java    # /history /历史
+│   │       ├── FeedbackCommand.java   # /feedback /反馈
+│   │       ├── ClearCommand.java      # /clear /清空
+│   │       ├── AppCommand.java        # /app /应用
+│   │       └── StatsCommand.java      # /stats /统计
+│   │
 │   ├── opencode/                    # 本地 opencode serve 集成
 │   │   └── service/OpencodeService.java   # 远程驱动本机 opencode（会话映射/轮询）
 │   │

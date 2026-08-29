@@ -71,6 +71,7 @@ ChatBase 是一个基于 Spring Boot + Vue 3 的智能对话系统，集成 Dify
 | **dify** | `com.zxl.chatbase.dify` | Dify API 集成、对话、文件上传、知识库操作 |
 | **kb** | `com.zxl.chatbase.kb` | 知识库管理、分类、文档、FAQ、反馈、应用、关键词 |
 | **im** | `com.zxl.chatbase.im` | IM 消息采集、群聊管理、用户管理、机器人管理 |
+| **command** | `com.zxl.chatbase.command` | 机器人交互命令框架（/help /new /status 等） |
 | **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket 处理、NapCat 集成 |
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信机器人回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词、聚合 |
