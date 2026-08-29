@@ -30,6 +30,11 @@ public class AppCommand implements CommandHandler {
 
     @Override
     public String execute(String args, String channel, String userId, String conversationId) {
+        // 先检查 opencode 绑定
+        if (imConversationService.isOpencodeBound(conversationId)) {
+            return "📱 当前绑定: 🖥️ 本地opencode（远程编码代理）\n会话: " + conversationId;
+        }
+
         Long appId = imConversationService.getAppIdForConversation(conversationId);
 
         if (appId == null || appId <= 0) {
