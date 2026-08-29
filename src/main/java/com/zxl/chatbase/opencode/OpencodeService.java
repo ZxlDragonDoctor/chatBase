@@ -85,10 +85,6 @@ public class OpencodeService {
 
     private String doChat(String conversationId, String query, String userId, String channel) {
         String trimmed = query.trim();
-        if ("/new".equalsIgnoreCase(trimmed) || "/重置".equals(trimmed)) {
-            stringRedisTemplate.delete(SESSION_KEY_PREFIX + conversationId);
-            return "已重置会话，下一次消息将开启全新对话上下文。";
-        }
 
         String sessionId = getOrCreateSession(conversationId);
         if (!StringUtils.hasText(sessionId)) {

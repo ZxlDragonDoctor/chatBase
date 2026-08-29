@@ -3,6 +3,7 @@ package com.zxl.chatbase.wxroboot.webhook.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zxl.chatbase.command.BotCommandDispatcher;
 import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.common.MonitorException;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
@@ -71,6 +72,8 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     private ImConversationService imConversationService;
     @Resource
     private OpencodeService opencodeService;
+    @Resource
+    private BotCommandDispatcher botCommandDispatcher;
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
@@ -157,6 +160,25 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
                 }
 
                 final boolean finalIsGroup = isGroup;
+                final String channel = "wecom";
+                final String convId = isGroup ? chatId : "single:wecom:" + userId;
+
+                // 命令检测：以 / 开头的消息优先走命令处理
+                if (botCommandDispatcher.isCommand(finalQuery)) {
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            String cmdReply = botCommandDispatcher.dispatch(finalQuery, channel, userId, convId);
+                            if (cmdReply != null && msg.getResponse_url() != null && !msg.getResponse_url().isEmpty()) {
+                                WeChatUtil.sendMarkdown(msg.getResponse_url(), cmdReply);
+                                log.info("企微命令回复发送成功: userId={}, cmd={}", userId, finalQuery);
+                            }
+                        } catch (Exception e) {
+                            log.error("企微命令处理失败: userId={}, cmd={}", userId, finalQuery, e);
+                        }
+                    }, threadPool);
+                    return buildNullReturnString(timestamp, nonce);
+                }
+
                 CompletableFuture.runAsync(() -> {
                     try {
                         if (finalIsGroup) {

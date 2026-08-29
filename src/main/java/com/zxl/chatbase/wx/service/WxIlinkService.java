@@ -2,6 +2,7 @@ package com.zxl.chatbase.wx.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zxl.chatbase.command.BotCommandDispatcher;
 import com.zxl.chatbase.chat.service.ChatService;
 import com.zxl.chatbase.dify.model.request.FileInfo;
 import com.zxl.chatbase.dify.model.response.DifyChatResponse;
@@ -63,6 +64,7 @@ public class WxIlinkService {
     private final ImConversationService imConversationService;
     private final OpencodeService opencodeService;
     private final ThreadPoolExecutor threadPool;
+    private final BotCommandDispatcher botCommandDispatcher;
 
     private static final String REDIS_UPDATES_BUF_KEY = "bot:wx:get_updates_buf";
     private static final String REDIS_ONLINE_KEY = "bot:wx:online";
@@ -343,6 +345,25 @@ public class WxIlinkService {
             }
             rawMessage = rawMessage.replace(atMention, "").trim();
             log.info("群聊消息触发 @机器人 问答: groupId={}, 去除@后=[{}]", fromGroup, truncate(rawMessage, 100));
+        }
+
+        // 命令检测：以 / 开头的消息优先走命令处理
+        if (botCommandDispatcher.isCommand(rawMessage)) {
+            String convId = isPrivate ? conversationId : fromGroup;
+            String cmdReply = botCommandDispatcher.dispatch(rawMessage, "wx", fromUser, convId);
+            if (cmdReply != null && StringUtils.hasText(msg.getContextToken())) {
+                WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                        fromUser, msg.getContextToken(), cmdReply);
+                int ret = wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), reply);
+                if (ret == -14) {
+                    log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                    markOffline();
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                log.info("微信命令回复发送成功: msgId={}, toUser={}, cmd={}, ret={}", msg.getMsgId(), fromUser, rawMessage, ret);
+            }
+            return;
         }
 
         if (isPrivate) {
