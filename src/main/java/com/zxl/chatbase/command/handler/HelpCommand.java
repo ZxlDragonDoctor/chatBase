@@ -1,10 +1,11 @@
 package com.zxl.chatbase.command.handler;
 
-import com.zxl.chatbase.command.BotCommandDispatcher;
 import com.zxl.chatbase.command.CommandHandler;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.util.Collection;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -12,7 +13,7 @@ import java.util.TreeSet;
 public class HelpCommand implements CommandHandler {
 
     @Resource
-    private BotCommandDispatcher dispatcher;
+    private ApplicationContext applicationContext;
 
     @Override
     public String name() { return "help"; }
@@ -25,12 +26,14 @@ public class HelpCommand implements CommandHandler {
 
     @Override
     public String execute(String args, String channel, String userId, String conversationId) {
-        // Collect unique commands from the dispatcher's registered handlers
+        // Lazily get all CommandHandler beans from ApplicationContext to avoid circular dependency
+        Collection<CommandHandler> allHandlers = applicationContext.getBeansOfType(CommandHandler.class).values();
+
         Set<String> seen = new TreeSet<>();
         StringBuilder sb = new StringBuilder();
         sb.append("📋 可用命令列表\n\n");
 
-        for (CommandHandler handler : dispatcher.getRegisteredHandlers()) {
+        for (CommandHandler handler : allHandlers) {
             if (seen.add(handler.name())) {
                 sb.append("/").append(handler.name());
                 for (String alias : handler.aliases()) {
