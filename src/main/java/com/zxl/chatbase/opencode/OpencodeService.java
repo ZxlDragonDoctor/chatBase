@@ -41,6 +41,7 @@ public class OpencodeService {
 
     private static final String SESSION_KEY_PREFIX = "opencode:session:";
     private static final String PROMPT_KEY_PREFIX = "opencode:prompt:";
+    private static final String MODEL_KEY_PREFIX = "opencode:model:";
 
     /** 思考内容单条最大长度（字符） */
     private static final int MAX_REASONING_LEN = 600;
@@ -70,6 +71,10 @@ public class OpencodeService {
      * @param channel        平台标识（qq/wecom/wx）
      */
     public String chat(String conversationId, String query, String userId, String channel) {
+        return chat(conversationId, query, userId, channel, null);
+    }
+
+    public String chat(String conversationId, String query, String userId, String channel, String modelId) {
         if (!properties.isEnabled()) {
             return "【本地opencode未启用】请联系管理员在服务器上配置并启动 opencode serve 服务。";
         }
@@ -79,12 +84,74 @@ public class OpencodeService {
 
         Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
         synchronized (lock) {
-            return doChat(conversationId, query, userId, channel);
+            return doChat(conversationId, query, userId, channel, modelId);
         }
     }
 
-    private String doChat(String conversationId, String query, String userId, String channel) {
+    // ---- 模型管理 ----
+
+    private static final long MODEL_TTL_DAYS = 7;
+
+    public void setModel(String conversationId, String providerID, String modelID) {
+        String key = MODEL_KEY_PREFIX + conversationId;
+        String value = providerID + ":" + modelID;
+        stringRedisTemplate.opsForValue().set(key, value, Duration.ofDays(MODEL_TTL_DAYS));
+        log.info("opencode 模型已设置: conversationId={}, model={}", conversationId, value);
+    }
+
+    public String getModel(String conversationId) {
+        String key = MODEL_KEY_PREFIX + conversationId;
+        return stringRedisTemplate.opsForValue().get(key);
+    }
+
+    public void deleteModel(String conversationId) {
+        stringRedisTemplate.delete(MODEL_KEY_PREFIX + conversationId);
+    }
+
+    /**
+     * 解析模型字符串为 providerID 和 modelID
+     * 支持格式：providerID:modelID 或 modelID（默认 providerID 为 opencode）
+     */
+    public static String[] parseModel(String modelStr) {
+        if (!StringUtils.hasText(modelStr)) {
+            return null;
+        }
+        String trimmed = modelStr.trim();
+        if (trimmed.contains(":")) {
+            String[] parts = trimmed.split(":", 2);
+            return new String[]{parts[0], parts[1]};
+        }
+        return new String[]{"opencode", trimmed};
+    }
+
+    /**
+     * 构建模型 JSON 片段，返回格式如：
+     * ,"model":{"providerID":"opencode","modelID":"mimo-v2.5-free"}
+     * 或空字符串（无模型时）
+     */
+    private String buildModelJson(String conversationId) {
+        String modelValue = getModel(conversationId);
+        if (!StringUtils.hasText(modelValue)) {
+            return "";
+        }
+        String[] parts = modelValue.split(":", 2);
+        if (parts.length != 2 || !StringUtils.hasText(parts[0]) || !StringUtils.hasText(parts[1])) {
+            return "";
+        }
+        return ",\"model\":{\"providerID\":\"" + escapeJson(parts[0])
+                + "\",\"modelID\":\"" + escapeJson(parts[1]) + "\"}";
+    }
+
+    private String doChat(String conversationId, String query, String userId, String channel, String modelId) {
         String trimmed = query.trim();
+
+        // 如果调用方指定了模型，写入 Redis
+        if (StringUtils.hasText(modelId)) {
+            String[] parsed = parseModel(modelId);
+            if (parsed != null) {
+                setModel(conversationId, parsed[0], parsed[1]);
+            }
+        }
 
         String sessionId = getOrCreateSession(conversationId);
         if (!StringUtils.hasText(sessionId)) {
@@ -102,7 +169,7 @@ public class OpencodeService {
             }
         }
         if (!handled) {
-            sendPrompt(sessionId, query);
+            sendPrompt(sessionId, query, conversationId);
         }
 
         PollOutcome outcome = pollAnswer(sessionId, baselineId);
@@ -157,18 +224,21 @@ public class OpencodeService {
         }
     }
 
-    private void sendPrompt(String sessionId, String query) {
+    private void sendPrompt(String sessionId, String query, String conversationId) {
         if (!StringUtils.hasText(sessionId)) {
             return;
         }
         try {
             String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/prompt";
-            String body = "{\"prompt\":{\"text\":\"" + escapeJson(query) + "\"}}";
+            String modelJson = buildModelJson(conversationId);
+            String body = "{\"prompt\":{\"text\":\"" + escapeJson(query) + "\"}" + modelJson + "}";
             HttpHeaders headers = buildHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> request = new HttpEntity<>(body, headers);
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-            log.info("opencode 消息已发送: sessionId={}, status={}", sessionId, resp.getStatusCodeValue());
+            log.info("opencode 消息已发送: sessionId={}, status={}, model={}",
+                    sessionId, resp.getStatusCodeValue(),
+                    StringUtils.hasText(modelJson) ? getModel(conversationId) : "default");
         } catch (Exception e) {
             log.error("opencode 发送消息异常: sessionId={}", sessionId, e);
         }
