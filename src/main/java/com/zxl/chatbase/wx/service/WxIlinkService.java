@@ -385,7 +385,7 @@ public class WxIlinkService {
             if (isPrivate && imConversationService.isOpencodeBound(conversationId)) {
                 if (StringUtils.hasText(msg.getContextToken())) {
                     WxOutboundMessage processing = WxOutboundMessage.createTextMessage(
-                            fromUser, msg.getContextToken(), "正在处理中，请稍候…");
+                            fromUser, msg.getContextToken(), "⏳ opencode 处理中，请稍候…");
                     int processingRet = wxIlinkUtil.sendMessage(
                             resolveBaseUrl(), resolveBotToken(), processing);
                     if (processingRet == -14) {
@@ -397,7 +397,15 @@ public class WxIlinkService {
                     log.info("微信opencode处理中提示已发送: msgId={}, toUser={}, ret={}",
                             msg.getMsgId(), fromUser, processingRet);
                 }
-                String opencodeAnswer = opencodeService.chat(conversationId, rawMessage, fromUser, "wx");
+                String opencodeAnswer = opencodeService.chatStreaming(
+                        conversationId, rawMessage, fromUser, "wx", null,
+                        (partial) -> {
+                            if (StringUtils.hasText(partial) && StringUtils.hasText(msg.getContextToken())) {
+                                WxOutboundMessage update = WxOutboundMessage.createTextMessage(
+                                        fromUser, msg.getContextToken(), "⏳ 处理中…\n\n" + truncateWx(partial, 1800));
+                                wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), update);
+                            }
+                        });
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
                     WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
                             fromUser, msg.getContextToken(), opencodeAnswer);
@@ -500,6 +508,20 @@ public class WxIlinkService {
 
     private void markOffline() {
         stringRedisTemplate.delete(REDIS_ONLINE_KEY);
+        running.set(false);
+    }
+
+    /**
+     * 截断文本到微信消息长度限制，超出时保留头尾并加省略标记
+     */
+    private static String truncateWx(String text, int maxLen) {
+        if (text == null || text.length() <= maxLen) {
+            return text;
+        }
+        int half = maxLen / 2;
+        return text.substring(0, half)
+                + "\n\n…(内容过长已省略，共 " + text.length() + " 字)…\n\n"
+                + text.substring(text.length() - half);
     }
 
     private String loadGetUpdatesBuf() {

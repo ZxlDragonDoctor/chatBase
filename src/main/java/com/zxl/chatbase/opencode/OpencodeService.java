@@ -63,18 +63,34 @@ public class OpencodeService {
     private final IKbConversationService kbConversationService;
 
     /**
-     * 发送消息给 opencode 并返回回复文本
-     *
-     * @param conversationId IM 单聊会话ID（如 single:qq:xxx）
-     * @param query          用户消息
-     * @param userId         平台用户ID
-     * @param channel        平台标识（qq/wecom/wx）
+     * 发送消息给 opencode 并返回回复文本（同步等待完整结果）
      */
     public String chat(String conversationId, String query, String userId, String channel) {
         return chat(conversationId, query, userId, channel, null);
     }
 
     public String chat(String conversationId, String query, String userId, String channel, String modelId) {
+        return chat(conversationId, query, userId, channel, modelId, null);
+    }
+
+    /**
+     * 流式发送消息给 opencode，轮询过程中通过 callback 实时推送中间结果
+     */
+    public String chatStreaming(String conversationId, String query, String userId, String channel,
+                                String modelId, StreamingCallback callback) {
+        if (!properties.isEnabled()) {
+            return "【本地opencode未启用】请联系管理员在服务器上配置并启动 opencode serve 服务。";
+        }
+        if (!StringUtils.hasText(query)) {
+            return "请输入要执行的任务或问题。";
+        }
+        Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
+        synchronized (lock) {
+            return doChat(conversationId, query, userId, channel, modelId, callback);
+        }
+    }
+
+    private String chat(String conversationId, String query, String userId, String channel, String modelId, StreamingCallback callback) {
         if (!properties.isEnabled()) {
             return "【本地opencode未启用】请联系管理员在服务器上配置并启动 opencode serve 服务。";
         }
@@ -84,7 +100,7 @@ public class OpencodeService {
 
         Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
         synchronized (lock) {
-            return doChat(conversationId, query, userId, channel, modelId);
+            return doChat(conversationId, query, userId, channel, modelId, callback);
         }
     }
 
@@ -142,7 +158,7 @@ public class OpencodeService {
                 + "\",\"modelID\":\"" + escapeJson(parts[1]) + "\"}";
     }
 
-    private String doChat(String conversationId, String query, String userId, String channel, String modelId) {
+    private String doChat(String conversationId, String query, String userId, String channel, String modelId, StreamingCallback callback) {
         String trimmed = query.trim();
 
         // 如果调用方指定了模型，写入 Redis
@@ -172,7 +188,7 @@ public class OpencodeService {
             sendPrompt(sessionId, query, conversationId);
         }
 
-        PollOutcome outcome = pollAnswer(sessionId, baselineId);
+        PollOutcome outcome = pollAnswer(sessionId, baselineId, callback);
         if (outcome.isQuestion()) {
             return outcome.getText();
         }
@@ -246,33 +262,39 @@ public class OpencodeService {
 
     /**
      * 轮询消息，直到 agent 完成（出现 finish=stop）、出现待回答问题或超时。
-     *
-     * 每次轮询都取本次 prompt 之后新增的所有 assistant 内容（思考/工具/中间文本/最终回复）
-     * 拼接后作为当前累计回复。只要 agent 未完成就继续轮询，避免中间文本触发提前返回
-     * 而导致最终完整回复丢失。
-     *
-     * 若 agent 调用了 question 工具进入待回答状态，则立即返回问题文本（带 isQuestion 标记），
-     * 由上层回发给用户等待回答。
-     *
-     * @param baselineId 发送 prompt 前最新一条消息的 id，用于区分本次 prompt 前后的消息
+     * 支持流式回调：轮询过程中通过 callback 实时推送中间结果，带节流控制。
      */
-    private PollOutcome pollAnswer(String sessionId, String baselineId) {
+    private PollOutcome pollAnswer(String sessionId, String baselineId, StreamingCallback callback) {
         if (!StringUtils.hasText(sessionId)) {
             return PollOutcome.finish(null);
         }
         long deadline = System.currentTimeMillis() + properties.getTimeoutSeconds() * 1000L;
         long pollInterval = 2000;
         String accumulated = null;
+        long lastCallbackTime = 0;
+        long callbackMinInterval = 8000;
+        String lastCallbackContent = null;
         try {
             while (System.currentTimeMillis() < deadline) {
                 JsonNode pendingQuestion = fetchPendingQuestion(sessionId);
                 if (pendingQuestion != null) {
                     log.info("opencode 检测到待回答问题，结束轮询: sessionId={}", sessionId);
+                    if (callback != null && StringUtils.hasText(accumulated)
+                            && !accumulated.equals(lastCallbackContent)) {
+                        callback.onUpdate(accumulated);
+                    }
                     return PollOutcome.question(formatQuestionText(pendingQuestion));
                 }
                 PollResult result = fetchLatestAssistantAnswer(sessionId, baselineId);
                 if (StringUtils.hasText(result.answer)) {
                     accumulated = result.answer;
+                }
+                if (callback != null && StringUtils.hasText(accumulated)
+                        && !accumulated.equals(lastCallbackContent)
+                        && System.currentTimeMillis() - lastCallbackTime >= callbackMinInterval) {
+                    callback.onUpdate(accumulated);
+                    lastCallbackContent = accumulated;
+                    lastCallbackTime = System.currentTimeMillis();
                 }
                 if (result.finished) {
                     log.info("opencode agent 已完成，结束轮询: sessionId={}, hasAnswer={}",
