@@ -34,6 +34,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Slf4j
 @Service
 public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMapper,
@@ -41,7 +43,7 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
     @Resource
     private IntelligentRobotMapper intelligentRobotMapper;
 
-    @Resource
+    @Autowired(required = false)
     private WXBizJsonMsgCrypt wxBizJsonMsgCrypt;
     @Resource
     private  WXBizJsonMsgCryptConfig wxBizJsonMsgCryptConfig;
@@ -77,6 +79,9 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
     @Override
     public String verifyUrl(String msgSignature, String timestamp, String nonce, String echoStr) {
+        if (wxBizJsonMsgCrypt == null) {
+            throw MonitorException.build("企业微信未配置，无法验证URL");
+        }
         String sEchoStr; //需要返回的明文
         try {
             sEchoStr = wxBizJsonMsgCrypt.VerifyURL(msgSignature, timestamp, nonce, echoStr);
@@ -276,6 +281,9 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
     //解密
     private String decryptData(String msgSignature, String timestamp, String nonce, String postData) {
+        if (wxBizJsonMsgCrypt == null) {
+            throw MonitorException.build("企业微信未配置，无法解密消息");
+        }
         try {
             return wxBizJsonMsgCrypt.DecryptMsg(msgSignature, timestamp, nonce, postData);
         } catch (Exception e) {
@@ -286,6 +294,9 @@ public class IntelligentRobotServiceImpl extends ServiceImpl<IntelligentRobotMap
 
     //加密
     private String encryptData(String timestamp, String nonce, String reply) {
+        if (wxBizJsonMsgCrypt == null) {
+            throw MonitorException.build("企业微信未配置，无法加密消息");
+        }
         try {
             String sEncryptMsg = wxBizJsonMsgCrypt.EncryptMsg(reply, timestamp, nonce);
             return sEncryptMsg;

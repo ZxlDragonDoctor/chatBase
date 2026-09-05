@@ -22,13 +22,18 @@ public class WXBizJsonMsgCryptConfig {
     private String receiveId = "";
 
     @Bean
-    public WXBizJsonMsgCrypt wxcpt() throws AesException {
+    public WXBizJsonMsgCrypt wxcpt() {
         if (sEncodingAESKey == null || sEncodingAESKey.isEmpty()
                 || stoken == null || stoken.isEmpty()) {
-            log.warn("企业微信配置不完整，使用占位 WXBizJsonMsgCrypt");
-            return new WXBizJsonMsgCrypt("placeholder", "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", "");
+            log.warn("企业微信配置不完整，返回 null（企业微信功能不可用）");
+            return null;
         }
-         return new WXBizJsonMsgCrypt(stoken, sEncodingAESKey, receiveId);
+        try {
+            return new WXBizJsonMsgCrypt(stoken, sEncodingAESKey, receiveId);
+        } catch (AesException e) {
+            log.error("企业微信 AES 密钥无效，返回 null: {}", e.getMessage());
+            return null;
+        }
     }
 
     public String getsEncodingAESKey() {
