@@ -412,17 +412,21 @@ public class WxIlinkService {
                             }
                         });
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
-                    WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
-                            fromUser, msg.getContextToken(), opencodeAnswer);
-                    int ret = wxIlinkUtil.sendMessage(
-                            resolveBaseUrl(), resolveBotToken(), reply);
-                    if (ret == -14) {
-                        log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                        markOffline();
-                        Thread.currentThread().interrupt();
-                        return;
+                    if (!opencodeAnswer.equals(lastSent[0])) {
+                        WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                                fromUser, msg.getContextToken(), opencodeAnswer);
+                        int ret = wxIlinkUtil.sendMessage(
+                                resolveBaseUrl(), resolveBotToken(), reply);
+                        if (ret == -14) {
+                            log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                            markOffline();
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        log.info("微信opencode回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
+                    } else {
+                        log.info("微信opencode回复已通过流式推送，跳过重复发送: msgId={}", msg.getMsgId());
                     }
-                    log.info("微信opencode回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
                 } else {
                     log.warn("微信opencode问答结果为空或缺少context_token，未发送回复: msgId={}, hasAnswer={}, hasContextToken={}",
                             msg.getMsgId(), StringUtils.hasText(opencodeAnswer), StringUtils.hasText(msg.getContextToken()));
