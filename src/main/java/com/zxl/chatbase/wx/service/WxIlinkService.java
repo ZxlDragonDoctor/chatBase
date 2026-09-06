@@ -397,13 +397,18 @@ public class WxIlinkService {
                     log.info("微信opencode处理中提示已发送: msgId={}, toUser={}, ret={}",
                             msg.getMsgId(), fromUser, processingRet);
                 }
+                final String[] lastSent = {""};
                 String opencodeAnswer = opencodeService.chatStreaming(
                         conversationId, rawMessage, fromUser, "wx", null,
                         (partial) -> {
                             if (StringUtils.hasText(partial) && StringUtils.hasText(msg.getContextToken())) {
-                                WxOutboundMessage update = WxOutboundMessage.createTextMessage(
-                                        fromUser, msg.getContextToken(), "⏳ 处理中…\n\n" + truncateWx(partial, 1800));
-                                wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), update);
+                                String delta = partial.substring(lastSent[0].length());
+                                if (StringUtils.hasText(delta)) {
+                                    WxOutboundMessage update = WxOutboundMessage.createTextMessage(
+                                            fromUser, msg.getContextToken(), delta);
+                                    wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), update);
+                                    lastSent[0] = partial;
+                                }
                             }
                         });
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {

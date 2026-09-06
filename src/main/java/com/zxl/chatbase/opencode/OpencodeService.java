@@ -269,10 +269,10 @@ public class OpencodeService {
             return PollOutcome.finish(null);
         }
         long deadline = System.currentTimeMillis() + properties.getTimeoutSeconds() * 1000L;
-        long pollInterval = 2000;
+        long pollInterval = 1000;
         String accumulated = null;
         long lastCallbackTime = 0;
-        long callbackMinInterval = 8000;
+        long callbackMinInterval = 3000;
         String lastCallbackContent = null;
         try {
             while (System.currentTimeMillis() < deadline) {
