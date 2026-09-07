@@ -46,9 +46,9 @@ public class OpencodeService {
     /** 思考内容单条最大长度（字符） */
     private static final int MAX_REASONING_LEN = 600;
     /** 工具输出单条最大长度（字符） */
-    private static final int MAX_TOOL_OUTPUT_LEN = 500;
+    private static final int MAX_TOOL_OUTPUT_LEN = 300;
     /** 返回给 IM 的完整回复总长度上限（字符），超出按头尾截断 */
-    private static final int MAX_TOTAL_LEN = 6000;
+    private static final int MAX_TOTAL_LEN = 10000;
 
     /**
      * 每个会话的串行锁：同一 conversationId 的消息必须按顺序处理，
@@ -568,7 +568,7 @@ public class OpencodeService {
 
     /**
      * 从 accumulated 内容中只提取文本部分（过滤工具调用和思考过程），
-     * 用于流式回调，避免向用户发送噪音
+     * 用于流式回调和最终回复，避免向用户发送噪音
      */
     private String extractTextOnly(String accumulated) {
         if (!StringUtils.hasText(accumulated)) {
@@ -578,12 +578,16 @@ public class OpencodeService {
         String[] blocks = accumulated.split("\n\n");
         for (String block : blocks) {
             String trimmed = block.trim();
-            // 跳过工具调用块
-            if (trimmed.startsWith("【工具】")) {
+            // 只过滤独立的工具调用块（以【工具】开头且只包含工具内容）
+            if (trimmed.startsWith("【工具】") && !trimmed.contains("\n\n")) {
                 continue;
             }
-            // 跳过思考块
-            if (trimmed.startsWith("【思考】")) {
+            // 只过滤独立的思考块
+            if (trimmed.startsWith("【思考】") && !trimmed.contains("\n\n")) {
+                continue;
+            }
+            // 跳过纯命令输出
+            if (trimmed.startsWith("Command exited with code")) {
                 continue;
             }
             if (textOnly.length() > 0) {
