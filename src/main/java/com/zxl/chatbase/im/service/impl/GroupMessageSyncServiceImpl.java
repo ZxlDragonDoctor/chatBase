@@ -260,7 +260,11 @@ public class GroupMessageSyncServiceImpl extends ServiceImpl<GroupMessageMapper,
             log.info("群[{}]文本消息批量同步成功: 新增{}条", groupName, newMessages.size());
             return newMessages.size();
         } else {
-            log.warn("群[{}]文本消息同步失败", groupName);
+            for (GroupMessage msg : newMessages) {
+                msg.setSynced(true);
+            }
+            this.updateBatchById(newMessages);
+            log.warn("群[{}]文本消息同步失败，已标记为已处理避免无限重试", groupName);
             return 0;
         }
     }
