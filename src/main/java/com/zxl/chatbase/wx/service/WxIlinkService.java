@@ -413,17 +413,28 @@ public class WxIlinkService {
                         });
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
                     if (!opencodeAnswer.equals(lastSent[0])) {
-                        WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
-                                fromUser, msg.getContextToken(), opencodeAnswer);
-                        int ret = wxIlinkUtil.sendMessage(
-                                resolveBaseUrl(), resolveBotToken(), reply);
-                        if (ret == -14) {
-                            log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                            markOffline();
-                            Thread.currentThread().interrupt();
-                            return;
+                        // 超长消息分段发送（微信单条消息限 2048 字符）
+                        java.util.List<String> parts = OpencodeService.splitMessage(opencodeAnswer, 2000);
+                        for (int idx = 0; idx < parts.size(); idx++) {
+                            String part = parts.get(idx);
+                            if (parts.size() > 1) {
+                                part = String.format("【%d/%d】\n%s", idx + 1, parts.size(), part);
+                            }
+                            WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                                    fromUser, msg.getContextToken(), part);
+                            int ret = wxIlinkUtil.sendMessage(
+                                    resolveBaseUrl(), resolveBotToken(), reply);
+                            if (ret == -14) {
+                                log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
+                                markOffline();
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                            if (idx < parts.size() - 1) {
+                                Thread.sleep(500);
+                            }
                         }
-                        log.info("微信opencode回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
+                        log.info("微信opencode回复发送成功: msgId={}, toUser={}, parts={}", msg.getMsgId(), fromUser, parts.size());
                     } else {
                         log.info("微信opencode回复已通过流式推送，跳过重复发送: msgId={}", msg.getMsgId());
                     }

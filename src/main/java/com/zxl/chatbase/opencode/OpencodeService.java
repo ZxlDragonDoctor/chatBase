@@ -303,6 +303,12 @@ public class OpencodeService {
             answer = "【opencode 已执行完任务，但未生成文本回复】可能是任务过复杂或模型没有输出总结，请换个问法再试，或稍后重发。";
         }
 
+        // 最终回复也过滤工具调用，只保留文本
+        String cleanAnswer = extractTextOnly(answer);
+        if (StringUtils.hasText(cleanAnswer)) {
+            answer = cleanAnswer;
+        }
+
         saveConversation(conversationId, userId, channel, query, answer);
         return answer;
     }
@@ -420,7 +426,11 @@ public class OpencodeService {
                 if (callback != null && StringUtils.hasText(accumulated)
                         && !accumulated.equals(lastCallbackContent)
                         && System.currentTimeMillis() - lastCallbackTime >= callbackMinInterval) {
-                    callback.onUpdate(accumulated);
+                    // 流式回调只推送文本内容，过滤工具调用噪音
+                    String textOnly = extractTextOnly(accumulated);
+                    if (StringUtils.hasText(textOnly)) {
+                        callback.onUpdate(textOnly);
+                    }
                     lastCallbackContent = accumulated;
                     lastCallbackTime = System.currentTimeMillis();
                 }
@@ -551,6 +561,65 @@ public class OpencodeService {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    /**
+     * 从 accumulated 内容中只提取文本部分（过滤工具调用和思考过程），
+     * 用于流式回调，避免向用户发送噪音
+     */
+    private String extractTextOnly(String accumulated) {
+        if (!StringUtils.hasText(accumulated)) {
+            return "";
+        }
+        StringBuilder textOnly = new StringBuilder();
+        String[] blocks = accumulated.split("\n\n");
+        for (String block : blocks) {
+            String trimmed = block.trim();
+            // 跳过工具调用块
+            if (trimmed.startsWith("【工具】")) {
+                continue;
+            }
+            // 跳过思考块
+            if (trimmed.startsWith("【思考】")) {
+                continue;
+            }
+            if (textOnly.length() > 0) {
+                textOnly.append("\n\n");
+            }
+            textOnly.append(trimmed);
+        }
+        return textOnly.toString();
+    }
+
+    /**
+     * 将长文本按段落拆分为多条消息，每条不超过 maxLen 字符
+     */
+    public static java.util.List<String> splitMessage(String text, int maxLen) {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (!StringUtils.hasText(text)) {
+            return parts;
+        }
+        if (text.length() <= maxLen) {
+            parts.add(text);
+            return parts;
+        }
+        // 按段落分割
+        String[] paragraphs = text.split("\n");
+        StringBuilder current = new StringBuilder();
+        for (String para : paragraphs) {
+            if (current.length() + para.length() + 1 > maxLen && current.length() > 0) {
+                parts.add(current.toString());
+                current = new StringBuilder();
+            }
+            if (current.length() > 0) {
+                current.append("\n");
+            }
+            current.append(para);
+        }
+        if (current.length() > 0) {
+            parts.add(current.toString());
+        }
+        return parts;
     }
 
     /**
