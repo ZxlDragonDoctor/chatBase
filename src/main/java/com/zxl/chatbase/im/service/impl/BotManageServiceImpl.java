@@ -65,6 +65,11 @@ public class BotManageServiceImpl implements BotManageService {
 
     private BotInfoVO buildWxBot() {
         boolean online = "1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online"));
+        // 额外验证 token 是否存在，无 token 时强制显示离线
+        String token = stringRedisTemplate.opsForValue().get("bot:wx:token");
+        if (online && !StringUtils.hasText(token)) {
+            online = false;
+        }
         return BotInfoVO.builder()
                 .platform("wx")
                 .name(wxProperties.getNickname())

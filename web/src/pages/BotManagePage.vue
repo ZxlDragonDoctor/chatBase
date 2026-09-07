@@ -92,7 +92,7 @@
                   </div>
                 </div>
                 <div class="bot-card-actions" v-if="bot.platform === 'wx' || bot.platform === 'qq'">
-                  <button v-if="bot.online" class="anime-btn xs danger">
+                  <button v-if="bot.online" class="anime-btn xs danger" @click="handleDisconnect(bot.platform)">
                     <LogOut :size="14" />
                     <span>断开</span>
                   </button>
@@ -341,9 +341,14 @@ async function handleQrLogin(platform: 'wx' | 'qq' = 'wx') {
   await fetchQrCode()
 }
 
-async function handleDisconnect() {
+async function handleDisconnect(platform: 'wx' | 'qq') {
+  const name = platform === 'wx' ? '微信' : 'QQ'
+  if (!confirm(`确定要断开${name}机器人连接吗？`)) return
   try {
-    await disconnectWxBot()
+    if (platform === 'wx') {
+      await disconnectWxBot()
+    }
+    // QQ bot 断开：清除 NapCat 连接
     loadBots()
   } catch (e: any) {
     error.value = e?.response?.data?.message || '断开连接失败'
