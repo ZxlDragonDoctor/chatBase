@@ -300,7 +300,10 @@ public class OpencodeService {
         }
         String answer = outcome.getText();
         if (!StringUtils.hasText(answer)) {
-            answer = "【opencode 已执行完任务，但未生成文本回复】可能是任务过复杂或模型没有输出总结，请换个问法再试，或稍后重发。";
+            // 空回复时清除 session 缓存，下次自动创建新 session
+            stringRedisTemplate.delete(SESSION_KEY_PREFIX + conversationId);
+            log.warn("opencode 返回空回复，已清除 session 缓存: conversationId={}, sessionId={}", conversationId, sessionId);
+            answer = "【opencode 未生成回复】可能是任务过复杂或模型异常，已重置会话，请重试。";
         }
 
         // 最终回复也过滤工具调用，只保留文本
