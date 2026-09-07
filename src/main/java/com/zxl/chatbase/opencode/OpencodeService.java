@@ -62,6 +62,10 @@ public class OpencodeService {
     private final ObjectMapper objectMapper;
     private final IKbConversationService kbConversationService;
 
+    public boolean isEnabled() {
+        return properties.isEnabled();
+    }
+
     /**
      * 发送消息给 opencode 并返回回复文本（同步等待完整结果）
      */
@@ -122,6 +126,104 @@ public class OpencodeService {
 
     public void deleteModel(String conversationId) {
         stringRedisTemplate.delete(MODEL_KEY_PREFIX + conversationId);
+    }
+
+    // ---- 会话管理 ----
+
+    /**
+     * 获取当前对话绑定的 opencode sessionId
+     */
+    public String getCurrentSessionId(String conversationId) {
+        return stringRedisTemplate.opsForValue().get(SESSION_KEY_PREFIX + conversationId);
+    }
+
+    /**
+     * 切换到指定的 opencode 会话
+     */
+    public String switchSession(String conversationId, String targetSessionId) {
+        if (!StringUtils.hasText(targetSessionId)) {
+            return "请指定要切换的会话ID，例如：/session ses_xxx";
+        }
+        // 验证会话是否存在
+        String url = properties.getBaseUrl() + "/api/session/" + targetSessionId;
+        try {
+            HttpHeaders headers = buildHeaders();
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            JsonNode root = objectMapper.readTree(resp.getBody());
+            JsonNode data = root.path("data");
+            String sessionId = data.path("id").asText(null);
+            if (!StringUtils.hasText(sessionId)) {
+                return "会话不存在: " + targetSessionId;
+            }
+            String title = data.path("title").asText("无标题");
+            // 更新 Redis 缓存
+            stringRedisTemplate.opsForValue().set(
+                    SESSION_KEY_PREFIX + conversationId, sessionId, Duration.ofDays(7));
+            return "✅ 已切换会话\n📋 " + title + "\n🆔 " + sessionId;
+        } catch (Exception e) {
+            log.error("切换会话失败: targetSessionId={}", targetSessionId, e);
+            return "切换会话失败: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 列出 opencode 服务上的所有会话（最多返回最近30个）
+     */
+    public String listSessions(String conversationId) {
+        String currentSessionId = getCurrentSessionId(conversationId);
+        try {
+            HttpHeaders headers = buildHeaders();
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            String url = properties.getBaseUrl() + "/api/session";
+            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            JsonNode root = objectMapper.readTree(resp.getBody());
+            JsonNode data = root.path("data");
+            if (!data.isArray() || data.size() == 0) {
+                return "暂无 opencode 会话";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("📋 opencode 会话列表（最近").append(Math.min(data.size(), 30)).append("个）\n");
+            sb.append("当前会话: ").append(currentSessionId != null ? currentSessionId.substring(0, Math.min(16, currentSessionId.length())) + "..." : "无").append("\n");
+            sb.append("─────────────────\n");
+
+            int count = 0;
+            for (JsonNode s : data) {
+                if (count >= 30) break;
+                String id = s.path("id").asText("");
+                String title = s.path("title").asText("无标题");
+                String model = "";
+                JsonNode modelNode = s.path("model");
+                if (!modelNode.isMissingNode() && modelNode.has("id")) {
+                    model = " [" + modelNode.path("id").asText("") + "]";
+                }
+                long created = s.path("time").path("created").asLong(0);
+                String timeStr = "";
+                if (created > 0) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MM-dd HH:mm");
+                    timeStr = " " + sdf.format(new java.util.Date(created));
+                }
+                boolean isCurrent = id.equals(currentSessionId);
+                String marker = isCurrent ? " 👈" : "";
+                String shortId = id.length() > 20 ? id.substring(0, 20) + "..." : id;
+                sb.append(String.format("%s. %s%s%s\n   🆔 %s\n",
+                        count + 1, title, model, timeStr, shortId));
+                if (isCurrent) {
+                    sb.delete(sb.length() - marker.length() - 1, sb.length());
+                    sb.append(marker).append("\n");
+                }
+                count++;
+            }
+
+            sb.append("─────────────────\n");
+            sb.append("发送 /session <ID> 切换会话\n");
+            sb.append("发送 /new 重置为全新会话");
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("获取会话列表失败", e);
+            return "获取会话列表失败: " + e.getMessage();
+        }
     }
 
     /**
