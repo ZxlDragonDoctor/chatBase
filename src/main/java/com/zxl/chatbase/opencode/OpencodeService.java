@@ -148,6 +148,10 @@ public class OpencodeService {
     private String buildModelJson(String conversationId) {
         String modelValue = getModel(conversationId);
         if (!StringUtils.hasText(modelValue)) {
+            // 使用默认模型
+            modelValue = properties.getDefaultModel();
+        }
+        if (!StringUtils.hasText(modelValue)) {
             return "";
         }
         String[] parts = modelValue.split(":", 2);
@@ -155,7 +159,7 @@ public class OpencodeService {
             return "";
         }
         return ",\"model\":{\"providerID\":\"" + escapeJson(parts[0])
-                + "\",\"modelID\":\"" + escapeJson(parts[1]) + "\"}";
+                + "\",\"id\":\"" + escapeJson(parts[1]) + "\"}";
     }
 
     private String doChat(String conversationId, String query, String userId, String channel, String modelId, StreamingCallback callback) {
@@ -211,13 +215,34 @@ public class OpencodeService {
         try {
             HttpHeaders headers = buildHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            String createBody = "{}";
+
+            StringBuilder createBody = new StringBuilder("{");
             if (StringUtils.hasText(properties.getDefaultDirectory())) {
-                createBody = "{\"directory\":\"" + escapeJson(properties.getDefaultDirectory()) + "\",\"agent\":\"" + escapeJson(properties.getDefaultAgent()) + "\"}";
-            } else {
-                createBody = "{\"agent\":\"" + escapeJson(properties.getDefaultAgent()) + "\"}";
+                createBody.append("\"directory\":\"").append(escapeJson(properties.getDefaultDirectory())).append("\",");
             }
-            HttpEntity<String> request = new HttpEntity<>(createBody, headers);
+            if (StringUtils.hasText(properties.getDefaultAgent())) {
+                createBody.append("\"agent\":\"").append(escapeJson(properties.getDefaultAgent())).append("\",");
+            }
+            // 传入默认模型，避免 opencode 自动选择不可用模型（如 muse-spark 在国内被禁）
+            String modelStr = getModel(conversationId);
+            if (!StringUtils.hasText(modelStr)) {
+                modelStr = properties.getDefaultModel();
+            }
+            if (StringUtils.hasText(modelStr)) {
+                String[] parts = parseModel(modelStr);
+                if (parts != null) {
+                    createBody.append("\"model\":{\"providerID\":\"").append(escapeJson(parts[0]))
+                              .append("\",\"id\":\"").append(escapeJson(parts[1])).append("\"},");
+                }
+            }
+            // 去掉最后一个逗号
+            String bodyStr = createBody.toString();
+            if (bodyStr.endsWith(",")) {
+                bodyStr = bodyStr.substring(0, bodyStr.length() - 1);
+            }
+            bodyStr += "}";
+
+            HttpEntity<String> request = new HttpEntity<>(bodyStr, headers);
 
             String url = properties.getBaseUrl() + "/api/session";
             ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
@@ -232,7 +257,8 @@ public class OpencodeService {
                 return null;
             }
             stringRedisTemplate.opsForValue().set(cacheKey, sessionId, Duration.ofDays(7));
-            log.info("opencode 创建会话成功: conversationId={}, opencodeSession={}", conversationId, sessionId);
+            log.info("opencode 创建会话成功: conversationId={}, opencodeSession={}, model={}",
+                    conversationId, sessionId, StringUtils.hasText(modelStr) ? modelStr : "default");
             return sessionId;
         } catch (Exception e) {
             log.error("opencode 创建会话异常: conversationId={}", conversationId, e);
