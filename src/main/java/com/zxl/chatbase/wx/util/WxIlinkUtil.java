@@ -95,6 +95,11 @@ public class WxIlinkUtil {
             if (ret != 0) {
                 String errMsg = root.path("err_msg").asText();
                 log.warn("getUpdates 返回错误: ret={}, err_msg={}", ret, errMsg);
+                // 鉴权/凭证类错误返回 null，让调用方计入失败并可下线；
+                // 其它业务错误视作本轮无消息，避免把接口异常当成“在线且无消息”。
+                if (isAuthError(ret, errMsg)) {
+                    return null;
+                }
                 return Collections.emptyList();
             }
 
@@ -130,6 +135,18 @@ public class WxIlinkUtil {
 
     public String getNextUpdatesBuf() {
         return nextUpdatesBuf;
+    }
+
+    public static boolean isAuthError(int ret, String errMsg) {
+        if (ret == -14 || ret == -1 || ret == 401 || ret == 403) {
+            return true;
+        }
+        if (errMsg == null) {
+            return false;
+        }
+        String lower = errMsg.toLowerCase();
+        return lower.contains("token") || lower.contains("auth")
+                || lower.contains("unauthorized") || lower.contains("invalid");
     }
 
     public int sendMessage(String baseUrl, String token, WxOutboundMessage message) {

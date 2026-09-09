@@ -29,6 +29,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.PreDestroy;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -110,9 +112,30 @@ public class WxIlinkService {
     private void startPollingThread() {
         if (running.get()) return;
         running.set(true);
-        pollingThread = new Thread(this::pollingLoop, "wx-ilink-poll");
-        pollingThread.setDaemon(false);
-        pollingThread.start();
+        Thread t = new Thread(this::pollingLoop, "wx-ilink-poll");
+        // 守护线程：JVM 退出时不阻塞 shutdown；正常运行不受影响
+        t.setDaemon(true);
+        pollingThread = t;
+        t.start();
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        running.set(false);
+        Thread t = pollingThread;
+        if (t != null) {
+            t.interrupt();
+            pollingThread = null;
+        }
+    }
+
+    /**
+     * 凭证失效时停止轮询（不要 interrupt 工作线程，那无法停掉 pollingLoop）
+     */
+    private void stopPollingForAuthError(String reason) {
+        log.error("微信 ilink 凭证失效，停止轮询（需要重新扫码）: {}", reason);
+        markOffline();
+        running.set(false);
     }
 
     public void login(String baseUrl, String botToken, String nickname) {
@@ -179,10 +202,13 @@ public class WxIlinkService {
 
                 if (messages == null) {
                     consecutiveErrors++;
-                    if (consecutiveErrors >= 3) {
-                        log.warn("微信 ilink 连续 {} 次轮询失败，{}s 后重试",
-                                consecutiveErrors, wxProperties.getReconnectDelaySec());
+                    if (consecutiveErrors >= 5) {
+                        log.error("微信 ilink 连续 {} 次轮询失败，可能凭证失效，停止轮询", consecutiveErrors);
+                        stopPollingForAuthError("连续轮询失败");
+                        break;
                     }
+                    log.warn("微信 ilink 连续 {} 次轮询失败，{}s 后重试",
+                            consecutiveErrors, wxProperties.getReconnectDelaySec());
                     sleep(wxProperties.getReconnectDelaySec() * 1000L);
                     continue;
                 }
@@ -355,10 +381,8 @@ public class WxIlinkService {
                 WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
                         fromUser, msg.getContextToken(), cmdReply);
                 int ret = wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), reply);
-                if (ret == -14) {
-                    log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                    markOffline();
-                    Thread.currentThread().interrupt();
+                if (ret == -14 || WxIlinkUtil.isAuthError(ret, null)) {
+                    stopPollingForAuthError("命令回复 ret=" + ret);
                     return;
                 }
                 log.info("微信命令回复发送成功: msgId={}, toUser={}, cmd={}, ret={}", msg.getMsgId(), fromUser, rawMessage, ret);
@@ -388,27 +412,39 @@ public class WxIlinkService {
                             fromUser, msg.getContextToken(), "⏳ opencode 处理中，请稍候…");
                     int processingRet = wxIlinkUtil.sendMessage(
                             resolveBaseUrl(), resolveBotToken(), processing);
-                    if (processingRet == -14) {
-                        log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                        markOffline();
-                        Thread.currentThread().interrupt();
+                    if (processingRet == -14 || WxIlinkUtil.isAuthError(processingRet, null)) {
+                        stopPollingForAuthError("opencode处理中提示 ret=" + processingRet);
                         return;
                     }
                     log.info("微信opencode处理中提示已发送: msgId={}, toUser={}, ret={}",
                             msg.getMsgId(), fromUser, processingRet);
                 }
+                final Object lastSentLock = new Object();
                 final String[] lastSent = {""};
                 String opencodeAnswer = opencodeService.chatStreaming(
                         conversationId, rawMessage, fromUser, "wx", null,
                         (partial) -> {
-                            if (StringUtils.hasText(partial) && StringUtils.hasText(msg.getContextToken())) {
-                                String delta = partial.substring(lastSent[0].length());
-                                if (StringUtils.hasText(delta)) {
-                                    WxOutboundMessage update = WxOutboundMessage.createTextMessage(
-                                            fromUser, msg.getContextToken(), delta);
-                                    wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), update);
+                            if (!StringUtils.hasText(partial) || !StringUtils.hasText(msg.getContextToken())) {
+                                return;
+                            }
+                            String delta;
+                            synchronized (lastSentLock) {
+                                String prev = lastSent[0];
+                                // 仅当 partial 是 prev 的延长时才推送增量，避免内容重写导致 substring 越界/错乱
+                                if (partial.length() > prev.length() && partial.startsWith(prev)) {
+                                    delta = partial.substring(prev.length());
                                     lastSent[0] = partial;
+                                } else if (!partial.equals(prev)) {
+                                    // 内容发生重写，整段重发会被微信刷屏，跳过本次中间更新
+                                    return;
+                                } else {
+                                    return;
                                 }
+                            }
+                            if (StringUtils.hasText(delta)) {
+                                WxOutboundMessage update = WxOutboundMessage.createTextMessage(
+                                        fromUser, msg.getContextToken(), truncateWx(delta, 1800));
+                                wxIlinkUtil.sendMessage(resolveBaseUrl(), resolveBotToken(), update);
                             }
                         });
                 if (StringUtils.hasText(opencodeAnswer) && StringUtils.hasText(msg.getContextToken())) {
@@ -424,10 +460,8 @@ public class WxIlinkService {
                                     fromUser, msg.getContextToken(), part);
                             int ret = wxIlinkUtil.sendMessage(
                                     resolveBaseUrl(), resolveBotToken(), reply);
-                            if (ret == -14) {
-                                log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                                markOffline();
-                                Thread.currentThread().interrupt();
+                            if (ret == -14 || WxIlinkUtil.isAuthError(ret, null)) {
+                                stopPollingForAuthError("opencode分段回复 ret=" + ret);
                                 return;
                             }
                             if (idx < parts.size() - 1) {
@@ -456,20 +490,34 @@ public class WxIlinkService {
             answer = filterThinkingContent(answer);
 
             if (StringUtils.hasText(answer) && StringUtils.hasText(msg.getContextToken())) {
-                WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
-                        fromUser, msg.getContextToken(), answer);
-                int ret = wxIlinkUtil.sendMessage(
-                        resolveBaseUrl(), resolveBotToken(), reply);
-                if (ret == -14) {
-                    log.error("微信 ilink token 过期，停止轮询（需要重新扫码）");
-                    markOffline();
-                    Thread.currentThread().interrupt();
-                    return;
+                // 微信单条消息约 2048 字，Dify 长回复需分段，否则 send 失败导致“不回消息”
+                java.util.List<String> parts = OpencodeService.splitMessage(answer, 2000);
+                for (int idx = 0; idx < parts.size(); idx++) {
+                    String part = parts.get(idx);
+                    if (parts.size() > 1) {
+                        part = String.format("【%d/%d】\n%s", idx + 1, parts.size(), part);
+                    }
+                    WxOutboundMessage reply = WxOutboundMessage.createTextMessage(
+                            fromUser, msg.getContextToken(), part);
+                    int ret = wxIlinkUtil.sendMessage(
+                            resolveBaseUrl(), resolveBotToken(), reply);
+                    if (ret == -14 || WxIlinkUtil.isAuthError(ret, null)) {
+                        stopPollingForAuthError("Dify分段回复 ret=" + ret);
+                        return;
+                    }
+                    if (idx < parts.size() - 1) {
+                        sleep(500);
+                    }
                 }
-                log.info("微信回复发送成功: msgId={}, toUser={}, ret={}", msg.getMsgId(), fromUser, ret);
+                log.info("微信回复发送成功: msgId={}, toUser={}, parts={}", msg.getMsgId(), fromUser, parts.size());
             } else {
-                log.warn("微信问答结果为空或缺少context_token，未发送回复: msgId={}, hasAnswer={}, hasContextToken={}",
-                        msg.getMsgId(), StringUtils.hasText(answer), StringUtils.hasText(msg.getContextToken()));
+                log.warn("微信问答结果为空或缺少context_token，未发送回复: msgId={}, hasAnswer={}, hasContextToken={}, answerLen={}",
+                        msg.getMsgId(), StringUtils.hasText(answer), StringUtils.hasText(msg.getContextToken()),
+                        answer == null ? 0 : answer.length());
+                if (!StringUtils.hasText(msg.getContextToken())) {
+                    log.error("微信消息缺少 context_token，无法回复。请检查 ilink 协议字段或重新扫码登录: msgId={}, fromUser={}",
+                            msg.getMsgId(), fromUser);
+                }
             }
         } catch (Exception e) {
             log.error("微信消息问答失败: msgId={}", msg.getMsgId(), e);

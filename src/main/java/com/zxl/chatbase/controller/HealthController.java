@@ -29,17 +29,35 @@ public class HealthController {
 
         Map<String, Object> checks = new HashMap<>();
 
-        try (Connection conn = dataSource.getConnection()) {
-            checks.put("mysql", conn.isValid(3) ? "UP" : "DOWN");
-        } catch (Exception e) {
+        if (dataSource == null) {
             checks.put("mysql", "DOWN");
+        } else {
+            try (Connection conn = dataSource.getConnection()) {
+                checks.put("mysql", conn.isValid(3) ? "UP" : "DOWN");
+            } catch (Exception e) {
+                checks.put("mysql", "DOWN");
+            }
         }
 
-        try {
-            redisTemplate.getConnectionFactory().getConnection().ping();
-            checks.put("redis", "UP");
-        } catch (Exception e) {
+        if (redisTemplate == null || redisTemplate.getConnectionFactory() == null) {
             checks.put("redis", "DOWN");
+        } else {
+            org.springframework.data.redis.connection.RedisConnection redisConn = null;
+            try {
+                redisConn = redisTemplate.getConnectionFactory().getConnection();
+                redisConn.ping();
+                checks.put("redis", "UP");
+            } catch (Exception e) {
+                checks.put("redis", "DOWN");
+            } finally {
+                if (redisConn != null) {
+                    try {
+                        redisConn.close();
+                    } catch (Exception ignore) {
+                        // ignore
+                    }
+                }
+            }
         }
 
         result.put("checks", checks);
