@@ -27,6 +27,7 @@ public class BotManageServiceImpl implements BotManageService {
     private final StringRedisTemplate stringRedisTemplate;
     private final RestTemplate restTemplate;
     private final com.zxl.chatbase.wx.config.WxProperties wxProperties;
+    private final com.zxl.chatbase.wx.service.WxIlinkService wxIlinkService;
 
     @Override
     public List<BotInfoVO> listBots(String userId) {
@@ -64,15 +65,26 @@ public class BotManageServiceImpl implements BotManageService {
     }
 
     private BotInfoVO buildWxBot() {
-        boolean online = "1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online"));
-        // 额外验证 token 是否存在，无 token 时强制显示离线
-        String token = stringRedisTemplate.opsForValue().get("bot:wx:token");
-        if (online && !StringUtils.hasText(token)) {
-            online = false;
+        // 优先用 WxIlinkService：扫码成功后立即在线；同时校验凭证
+        boolean online;
+        String nickname;
+        try {
+            online = wxIlinkService.isOnline() || wxIlinkService.hasCredentials();
+            if (online && !wxIlinkService.hasCredentials()) {
+                online = false;
+            }
+            nickname = wxIlinkService.getLoginNickname();
+        } catch (Exception e) {
+            online = "1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online"));
+            String credentials = stringRedisTemplate.opsForValue().get("bot:wx:credentials");
+            if (online && !StringUtils.hasText(credentials)) {
+                online = false;
+            }
+            nickname = wxProperties.getNickname();
         }
         return BotInfoVO.builder()
                 .platform("wx")
-                .name(wxProperties.getNickname())
+                .name(nickname)
                 .botId(wxProperties.getBotId())
                 .online(online)
                 .groupCount(botManageMapper.countGroups("wx"))

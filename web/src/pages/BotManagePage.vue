@@ -307,10 +307,16 @@ function startPolling() {
         if (data.status === 'confirmed') {
           qrStatus.value = 'confirmed'
           stopPolling()
-          setTimeout(() => {
-            closeQrModal()
-            loadBots()
-          }, 1500)
+          // 后端 login 已写凭证并 markOnline；稍候刷新列表，避免首帧仍显示离线
+          setTimeout(async () => {
+            try {
+              await getWxBotStatus()
+            } catch { /* ignore */ }
+            await loadBots()
+            // 再补一次，覆盖轮询线程冷启动延迟
+            setTimeout(() => { loadBots() }, 1200)
+            setTimeout(() => { closeQrModal() }, 800)
+          }, 400)
         } else if (data.status === 'expired') {
           qrStatus.value = 'expired'
           stopPolling()

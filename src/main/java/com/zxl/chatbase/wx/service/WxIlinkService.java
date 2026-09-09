@@ -152,7 +152,16 @@ public class WxIlinkService {
         } catch (Exception e) {
             log.warn("保存微信 ilink 凭证失败", e);
         }
-        startPollingThread();
+        // 立即标记在线，避免前端在首次 getUpdates 成功前一直显示离线
+        markOnline();
+        if (!running.get()) {
+            startPollingThread();
+        } else if (pollingThread == null || !pollingThread.isAlive()) {
+            // 线程已死但 running 未复位时强制拉起
+            running.set(false);
+            startPollingThread();
+        }
+        log.info("微信 ilink 登录完成，已标记在线: nickname={}", nickname);
     }
 
     public void logout() {
@@ -170,6 +179,33 @@ public class WxIlinkService {
 
     public boolean isOnline() {
         return "1".equals(stringRedisTemplate.opsForValue().get(REDIS_ONLINE_KEY));
+    }
+
+    /**
+     * 已保存凭证即视为“已登录/在线”（扫码成功后立即可用）
+     */
+    public boolean hasCredentials() {
+        return StringUtils.hasText(resolveBotToken());
+    }
+
+    public String getLoginNickname() {
+        if (StringUtils.hasText(activeNickname)) {
+            return activeNickname;
+        }
+        try {
+            String saved = stringRedisTemplate.opsForValue().get(REDIS_CREDENTIALS_KEY);
+            if (StringUtils.hasText(saved)) {
+                Map<String, String> creds = objectMapper.readValue(saved,
+                        new TypeReference<Map<String, String>>() {});
+                String n = creds.get("nickname");
+                if (StringUtils.hasText(n)) {
+                    return n;
+                }
+            }
+        } catch (Exception ignore) {
+            // fall through
+        }
+        return getNickname();
     }
 
     public String getNickname() {
@@ -571,7 +607,8 @@ public class WxIlinkService {
     }
 
     private void markOnline() {
-        stringRedisTemplate.opsForValue().set(REDIS_ONLINE_KEY, "1", 30, TimeUnit.SECONDS);
+        // TTL 拉长，避免轮询稍慢时前端误判离线；轮询成功会续期
+        stringRedisTemplate.opsForValue().set(REDIS_ONLINE_KEY, "1", 120, TimeUnit.SECONDS);
     }
 
     private void markOffline() {
