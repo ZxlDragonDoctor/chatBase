@@ -29,9 +29,16 @@ export type ChangePasswordRequest = {
   newPassword: string
 }
 
-export async function register(username: string, password: string, nickname?: string, email?: string, phone?: string): Promise<LoginResponse> {
-  const resp = await api.post<LoginResponse>('/user/register', { username, password, nickname, email, phone })
-  return resp.data
+/** 管理员创建用户（公开注册已关闭） */
+export async function createUser(payload: {
+  username: string
+  password: string
+  nickname?: string
+  email?: string
+  phone?: string
+}): Promise<LoginResponse> {
+  const resp = await api.post<LoginResponse>('/user/create', payload)
+  return resp.data as LoginResponse
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {

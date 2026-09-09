@@ -1,24 +1,24 @@
 :root {
-  --anime-bg-primary: #faf8f5;
-  --anime-bg-secondary: #f5f0eb;
-  --anime-bg-card: rgba(255, 255, 255, 0.95);
-  --anime-bg-glass: rgba(255, 255, 255, 0.72);
+  --anime-bg-primary: #fff7fb;
+  --anime-bg-secondary: #f3eef8;
+  --anime-bg-card: rgba(255, 255, 255, 0.92);
+  --anime-bg-glass: rgba(255, 255, 255, 0.78);
   --anime-bg: #ffffff;
 
   --anime-pink: #ff6b9d;
   --anime-pink-light: #ff8fab;
   --anime-pink-soft: #ffb7c5;
-  --anime-pink-bg: rgba(255, 107, 157, 0.08);
+  --anime-pink-bg: rgba(255, 107, 157, 0.10);
 
   --anime-blue: #4fc3f7;
   --anime-blue-light: #81d4fa;
   --anime-blue-soft: #a8d8ea;
-  --anime-blue-bg: rgba(79, 195, 247, 0.08);
+  --anime-blue-bg: rgba(79, 195, 247, 0.10);
 
   --anime-purple: #b39ddb;
   --anime-purple-light: #ce93d8;
   --anime-purple-soft: #c9b1ff;
-  --anime-purple-bg: rgba(179, 157, 219, 0.08);
+  --anime-purple-bg: rgba(179, 157, 219, 0.10);
 
   --anime-green: #81c784;
   --anime-green-light: #a5d6a7;
@@ -31,34 +31,35 @@
   --anime-mint: #80cbc4;
   --anime-peach: #ffccbc;
 
-  --anime-gradient-pink: linear-gradient(135deg, #ff6b9d 0%, #b39ddb 100%);
+  --anime-gradient-pink: linear-gradient(135deg, #ff6b9d 0%, #b39ddb 55%, #4fc3f7 100%);
   --anime-gradient-blue: linear-gradient(135deg, #4fc3f7 0%, #b39ddb 100%);
   --anime-gradient-green: linear-gradient(135deg, #81c784 0%, #4fc3f7 100%);
-  --anime-gradient-bg: linear-gradient(135deg, #faf8f5 0%, #f5f0eb 50%, #fff5f5 100%);
+  --anime-gradient-bg: linear-gradient(160deg, #fff7fb 0%, #f3eef8 42%, #eef9ff 100%);
   --anime-gradient-warm: linear-gradient(135deg, #ff6b9d 0%, #ffb74d 100%);
   --anime-gradient-cool: linear-gradient(135deg, #4fc3f7 0%, #b39ddb 100%);
 
-  --anime-text-primary: #3d3d3d;
-  --anime-text-secondary: #8d8d8d;
-  --anime-text-muted: #bdbdbd;
+  --anime-text-primary: #3a3344;
+  --anime-text-secondary: #8b8296;
+  --anime-text-muted: #b8b0c0;
 
-  --anime-border: rgba(0, 0, 0, 0.06);
+  --anime-border: rgba(255, 107, 157, 0.12);
   --anime-border-light: rgba(0, 0, 0, 0.04);
-  --anime-border-accent: rgba(255, 107, 157, 0.25);
+  --anime-border-accent: rgba(255, 107, 157, 0.35);
 
-  --anime-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --anime-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --anime-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
-  --anime-shadow-pink: 0 4px 20px rgba(255, 107, 157, 0.2);
-  --anime-shadow-glow: 0 0 30px rgba(179, 157, 219, 0.25);
+  --anime-shadow-sm: 0 2px 10px rgba(255, 107, 157, 0.08);
+  --anime-shadow-md: 0 10px 36px rgba(179, 157, 219, 0.14);
+  --anime-shadow-lg: 0 18px 50px rgba(255, 107, 157, 0.12);
+  --anime-shadow-pink: 0 6px 24px rgba(255, 107, 157, 0.22);
+  --anime-shadow-glow: 0 0 36px rgba(179, 157, 219, 0.28);
 
-  --anime-radius-sm: 8px;
-  --anime-radius: 16px;
-  --anime-radius-lg: 24px;
-  --anime-radius-xl: 32px;
+  --anime-radius-sm: 10px;
+  --anime-radius: 18px;
+  --anime-radius-lg: 26px;
+  --anime-radius-xl: 34px;
   --anime-radius-pill: 999px;
 
-  --anime-font-sans: 'Nunito', 'Quicksand', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --anime-font-sans: 'M PLUS Rounded 1c', 'ZCOOL KuaiLe', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --anime-font-display: 'ZCOOL KuaiLe', 'M PLUS Rounded 1c', 'Nunito', sans-serif;
   --anime-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 }
 
@@ -79,7 +80,25 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-attachment: fixed;
 }
+
+/* 轻量二次元氛围：粉紫光斑 + 网点 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 107, 157, 0.12), transparent 28%),
+    radial-gradient(circle at 82% 12%, rgba(79, 195, 247, 0.12), transparent 26%),
+    radial-gradient(circle at 70% 78%, rgba(179, 157, 219, 0.14), transparent 30%),
+    radial-gradient(circle at 1px 1px, rgba(255, 107, 157, 0.05) 1px, transparent 1.2px);
+  background-size: auto, auto, auto, 18px 18px;
+}
+
+#app { position: relative; z-index: 1; }
 
 ::selection {
   background: rgba(255, 107, 157, 0.25);
@@ -407,6 +426,19 @@ body {
   position: relative;
   overflow: hidden;
   transition: box-shadow 0.3s ease, transform 0.3s ease;
+  border: 1px solid var(--anime-border);
+}
+
+/* 顶部粉紫渐变描边：二次元卡片签名 */
+.anime-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--anime-gradient-pink);
+  opacity: 0.9;
 }
 
 .anime-card:hover {
@@ -1376,4 +1408,59 @@ body {
   .anime-card-title {
     font-size: 18px;
   }
+}
+
+/* ─── 二次元增强 ─── */
+
+.anime-card-title,
+.anime-modal-title,
+.anime-page-title {
+  font-family: var(--anime-font-display);
+  letter-spacing: 0.04em;
+}
+
+.anime-btn.primary {
+  background-image: var(--anime-gradient-pink);
+  color: #fff;
+  border: none;
+  box-shadow: var(--anime-shadow-pink);
+}
+
+.anime-btn.primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.anime-nav-item.active {
+  background: linear-gradient(135deg, rgba(255, 107, 157, 0.12), rgba(179, 157, 219, 0.14));
+  color: var(--anime-pink);
+  box-shadow: var(--anime-shadow-pink);
+}
+
+.anime-badge.green {
+  background: rgba(129, 199, 132, 0.18);
+  color: #4caf50;
+}
+
+.anime-badge.pink {
+  background: rgba(255, 107, 157, 0.14);
+  color: var(--anime-pink);
+}
+
+.anime-table thead th {
+  font-family: var(--anime-font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--anime-text-secondary);
+}
+
+.anime-input:focus {
+  border-color: var(--anime-pink);
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.15);
+}
+
+/* 登录页标题更卡通 */
+.login-title,
+.ill-title {
+  font-family: var(--anime-font-display);
 }

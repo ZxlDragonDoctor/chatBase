@@ -45,7 +45,7 @@ public class OpencodeProperties {
     /**
      * 默认模型（providerID:modelID），创建会话时指定，避免 opencode 自动选择不可用模型
      */
-    private String defaultModel = "opencode/mimo-v2.5-free";
+    private String defaultModel = "opencode:mimo-v2.5-free";
 
     /**
      * 是否启用 opencode 集成（未配置时提示不可用）

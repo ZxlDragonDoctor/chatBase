@@ -19,7 +19,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private static final List<String> EXCLUDE_PATHS = Arrays.asList(
             "/api/health",
             "/api/user/login",
-            "/api/user/register",
+            "/api/user/register", // 保留路径但仅返回「已关闭」提示，不再放行业务
             "/api/chat/**",
             "/api/upload/**",
             "/api/uploads/**",
@@ -37,6 +37,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/feedback/*/status",
             "/api/feedback/stats",
             "/api/user/list",
+            "/api/user/create",
             "/api/user/*/detail",
             "/api/user/*/role",
             "/api/user/*/status",

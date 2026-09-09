@@ -35,7 +35,7 @@ ChatBase 是一个基于 Spring Boot + Vue 3 的智能对话系统，集成 Dify
 ┌─────────────────────────────────────────────────────────────────┐
 │                          前端层 (Vue 3)                          │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │ 登录注册 │ │ AI 问答  │ │ 知识库   │ │ 统计面板 │ │ 控制台 │ │
+│  │ 登录 │ │ AI 问答  │ │ 知识库   │ │ 统计面板 │ │ 控制台 │ │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └────────┘ │
 └───────────────────────────────┬─────────────────────────────────┘
                                 │ HTTP / WebSocket
@@ -76,7 +76,7 @@ ChatBase 是一个基于 Spring Boot + Vue 3 的智能对话系统，集成 Dify
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信机器人回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词、聚合 |
 | **feedback** | `com.zxl.chatbase.feedback` | 用户反馈收集与统计 |
-| **user** | `com.zxl.chatbase.user` | 用户注册、登录、信息管理 |
+| **user** | `com.zxl.chatbase.user` | 登录认证、管理员建号、信息管理 |
 | **controller** | `com.zxl.chatbase.controller` | REST API 控制器 |
 | **config** | `com.zxl.chatbase.config` | 配置类、拦截器、线程池、跨域 |
 | **common** | `com.zxl.chatbase.common` | 通用组件、限流服务、异常定义 |
@@ -574,7 +574,7 @@ user/
 
 | 功能 | 说明 |
 |------|------|
-| **注册** | 用户名唯一校验，BCrypt 密码加密，默认角色 user |
+| **建号** | **已关闭公开注册**；管理员 `POST /api/user/create` 创建账号（BCrypt，默认角色 user） |
 | **登录** | 验证用户名密码，生成 UUID Token，返回用户信息 |
 | **Token 管理** | Token 存储 Redis（chatbase:token:{token}），TTL 7 天 |
 | **用户信息** | 查询、更新（昵称、头像、邮箱、电话） |
@@ -608,7 +608,7 @@ user/
 WebMvcConfig.addInterceptors()
     ↓
 AuthInterceptor.preHandle()（拦截 /api/**，排除公开路径）
-    ├── 排除路径：/api/user/login, /api/user/register, /api/chat/**,
+    ├── 排除路径：/api/user/login, /api/user/register(仅返回关闭提示), /api/chat/**,
     │            /api/upload/**, /api/uploads/**, /api/feedback/submit,
     │            /api/feedback/user/**, /qq/**, /intellrobot/**, /error, /uploads/**
     ├── 获取 Token（Header: Authorization 或 Query: token）
@@ -618,7 +618,7 @@ AuthInterceptor.preHandle()（拦截 /api/**，排除公开路径）
     ↓
 AdminInterceptor.preHandle()（仅 admin 路径）
     ├── /api/feedback/page, /api/feedback/*/reply, /api/feedback/*/status,
-    │   /api/feedback/stats, /api/user/list, /api/user/*/detail,
+    │   /api/user/list, /api/user/create, /api/user/*/detail,
     │   /api/user/*/role, /api/user/*/status, /api/user/*/remove,
     │   /api/kb/app/admin/**, /api/kb/admin/**
     ├── 查询 SysUser 表校验 role=admin
@@ -1217,7 +1217,7 @@ web/
 
 | 路径 | 页面 | 说明 | 权限 |
 |------|------|------|------|
-| `/login` | LoginPage | 登录注册 | 公开 |
+| `/login` | LoginPage | 登录（无自助注册） | 公开 |
 | `/console/dashboard` | DashboardPage | 系统概览 | 登录 |
 | `/console/statistics` | StatisticsPage | 数据统计 | 登录（admin 可切换 scope） |
 | `/console/im` | ImGroupsPage | 群聊采集管理 | 登录 |
@@ -1373,7 +1373,8 @@ server {
 
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| POST | `/api/user/register` | 用户注册 | 公开 |
+| POST | `/api/user/register` | 自助注册已关闭 | 公开 |
+| POST | `/api/user/create` | 管理员创建用户 | Admin |
 | POST | `/api/user/login` | 用户登录 | 公开 |
 | GET | `/api/user/info?username=` | 获取用户信息 | 登录 |
 | PUT | `/api/user/info` | 更新用户信息 | 登录 |

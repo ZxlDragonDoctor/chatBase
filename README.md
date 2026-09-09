@@ -69,7 +69,7 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 | 📊 **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
 | 🧾 **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
 | 🤖 **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
-| 🛡️ **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤，多租户友好 |
+| 🛡️ **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；**关闭自助注册**，仅管理员建号 |
 
 ---
 
@@ -107,7 +107,7 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                          前端层 Frontend (Vue 3)                  │
-│  登录注册 │ AI问答 │ 知识库 │ 统计看板 │ 控制台 │ 机器人管理        │
+│  登录 │ AI问答 │ 知识库 │ 统计看板 │ 控制台 │ 机器人管理        │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │ HTTP / WebSocket
 ┌────────────────────────────────▼─────────────────────────────────┐
@@ -260,7 +260,7 @@ opencode serve --port 4096
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词聚合 |
 | **feedback** | `com.zxl.chatbase.feedback` | 用户反馈收集与统计 |
-| **user** | `com.zxl.chatbase.user` | 用户注册、登录、信息管理 |
+| **user** | `com.zxl.chatbase.user` | 登录认证、管理员建号、信息管理 |
 | **upload** | `com.zxl.chatbase.upload` | 文件上传进度（SSE） |
 | **config** | `com.zxl.chatbase.config` | 配置类、拦截器、跨域、限流 |
 
@@ -268,7 +268,7 @@ opencode serve --port 4096
 
 | 页面 Page | 路径 Route | 权限 | 功能 |
 |-----------|-----------|------|------|
-| 登录注册 | `/login` | 公开 | 用户认证 |
+| 登录 | `/login` | 公开 | 用户登录（无自助注册入口） |
 | 系统概览 | `/console/dashboard` | 登录 | 统计卡片、快捷导航 |
 | 数据统计 | `/console/statistics` | 登录 | Token/费用趋势、词云、活跃度（admin 可切换全部/个人） |
 | 群聊采集 | `/console/im` | 登录 | 群列表、消息查询、应用绑定 |
@@ -282,7 +282,7 @@ opencode serve --port 4096
 | 反馈管理 | `/console/feedback-manage` | admin | 反馈处理、回复 |
 | 应用管理(全部) | `/console/admin/apps` | admin | 所有应用管理 |
 | 知识库管理(全部) | `/console/admin/kbs` | admin | 所有知识库管理 |
-| 用户管理 | `/console/admin/users` | admin | 用户增删改查 |
+| 用户管理 | `/console/admin/users` | admin | 创建用户、角色/状态、删除 |
 
 ---
 
@@ -294,7 +294,8 @@ opencode serve --port 4096
 - **群聊可见性**：`created_by IS NULL`（公共/未认领）或 `created_by = 当前用户`（已认领）
 - **分类可见性**：`create_by = 当前用户` 或 `create_by IS NULL`（系统默认分类如"群聊消息"）
 - **应用/知识库**：按 `created_by = 当前用户` 过滤；admin 管理端 `/api/kb/app/admin/**`、`/api/kb/admin/**` 看全部
-- **认证排除**：登录、注册、Web 聊天、反馈提交、QQ WebSocket、企微回调等为公开路径
+- **账号策略**：关闭公开注册；`POST /api/user/register` 仅返回提示；管理员通过 `POST /api/user/create` 在后台建号
+- **认证排除**：登录、Web 聊天、反馈提交、QQ WebSocket、企微回调等为公开路径
 
 > ⚠️ `pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 运行时报 `Name not specified` 异常。
 
@@ -423,7 +424,7 @@ docker compose --profile qq up -d
 
 | 分类 | 路径前缀 | 说明 |
 |------|----------|------|
-| 用户 | `/api/user` | 注册、登录、信息管理 |
+| 用户 | `/api/user` | 登录、管理员建号、信息管理 |
 | 聊天 | `/api/chat` | 对话、文件上传 |
 | 会话 | `/api/chat/session` | 会话 CRUD |
 | 知识库 | `/api/kb` | 知识库、分类、文档 |

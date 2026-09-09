@@ -235,9 +235,17 @@ public class OpencodeService {
             return null;
         }
         String trimmed = modelStr.trim();
+        // 支持 provider:id 与 provider/id，避免 defaultModel 写成 opencode/mimo-... 时
+        // 被解析成 provider=opencode, id=opencode/mimo-... 从而变成 opencode/opencode/mimo-...
         if (trimmed.contains(":")) {
             String[] parts = trimmed.split(":", 2);
-            return new String[]{parts[0], parts[1]};
+            if (StringUtils.hasText(parts[0]) && StringUtils.hasText(parts[1])) {
+                return new String[]{parts[0], parts[1]};
+            }
+        }
+        int slash = trimmed.indexOf('/');
+        if (slash > 0 && slash < trimmed.length() - 1) {
+            return new String[]{trimmed.substring(0, slash), trimmed.substring(slash + 1)};
         }
         return new String[]{"opencode", trimmed};
     }
@@ -256,12 +264,18 @@ public class OpencodeService {
         if (!StringUtils.hasText(modelValue)) {
             return "";
         }
-        String[] parts = modelValue.split(":", 2);
-        if (parts.length != 2 || !StringUtils.hasText(parts[0]) || !StringUtils.hasText(parts[1])) {
+        String[] parts = parseModel(modelValue);
+        if (parts == null || !StringUtils.hasText(parts[0]) || !StringUtils.hasText(parts[1])) {
             return "";
         }
-        return ",\"model\":{\"providerID\":\"" + escapeJson(parts[0])
-                + "\",\"id\":\"" + escapeJson(parts[1]) + "\"}";
+        // id 不要再带 provider 前缀，否则 opencode 会解析成 provider/provider/id
+        String modelId = parts[1];
+        String providerId = parts[0];
+        if (modelId.startsWith(providerId + "/")) {
+            modelId = modelId.substring(providerId.length() + 1);
+        }
+        return ",\"model\":{\"providerID\":\"" + escapeJson(providerId)
+                + "\",\"id\":\"" + escapeJson(modelId) + "\"}";
     }
 
     private String doChat(String conversationId, String query, String userId, String channel, String modelId, StreamingCallback callback) {
@@ -302,8 +316,10 @@ public class OpencodeService {
         if (!StringUtils.hasText(answer)) {
             // 空回复时清除 session 缓存，下次自动创建新 session
             stringRedisTemplate.delete(SESSION_KEY_PREFIX + conversationId);
-            log.warn("opencode 返回空回复，已清除 session 缓存: conversationId={}, sessionId={}", conversationId, sessionId);
-            answer = "【opencode 未生成回复】可能是任务过复杂或模型异常，已重置会话，请重试。";
+            log.warn("opencode 返回空回复，已清除 session 缓存: conversationId={}, sessionId={}, model={}",
+                    conversationId, sessionId, getModel(conversationId));
+            answer = "【opencode 未生成回复】当前模型可能不可用（Endpoint unavailable）或任务无文本输出。"
+                    + "请稍后重试；若持续失败，请检查本机 opencode 模型配置（/model 命令）。";
         }
 
         // 最终回复也过滤工具调用，只保留文本

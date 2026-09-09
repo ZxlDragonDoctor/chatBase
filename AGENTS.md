@@ -301,7 +301,8 @@ Implemented via query-time filtering in all service layers:
 ### User & Auth (`/api/user`)
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/register` | None | Register new user |
+| POST | `/register` | None | **Disabled** — returns "contact admin" message only |
+| POST | `/create` | Admin | Create user account (admin only) |
 | POST | `/login` | None | Login, returns JWT token |
 | POST | `/logout` | Auth | Logout |
 | GET | `/info` | Auth | Get user profile (`?username=`) |
@@ -503,7 +504,7 @@ qq:
 
 | Route | Page | Description | Admin Only |
 |-------|------|-------------|------------|
-| `/login` | LoginPage | Login / Register | No |
+| `/login` | LoginPage | Login (no self-registration) | No |
 | `/console/dashboard` | DashboardPage | System dashboard overview | No |
 | `/console/statistics` | StatisticsPage | Usage statistics with scope toggle | No |
 | `/console/im` | ImGroupsPage | Group chat management | No |

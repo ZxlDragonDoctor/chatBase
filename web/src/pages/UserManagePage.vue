@@ -7,6 +7,10 @@
           <div class="anime-card-desc">查看和管理所有系统用户</div>
         </div>
         <div class="anime-card-actions">
+          <button class="anime-btn primary" @click="showCreate = true">
+            <UserPlus :size="18" />
+            <span>创建用户</span>
+          </button>
           <button class="anime-btn ghost" @click="loadList">
             <RefreshCw :size="18" />
             <span>刷新</span>
@@ -79,13 +83,53 @@
         </div>
       </div>
     </section>
+
+    <div v-if="showCreate" class="anime-modal-overlay" @click.self="showCreate = false">
+      <div class="anime-modal">
+        <div class="anime-modal-header">
+          <span class="anime-modal-title">创建用户</span>
+          <button class="anime-modal-close" @click="showCreate = false">✕</button>
+        </div>
+        <div class="anime-modal-body">
+          <div class="anime-form-group">
+            <label>用户名 *</label>
+            <input v-model="form.username" class="anime-input" placeholder="登录用户名" />
+          </div>
+          <div class="anime-form-group">
+            <label>初始密码 *</label>
+            <input v-model="form.password" class="anime-input" type="password" placeholder="至少 6 位" />
+          </div>
+          <div class="anime-form-group">
+            <label>昵称</label>
+            <input v-model="form.nickname" class="anime-input" placeholder="显示名称（可选）" />
+          </div>
+          <div class="anime-form-group">
+            <label>邮箱</label>
+            <input v-model="form.email" class="anime-input" placeholder="可选" />
+          </div>
+          <div v-if="createErr" class="anime-error" style="margin-bottom: 12px;">{{ createErr }}</div>
+        </div>
+        <div class="anime-modal-footer">
+          <button class="anime-btn ghost" @click="showCreate = false">取消</button>
+          <button
+            class="anime-btn primary"
+            :disabled="createLoading || !form.username.trim() || form.password.length < 6"
+            @click="handleCreate"
+          >
+            <span v-if="createLoading" class="anime-loader-spinner"></span>
+            <span v-else>创建</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { RefreshCw, Trash2 } from 'lucide-vue-next'
+import { RefreshCw, Trash2, UserPlus } from 'lucide-vue-next'
 import { api } from '../api/client'
+import { createUser } from '../api/user'
 
 interface UserItem {
   id: number
@@ -107,6 +151,34 @@ const pageSize = ref(10)
 const total = ref(0)
 const editingId = ref<number | null>(null)
 const roleSaving = ref(false)
+const showCreate = ref(false)
+const createLoading = ref(false)
+const createErr = ref<string | null>(null)
+const form = ref({ username: '', password: '', nickname: '', email: '' })
+
+async function handleCreate() {
+  createLoading.value = true
+  createErr.value = null
+  try {
+    const resp = await createUser({
+      username: form.value.username.trim(),
+      password: form.value.password,
+      nickname: form.value.nickname.trim() || undefined,
+      email: form.value.email.trim() || undefined
+    })
+    if (resp.success) {
+      showCreate.value = false
+      form.value = { username: '', password: '', nickname: '', email: '' }
+      await loadList()
+    } else {
+      createErr.value = resp.message || '创建失败'
+    }
+  } catch (e: any) {
+    createErr.value = e?.response?.data?.message || e?.message || '创建失败'
+  } finally {
+    createLoading.value = false
+  }
+}
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 

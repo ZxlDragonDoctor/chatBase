@@ -27,14 +27,36 @@ public class UserController {
 
     private final UserService userService;
 
+    /**
+     * 公开注册已关闭：仅允许管理员在后台创建账号。
+     */
     @PostMapping("/register")
-    public Map<String, Object> register(@RequestBody RegisterRequest request) {
-        SysUser user = userService.register(request);
+    public Map<String, Object> register() {
         Map<String, Object> result = new HashMap<>();
+        result.put("success", false);
+        result.put("message", "系统已关闭自助注册，请联系管理员开通账号");
+        return result;
+    }
+
+    /**
+     * 管理员创建用户（需 AdminInterceptor）
+     */
+    @PostMapping("/create")
+    public Map<String, Object> createUser(@RequestBody RegisterRequest request,
+                                          @RequestAttribute(value = "currentUser", required = false) String currentUser) {
+        Map<String, Object> result = new HashMap<>();
+        if (request == null || request.getUsername() == null || request.getUsername().isBlank()
+                || request.getPassword() == null || request.getPassword().isBlank()) {
+            result.put("success", false);
+            result.put("message", "用户名和密码不能为空");
+            return result;
+        }
+        SysUser user = userService.register(request);
         if (user != null) {
             result.put("success", true);
-            result.put("message", "注册成功");
+            result.put("message", "用户创建成功");
             result.put("userId", user.getId());
+            result.put("createdBy", currentUser);
         } else {
             result.put("success", false);
             result.put("message", "用户名已存在");

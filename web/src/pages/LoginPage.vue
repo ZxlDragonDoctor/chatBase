@@ -99,43 +99,10 @@
               </button>
 
               <div class="login-register-link">
-                还没有账号？
-                <button class="login-link-btn" @click="showRegister = true">立即注册</button>
+                账号由管理员统一分配
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Register Modal -->
-    <div v-if="showRegister" class="anime-modal-overlay" @click.self="showRegister = false">
-      <div class="anime-modal">
-        <div class="anime-modal-header">
-          <span class="anime-modal-title">用户注册</span>
-          <button class="anime-modal-close" @click="showRegister = false">✕</button>
-        </div>
-        <div class="anime-modal-body">
-          <div class="anime-form-group">
-            <label>用户名 *</label>
-            <input v-model="regUsername" class="anime-input" placeholder="请输入用户名" :disabled="regLoading" />
-          </div>
-          <div class="anime-form-group">
-            <label>密码 *</label>
-            <input v-model="regPassword" class="anime-input" type="password" placeholder="请输入密码" :disabled="regLoading" />
-          </div>
-          <div class="anime-form-group">
-            <label>昵称（可选）</label>
-            <input v-model="regNickname" class="anime-input" placeholder="请输入昵称" :disabled="regLoading" />
-          </div>
-          <div v-if="regError" class="anime-error" style="margin-bottom: 16px;">{{ regError }}</div>
-        </div>
-        <div class="anime-modal-footer">
-          <button class="anime-btn ghost" @click="showRegister = false">取消</button>
-          <button class="anime-btn primary" :disabled="regLoading || !regUsername.trim() || !regPassword.trim()" @click="handleRegister">
-            <span v-if="regLoading" class="anime-loader-spinner"></span>
-            <span v-else>注册</span>
-          </button>
         </div>
       </div>
     </div>
@@ -145,7 +112,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { login, register } from '../api/user'
+import { login } from '../api/user'
 
 const router = useRouter()
 
@@ -154,13 +121,6 @@ const password = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 const illLoaded = ref(false)
-
-const showRegister = ref(false)
-const regUsername = ref('')
-const regPassword = ref('')
-const regNickname = ref('')
-const regLoading = ref(false)
-const regError = ref<string | null>(null)
 
 const animeBgUrl = ref('https://t.alcy.cc/moe?' + Date.now())
 
@@ -189,29 +149,6 @@ async function handleLogin() {
     error.value = e?.message || '登录失败'
   } finally {
     loading.value = false
-  }
-}
-
-async function handleRegister() {
-  if (!regUsername.value.trim() || !regPassword.value.trim()) return
-  regLoading.value = true
-  regError.value = null
-  try {
-    const resp = await register(regUsername.value.trim(), regPassword.value, regNickname.value.trim())
-    if (resp.success) {
-      showRegister.value = false
-      username.value = regUsername.value
-      password.value = regPassword.value
-      regUsername.value = ''
-      regPassword.value = ''
-      regNickname.value = ''
-    } else {
-      regError.value = resp.message || '注册失败'
-    }
-  } catch (e: any) {
-    regError.value = e?.message || '注册失败'
-  } finally {
-    regLoading.value = false
   }
 }
 
