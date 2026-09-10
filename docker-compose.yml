@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   mysql:
     image: mysql:8.0
     container_name: chatbase-mysql
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3306:3306"
     environment:
@@ -34,6 +41,7 @@ services:
     image: redis:7
     container_name: chatbase-redis
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "6379:6379"
     environment:
@@ -64,6 +72,7 @@ services:
     image: chatbase-backend:latest
     container_name: chatbase-backend
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "8080:8080"
     depends_on:
@@ -126,6 +135,7 @@ services:
     image: chatbase-frontend:latest
     container_name: chatbase-frontend
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       chatbase-backend:
         condition: service_healthy
@@ -139,6 +149,7 @@ services:
     image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:v4.17.46}
     container_name: chatbase-napcat
     restart: unless-stopped
+    logging: *default-logging
     profiles:
       - qq
     ports:
