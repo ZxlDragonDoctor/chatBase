@@ -140,7 +140,8 @@ services:
       chatbase-backend:
         condition: service_healthy
     ports:
-      - "80:80"
+      # 仅本机回环：宿主机 Nginx 负责 80/443 与 SSL
+      - "127.0.0.1:8081:80"
     mem_limit: 100m
     networks:
       - chatbase-network

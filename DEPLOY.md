@@ -62,11 +62,29 @@ docker compose logs -f chatbase-backend
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
-| chatbase-frontend | 80 | Vue 前端，Nginx |
+| 宿主机 Nginx | 80 / 443 | SSL 终止 + 反代（Let's Encrypt） |
+| chatbase-frontend | 127.0.0.1:8081 | Vue 前端容器（不对公网直出） |
 | chatbase-backend | 8080 | Spring Boot 后端 |
 | mysql | 3306 | MySQL 8.0 |
 | redis | 6379 | Redis 7 |
 | napcat | 3000/6099 | QQ Bot（可选） |
+
+### HTTPS / SSL（www.zxldragon.fun）
+
+1. 域名 A 记录指向服务器公网 IP
+2. 前端容器只绑 `127.0.0.1:8081`（见 `docker-compose.yml`）
+3. 在服务器执行：
+
+```bash
+cd /opt/chatBase
+bash scripts/setup-ssl.sh
+# 或指定域名/邮箱
+DOMAIN=www.zxldragon.fun EMAIL=you@example.com bash scripts/setup-ssl.sh
+```
+
+4. 证书路径：`/etc/letsencrypt/live/<domain>/`
+5. 自动续期：certbot timer + deploy hook reload nginx
+6. **阿里云安全组需放行 443/TCP**（80 用于 HTTP→HTTPS 跳转与续期）
 
 ## 可选服务
 
