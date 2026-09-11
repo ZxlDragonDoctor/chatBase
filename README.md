@@ -1,4 +1,12 @@
-# 🤖 ChatBase · 智能对话客服系统 / Multi-channel AI Customer-Service System
+<div align="center">
+
+<img src="./assets/readme-banner.png" alt="ChatBase · 多渠道智能对话 · 知识库 · 远程 AI 代理" width="100%">
+
+<img src="./assets/chatbase-icon.png" alt="ChatBase icon" width="96">
+
+</div>
+
+# ChatBase · 智能对话客服系统 / Multi-channel AI Customer-Service System
 
 > 把 QQ / 企业微信 / 微信个人号的消息统一接入 Dify 大模型 + 知识库，自动智能回复；
 > 还能将一段私聊会话绑定到**自己电脑上的 opencode**，实现"人在服务器、AI 在本机"的远程编码代理。
@@ -16,38 +24,38 @@
 ![Dify](https://img.shields.io/badge/Dify-LLM-orange)
 ![MIT](https://img.shields.io/badge/License-MIT-blue)
 
-**🚀 一键 Docker 部署 / One-command deploy**  ·
-**📊 Token·费用看板 / Analytics dashboard**  ·
-**🧠 私聊遥控本机 AI / Remote local-agent control**
+**一键 Docker 部署 / One-command deploy**  ·
+**Token·费用看板 / Analytics dashboard**  ·
+**私聊遥控本机 AI / Remote local-agent control**
 
 </div>
 
 ---
 
-## 📖 目录 / Table of Contents
+## 目录 / Table of Contents
 
-- [项目简介 · What is it](#-项目简介--what-is-it)
-- [核心特性 · Features](#-核心特性--features)
-- [技术栈 · Tech Stack](#-技术栈--tech-stack)
-- [系统架构 · Architecture](#-系统架构--architecture)
-- [快速开始 · Quick Start](#-快速开始--quick-start)
-- [配置说明 · Configuration](#-配置说明--configuration)
-- [功能模块 · Modules](#-功能模块--modules)
-- [数据隔离与权限 · Security & Isolation](#-数据隔离与权限--security--isolation)
-- [多渠道 IM 接入 · IM Integration](#-多渠道-im-接入--im-integration)
-- [机器人命令 · Bot Commands](#-机器人命令--bot-commands)
-- [私聊遥控本机 opencode · Remote opencode](#-私聊遥控本机-opencode--remote-opencode)
-- [定时任务 · Scheduled Tasks](#-定时任务--scheduled-tasks)
-- [数据库表 · Database](#-数据库表--database)
-- [API 接口 · API](#-api-接口--api)
-- [文档 & 常见问题 · Docs & FAQ](#-文档--常见问题--docs--faq)
-- [项目结构 · Project Structure](#-项目结构--project-structure)
-- [许可证 · License](#-许可证--license)
-- [重要注意事项 · Notes](#-重要注意事项--notes)
+- [项目简介 · What is it](#项目简介--what-is-it)
+- [核心特性 · Features](#核心特性--features)
+- [技术栈 · Tech Stack](#技术栈--tech-stack)
+- [系统架构 · Architecture](#系统架构--architecture)
+- [快速开始 · Quick Start](#快速开始--quick-start)
+- [配置说明 · Configuration](#配置说明--configuration)
+- [功能模块 · Modules](#功能模块--modules)
+- [数据隔离与权限 · Security & Isolation](#数据隔离与权限--security--isolation)
+- [多渠道 IM 接入 · IM Integration](#多渠道-im-接入--im-integration)
+- [机器人命令 · Bot Commands](#机器人命令--bot-commands)
+- [私聊遥控本机 opencode · Remote opencode](#私聊遥控本机-opencode--remote-opencode)
+- [定时任务 · Scheduled Tasks](#定时任务--scheduled-tasks)
+- [数据库表 · Database](#数据库表--database)
+- [API 接口 · API](#api-接口--api)
+- [文档 & 常见问题 · Docs & FAQ](#文档--常见问题--docs--faq)
+- [项目结构 · Project Structure](#项目结构--project-structure)
+- [许可证 · License](#许可证--license)
+- [重要注意事项 · Notes](#重要注意事项--notes)
 
 ---
 
-## 📌 项目简介 / What is it
+## 项目简介 / What is it
 
 ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决方案。后端对接 Dify 大模型，前端提供管理看板，把分散在 QQ、企业微信、微信个人号里的用户消息统一汇聚、自动回复、沉淀为知识库，并支持数据统计与反馈闭环。
 
@@ -58,22 +66,22 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 
 ---
 
-## ✨ 核心特性 / Features
+## 核心特性 / Features
 
 | 模块 Tier | 能力 What you get | 说明 |
 |-----------|------------------|------|
-| 🧠 **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
-| 📚 **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
-| 💬 **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
-| 🖥️ **远程 opencode / Remote** | 私聊绑定本机 opencode，frp 隧道遥控 | 会话级绑定特殊应用（appId=-1），仅 admin 可用，全程审计落库 |
-| 📊 **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
-| 🧾 **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
-| 🤖 **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
-| 🛡️ **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；**关闭自助注册**，仅管理员建号 |
+| **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
+| **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
+| **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
+| **远程 opencode / Remote** | 私聊绑定本机 opencode，frp 隧道遥控 | 会话级绑定特殊应用（appId=-1），仅 admin 可用，全程审计落库 |
+| **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
+| **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
+| **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
+| **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；**关闭自助注册**，仅管理员建号 |
 
 ---
 
-## 🛠 技术栈 / Tech Stack
+## 技术栈 / Tech Stack
 
 ### 后端 / Backend
 
@@ -102,7 +110,7 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 
 ---
 
-## 🏗 系统架构 / Architecture
+## 系统架构 / Architecture
 
 > 交互式架构图（推荐查看）：[docs/chatbase-architecture.html](./docs/chatbase-architecture.html)  
 > 源规格：[docs/chatbase-architecture.json](./docs/chatbase-architecture.json)
@@ -158,11 +166,11 @@ flowchart LR
   → 回发私聊
 ```
 
-> ⚠️ 后端运行在容器内，访问宿主机 frps 必须用网桥网关 `http://172.17.0.1:14096`，**不能用 `127.0.0.1`**（容器内回环是容器自身）。详见 [DEPLOY.md](./DEPLOY.md)。
+> 注意：后端运行在容器内，访问宿主机 frps 必须用网桥网关 `http://172.17.0.1:14096`，**不能用 `127.0.0.1`**（容器内回环是容器自身）。详见 [DEPLOY.md](./DEPLOY.md)。
 
 ---
 
-## 🚀 快速开始 / Quick Start
+## 快速开始 / Quick Start
 
 ### Docker 部署（推荐）/ Docker Deploy (recommended)
 
@@ -222,7 +230,7 @@ opencode serve --port 4096
 
 ---
 
-## ⚙️ 配置说明 / Configuration
+## 配置说明 / Configuration
 
 ### 必填配置 / Required
 
@@ -268,7 +276,7 @@ opencode serve --port 4096
 
 ---
 
-## 🧩 功能模块 / Modules
+## 功能模块 / Modules
 
 | 模块 Module | 包路径 Package | 职责 Responsibility |
 |-------------|----------------|---------------------|
@@ -308,7 +316,7 @@ opencode serve --port 4096
 
 ---
 
-## 🔐 数据隔离与权限 / Security & Isolation
+## 数据隔离与权限 / Security & Isolation
 
 - **角色模型**：`admin` / `user`，`AuthInterceptor` + `AdminInterceptor` 双重校验
 - **数据隔离规则**：`created_by = 当前用户 OR created_by IS NULL`（系统级记录所有人可见）
@@ -319,11 +327,11 @@ opencode serve --port 4096
 - **账号策略**：关闭公开注册；`POST /api/user/register` 仅返回提示；管理员通过 `POST /api/user/create` 在后台建号
 - **认证排除**：登录、Web 聊天、反馈提交、QQ WebSocket、企微回调等为公开路径
 
-> ⚠️ `pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 运行时报 `Name not specified` 异常。
+> 注意：`pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 运行时报 `Name not specified` 异常。
 
 ---
 
-## 💬 多渠道 IM 接入 / IM Integration
+## 多渠道 IM 接入 / IM Integration
 
 | 平台 Platform | 接入方式 | 功能 |
 |---------------|----------|------|
@@ -344,7 +352,7 @@ docker compose --profile qq up -d
 **HTTP 服务器**：端口 `3000`
 **ChatBase 配置**：`QQ_BOT_ENABLE` / `QQ_BOT_SELF_ID` / `QQ_BOT_ACCESS_TOKEN` / `QQ_BOT_HTTP_BASE_URL` / `QQ_BOT_WEBUI_BASE_URL` / `QQ_BOT_WEBUI_TOKEN`
 
-> ⚠️ 务必使用 QQ **小号**，防止封号。回复仅在消息 **@机器人** 时触发。
+> 注意：务必使用 QQ **小号**，防止封号。回复仅在消息 **@机器人** 时触发。
 
 ### 企业微信配置
 
@@ -354,7 +362,7 @@ docker compose --profile qq up -d
 
 ---
 
-## 🤖 机器人命令 / Bot Commands
+## 机器人命令 / Bot Commands
 
 微信/企微机器人支持交互式命令，以 `/` 开头的消息会被命令分发器拦截处理，不走 Dify/opencode。
 
@@ -383,14 +391,14 @@ docker compose --profile qq up -d
 
 ---
 
-## 🖥️ 私聊遥控本机 opencode / Remote opencode
+## 私聊遥控本机 opencode / Remote opencode
 
 > 通过私聊会话远程驱动开发者**本机**的 opencode，实现"人在服务器、代理在本机"的远程编码代理。
 
 **前提条件**：
 1. 本机 `opencode serve --port 4096` 并设置 `OPENCODE_SERVER_PASSWORD`
 2. 服务器经 frp 隧道可达本机，配置 `OPENCODE_ENABLED=true` / `OPENCODE_BASE_URL` / `OPENCODE_PASSWORD`
-3. 以 **admin** 在「私聊采集」会话详情选择 **🖥️ 本地opencode** 绑定（仅 admin 可见该选项）
+3. 以 **admin** 在「私聊采集」会话详情选择 **本地opencode** 绑定（仅 admin 可见该选项）
 
 **数据流**：见上文架构图。会话映射存 Redis（`opencode:session:<conversationId>`，TTL 7 天），回复写入 `kb_conversation` 审计后回发私聊。
 
@@ -398,21 +406,21 @@ docker compose --profile qq up -d
 
 ---
 
-## ⏰ 定时任务 / Scheduled Tasks
+## 定时任务 / Scheduled Tasks
 
 | 任务 Task | 频率 | 功能 | 状态 |
 |-----------|------|------|:----:|
-| Redis Stream 消费 | 每 5 秒 | 实时处理 IM 消息 | ✅ 推荐 |
-| 定时同步（废弃） | 每 60 秒 | 批量同步群消息到 Dify | ⚠️ 已过时 |
-| 统计聚合 | 每天 00:05 | 聚合昨日统计数据 | ✅ |
-| 关键词提取 | 每天 05:00 | 从对话中提取关键词 | ✅ |
-| 关键词清理 | 每天 06:00 | 清理 90 天前关键词 | ✅ |
-| 会话清理 | 每天 03:00 | 清理过期会话 | ✅ |
-| 消息清理 | 每天 04:30 | 清理 90 天前消息 | ✅ |
+| Redis Stream 消费 | 每 5 秒 | 实时处理 IM 消息 | 推荐 |
+| 定时同步（废弃） | 每 60 秒 | 批量同步群消息到 Dify | 已过时 |
+| 统计聚合 | 每天 00:05 | 聚合昨日统计数据 | 启用 |
+| 关键词提取 | 每天 05:00 | 从对话中提取关键词 | 启用 |
+| 关键词清理 | 每天 06:00 | 清理 90 天前关键词 | 启用 |
+| 会话清理 | 每天 03:00 | 清理过期会话 | 启用 |
+| 消息清理 | 每天 04:30 | 清理 90 天前消息 | 启用 |
 
 ---
 
-## 🗃 数据库表 / Database
+## 数据库表 / Database
 
 ### 核心表 / Core Tables
 
@@ -440,7 +448,7 @@ docker compose --profile qq up -d
 
 ---
 
-## 🔌 API 接口 / API
+## API 接口 / API
 
 ### 主要分组 / Groups
 
@@ -463,7 +471,7 @@ docker compose --profile qq up -d
 
 ---
 
-## 📚 文档 & 常见问题 / Docs & FAQ
+## 文档 & 常见问题 / Docs & FAQ
 
 | 文档 | 说明 |
 |------|------|
@@ -481,7 +489,7 @@ docker compose --profile qq up -d
 
 ---
 
-## 📁 项目结构 / Project Structure
+## 项目结构 / Project Structure
 
 ```
 chatBase/
@@ -525,7 +533,7 @@ chatBase/
 
 ---
 
-## 📄 许可证 / License
+## 许可证 / License
 
 [MIT License](./LICENSE) © 2026 ZxlDragonDoctor
 
@@ -533,7 +541,7 @@ chatBase/
 
 ---
 
-## ⚠️ 重要注意事项 / Notes
+## 重要注意事项 / Notes
 
 - **pom.xml 编译参数**：`maven-compiler-plugin` 需配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 报 `Name not specified`。
 - **数据隔离**：所有业务数据通过 `created_by` 按用户维度过滤；普通用户仅看自己，admin 可在统计页切 `scope=all/mine`。
@@ -542,4 +550,4 @@ chatBase/
 
 ---
 
-*最后更新 / Last updated：2026-08-29 · 中文为主 / Chinese-primary, English-mirror*
+*最后更新 / Last updated：2026-09-12 · 中文为主 / Chinese-primary, English-mirror*
