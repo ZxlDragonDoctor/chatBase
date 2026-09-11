@@ -527,7 +527,9 @@ chatBase/
 
 ## 📄 许可证 / License
 
-MIT License
+[MIT License](./LICENSE) © 2026 ZxlDragonDoctor
+
+使用、修改与分发请保留版权声明与许可证全文。
 
 ---
 
