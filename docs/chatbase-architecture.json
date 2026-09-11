@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ChatBase 多渠道智能客服架构",
+    "quality_profile": "showcase",
+    "locale": "zh-CN",
+    "views": [
+      {
+        "id": "web-path",
+        "label": "Web 管理台路径",
+        "focus": ["users", "nginx", "frontend", "backend", "mysql", "redis"],
+        "note": "浏览器经 HTTPS 进入宿主机 Nginx，反代前端容器，再代理到 Spring Boot API。"
+      },
+      {
+        "id": "im-channels",
+        "label": "IM 多渠道接入",
+        "focus": ["qq", "wecom", "wxbot", "backend", "dify", "opencode"],
+        "note": "QQ/企微/微信消息汇入统一后端，按会话绑定走 Dify 或本机 opencode。"
+      },
+      {
+        "id": "data-and-ai",
+        "label": "数据与 AI 外部依赖",
+        "focus": ["backend", "mysql", "redis", "dify", "opencode"],
+        "note": "MySQL 持久化业务数据，Redis 存 Token/会话/在线状态，Dify 与 opencode 提供智能回复。"
+      }
+    ]
+  },
+  "components": [
+    { "id": "qq", "type": "external", "label": "NapCat QQ", "sublabel": "OneBot WS", "pos": [40, 70], "size": [140, 60], "tag": "可选" },
+    { "id": "wecom", "type": "external", "label": "企业微信", "sublabel": "回调 /intellrobot", "pos": [40, 170], "size": [140, 60] },
+    { "id": "users", "type": "external", "label": "用户 / 管理员", "sublabel": "浏览器", "pos": [40, 320], "size": [130, 60] },
+    { "id": "wxbot", "type": "external", "label": "微信个人号", "sublabel": "iLink 轮询", "pos": [40, 500], "size": [140, 60] },
+    { "id": "nginx", "type": "cloud", "label": "宿主机 Nginx", "sublabel": "HTTPS :443 / LE", "pos": [240, 320], "size": [140, 64], "tag": "SSL 终止" },
+    { "id": "frontend", "type": "frontend", "label": "Vue 前端", "sublabel": "127.0.0.1:8081", "pos": [450, 320], "size": [130, 64] },
+    { "id": "backend", "type": "backend", "label": "Spring Boot", "sublabel": "API :8080", "pos": [670, 320], "size": [140, 64], "tag": "chatBase" },
+    { "id": "dify", "type": "cloud", "label": "Dify", "sublabel": "LLM + RAG", "pos": [900, 70], "size": [140, 60] },
+    { "id": "redis", "type": "database", "label": "Redis", "sublabel": "Token / 会话 / 在线", "pos": [920, 220], "size": [140, 64] },
+    { "id": "mysql", "type": "database", "label": "MySQL 8", "sublabel": "业务持久化", "pos": [920, 400], "size": [140, 64] },
+    { "id": "opencode", "type": "external", "label": "本机 opencode", "sublabel": "frp 隧道 :14096", "pos": [900, 530], "size": [140, 60], "tag": "仅 admin" }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "阿里云 ECS · www.zxldragon.fun",
+      "wraps": ["nginx", "frontend", "backend", "redis", "mysql", "qq"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group",
+      "label": "Docker chatbase-network",
+      "wraps": ["frontend", "backend", "redis", "mysql"],
+      "pad": 12
+    }
+  ],
+  "connections": [
+    { "id": "user-https", "from": "users", "to": "nginx", "label": "HTTPS 443", "variant": "emphasis" },
+    { "id": "nginx-fe", "from": "nginx", "to": "frontend", "label": "反代 :8081" },
+    { "id": "fe-api", "from": "frontend", "to": "backend", "label": "/api 代理", "labelAt": [535, 398] },
+    { "id": "be-redis", "from": "backend", "to": "redis", "label": "会话 / 限流", "labelAt": [920, 298] },
+    { "id": "be-mysql", "from": "backend", "to": "mysql", "label": "JDBC", "labelAt": [880, 400] },
+    { "id": "qq-ws", "from": "qq", "to": "backend", "label": "WS /qq/ws", "variant": "dashed", "labelAt": [320, 95] },
+    { "id": "wecom-cb", "from": "wecom", "to": "backend", "label": "回调 POST", "variant": "dashed", "labelAt": [320, 195] },
+    { "id": "wx-poll", "from": "wxbot", "to": "backend", "label": "getUpdates 轮询", "variant": "dashed", "labelAt": [320, 500] },
+    { "id": "be-dify", "from": "backend", "to": "dify", "label": "Chat / Dataset", "labelAt": [880, 144] },
+    { "id": "be-oc", "from": "backend", "to": "opencode", "label": "私聊绑定 appId=-1", "variant": "security", "labelAt": [880, 520] }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "接入层",
+      "items": [
+        "HTTPS 由宿主机 Nginx 终止（Let's Encrypt）",
+        "前端容器仅监听 127.0.0.1:8081",
+        "公开注册已关闭，账号由管理员创建"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "应用与数据",
+      "items": [
+        "Spring Boot 2.7.6 统一处理 Web / IM 消息",
+        "MySQL 持久化会话、知识库、统计",
+        "Redis 存 Token、会话映射、bot 在线状态"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "智能与渠道",
+      "items": [
+        "Dify 提供多轮对话与知识库检索",
+        "QQ 走 NapCat，企微走回调，微信走 iLink",
+        "私聊可绑定本机 opencode（frp 隧道，仅 admin）"
+      ]
+    }
+  ]
+}

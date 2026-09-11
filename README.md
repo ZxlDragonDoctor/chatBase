@@ -104,26 +104,48 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 
 ## 🏗 系统架构 / Architecture
 
+> 交互式架构图（推荐查看）：[docs/chatbase-architecture.html](./docs/chatbase-architecture.html)  
+> 源规格：[docs/chatbase-architecture.json](./docs/chatbase-architecture.json)
+
+```mermaid
+flowchart LR
+  users["用户 / 管理员<br/>浏览器"] -->|HTTPS 443| nginx["宿主机 Nginx<br/>SSL 终止"]
+  nginx -->|反代 :8081| fe["Vue 前端<br/>127.0.0.1:8081"]
+  fe -->|/api| be["Spring Boot<br/>API :8080"]
+
+  qq["NapCat QQ<br/>OneBot WS"] -.->|WS /qq/ws| be
+  wecom["企业微信<br/>回调"] -.->|/intellrobot| be
+  wx["微信个人号<br/>iLink"] -.->|getUpdates| be
+
+  be --> redis[("Redis<br/>Token / 会话 / 在线")]
+  be --> mysql[("MySQL 8<br/>业务持久化")]
+  be -->|Chat / Dataset| dify["Dify<br/>LLM + RAG"]
+  be -->|私聊绑定 appId=-1| oc["本机 opencode<br/>frp 隧道"]
+```
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                          前端层 Frontend (Vue 3)                  │
-│  登录 │ AI问答 │ 知识库 │ 统计看板 │ 控制台 │ 机器人管理        │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │ HTTP / WebSocket
-┌────────────────────────────────▼─────────────────────────────────┐
-│                       后端层 Backend (Spring Boot)                 │
-│   Controller │ Service │ Mapper │ Config │ Interceptor            │
-│  ┌───────────────────────────────┐                                │
-│  │ Chat│Dify│KB│IM│QQ│WeCom│Wx│   │ Stats│Opencode│Feedback│User  │
-│  └───────────────────────────────┘                                │
+│                    阿里云 ECS · www.zxldragon.fun                 │
+│  宿主机 Nginx(443) → Vue(8081) → Spring Boot(8080)               │
+│  Chat│Dify│KB│IM│QQ│WeCom│Wx│Stats│Opencode│Feedback│User        │
 └───────────────┬──────────────────────────┬────────────────────────┘
                 │                          │
 ┌───────────────▼──────────┐   ┌───────────▼────────────────────────┐
 │    数据层 Data            │   │    外部服务 External               │
-│  MySQL 8 · Redis 7        │   │  Dify API · NapCat(QQ)            │
-└──────────────────────────┘   │  WeCom 回调 · 本机 opencode(frp)   │
+│  MySQL 8 · Redis 7        │   │  Dify API · NapCat(QQ, 可选)       │
+└──────────────────────────┘   │  WeCom 回调 · 微信 iLink            │
+                               │  本机 opencode (frp)               │
                                └────────────────────────────────────┘
 ```
+
+### 生产接入（当前部署）
+
+| 层 | 说明 |
+|----|------|
+| TLS | 宿主机 Nginx + Let's Encrypt（`scripts/setup-ssl.sh`） |
+| 前端 | 容器仅绑 `127.0.0.1:8081`，不对公网直出 |
+| 账号 | 关闭自助注册，管理员在控制台建号 |
+| 资源 | 1.6G ECS 建议停用 NapCat 以降低 OOM 风险 |
 
 ### 私聊遥控本机 opencode（特色数据流）
 

@@ -1262,7 +1262,7 @@ web/
 | mysql | mysql:8.0 | 3306 | MySQL 数据库 |
 | redis | redis:7 | 6379 | Redis 缓存 |
 | chatbase-backend | chatbase-backend:latest | 8080 | 后端服务 |
-| chatbase-frontend | chatbase-frontend:latest | 80 | 前端服务（Nginx） |
+| chatbase-frontend | chatbase-frontend:latest | 127.0.0.1:8081 | 前端容器（宿主机 Nginx 反代 + SSL） |
 | napcat | mlikiowa/napcat-docker:v4.17.46 | 3000, 6099 | QQ 机器人（可选） |
 
 ### 12.2 网络拓扑
