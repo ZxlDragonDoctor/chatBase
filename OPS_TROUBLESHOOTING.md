@@ -1,7 +1,7 @@
 # ChatBase 运维排障手册
 
 > 记录生产环境常见故障的现象、根因与解决方案，供后续排障直接参考。
-> 环境：阿里云轻量 1 核 1.6GB，Ubuntu + Docker Compose 部署；服务器 `47.93.233.131`（SSH 22 → 2234）。
+> 环境：轻量云主机（示例：1 核 1.6GB），Ubuntu + Docker Compose 部署；服务器 `<SERVER_IP>`（SSH 自定义端口）。
 
 ---
 
@@ -37,21 +37,19 @@
 本机（Windows）依次恢复两个进程：
 
 ```powershell
-# 1. 启动 opencode serve（监听 4096）
-$exe = "C:\nvm4w\nodejs\node_modules\opencode-ai\bin\opencode.exe"
-Start-Process -FilePath $exe -ArgumentList "serve","--hostname","127.0.0.1","--port","4096" -WindowStyle Hidden
-
+# 1. 启动 opencode serve（监听 4096，路径按本机安装位置调整）
+#    opencode serve --hostname 127.0.0.1 --port 4096
 # 2. 启动 frp 客户端（本机 4096 → 服务器 14096）
-Start-Process -FilePath "D:\tools\frp\frpc.exe" -ArgumentList "-c","D:\tools\frp\frpc.toml" -WindowStyle Hidden
+#    frpc -c <path-to-frpc.toml>
 ```
 
-`frpc.toml`（`D:\tools\frp\frpc.toml`）：
+`frpc.toml` 示例：
 
 ```toml
-serverAddr = "47.93.233.131"
+serverAddr = "<SERVER_IP>"
 serverPort = 7000
 auth.method = "token"
-auth.token = "CHATBASE_OPENTUN_2026"
+auth.token = "<FRP_TOKEN>"
 [[proxies]]
 name = "opencode"
 type = "tcp"
@@ -79,7 +77,7 @@ docker logs --since 5m chatbase-backend 2>&1 | grep -i 'Connection refused'
 
 ### 现象
 
-- SSH banner 超时（`Error reading SSH protocol banner`），但 TCP 端口 2234/8080/80 全部可达
+- SSH banner 超时（`Error reading SSH protocol banner`），但 关键 TCP 端口全部可达
 - 后端 `/api/**` 请求长时间无响应或被中断
 - 服务器短时间内多次重启（`last reboot` 能看到 1 分钟内两条记录）
 - 系统日志出现 OOM 击杀：
@@ -90,7 +88,7 @@ docker logs --since 5m chatbase-backend 2>&1 | grep -i 'Connection refused'
 
 ### 根因
 
-- 阿里云轻量仅 **1.6GB 内存、无 Swap**
+- 低配云主机（例如 **1.6GB 内存、无 Swap**
 - 5 个容器（MySQL 397MB + backend 300MB + napcat 190MB + Redis + frontend）+ 系统本身，内存余量常低于 300MB
 - MySQL 使用默认内存参数（`innodb_buffer_pool_size=128M`、`performance_schema=ON`），瞬间峰值触发内核 OOM killer，优先击杀 mysqld
 - mysqld 被杀 → 后端 HikariPool `Connection refused` → 全服务假死 → 运维误判重启，恶性循环
@@ -275,7 +273,7 @@ docker update --cpus=0.5 chatbase-napcat   # 降低 I/O 争抢
 import paramiko, time
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-c.connect('47.93.233.131', port=2234, username='root', password='<PWD>',
+c.connect('<SERVER_IP>', port=<SSH_PORT>, username='root', password='<PWD>',
           timeout=45, banner_timeout=45, auth_timeout=45)
 ```
 

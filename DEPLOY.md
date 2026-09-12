@@ -69,7 +69,7 @@ docker compose logs -f chatbase-backend
 | redis | 6379 | Redis 7 |
 | napcat | 3000/6099 | QQ Bot（可选） |
 
-### HTTPS / SSL（www.zxldragon.fun）
+### HTTPS / SSL（your-domain.example.com）
 
 1. 域名 A 记录指向服务器公网 IP
 2. 前端容器只绑 `127.0.0.1:8081`（见 `docker-compose.yml`）
@@ -79,12 +79,12 @@ docker compose logs -f chatbase-backend
 cd /opt/chatBase
 bash scripts/setup-ssl.sh
 # 或指定域名/邮箱
-DOMAIN=www.zxldragon.fun EMAIL=you@example.com bash scripts/setup-ssl.sh
+DOMAIN=your-domain.example.com EMAIL=you@example.com bash scripts/setup-ssl.sh
 ```
 
 4. 证书路径：`/etc/letsencrypt/live/<domain>/`
 5. 自动续期：certbot timer + deploy hook reload nginx
-6. **阿里云安全组需放行 443/TCP**（80 用于 HTTP→HTTPS 跳转与续期）
+6. **云厂商安全组需放行 443/TCP**（80 用于 HTTP→HTTPS 跳转与续期）
 
 ## 可选服务
 

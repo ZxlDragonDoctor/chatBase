@@ -69,7 +69,7 @@ vim .env
 | `WX_BOT_BOT_ID` | 否 | 微信机器人 ID | `your-bot-id` |
 | `WX_BOT_NICKNAME` | 否 | 微信机器人昵称 | `微信机器人` |
 | `OPENCODE_ENABLED` | 否 | 启用本地 opencode 集成（true/false） | `false` |
-| `OPENCODE_BASE_URL` | 否 | opencode serve 地址。⚠️ 后端在容器内，访问宿主机 frps 需用网桥网关 `http://172.17.0.1:14096`；仅本机开发用 `http://127.0.0.1:4096` | `http://172.17.0.1:14096` |
+| `OPENCODE_BASE_URL` | 否 | opencode serve 地址。本机开发常用 `http://127.0.0.1:4096`；后端在容器内时，若服务在宿主机，请使用 Docker 网桥网关或 `host.docker.internal`，不要用容器内 `127.0.0.1` | - |
 | `OPENCODE_PASSWORD` | 否 | opencode serve 密码（Basic Auth，与本机 `OPENCODE_SERVER_PASSWORD` 一致） | `your-password` |
 | `OPENCODE_USERNAME` | 否 | opencode Basic Auth 用户名 | `opencode` |
 | `OPENCODE_DEFAULT_DIRECTORY` | 否 | 本机项目根目录（创建会话时指定） | `/path/to/project` |
@@ -128,7 +128,7 @@ docker compose down -v
 # 使用 Docker 启动 MySQL 和 Redis
 docker run -d --name mysql \
   -p 3306:3306 \
-  -e MYSQL_ROOT_PASSWORD=zxl123 \
+  -e MYSQL_ROOT_PASSWORD=your_password \
   -e MYSQL_DATABASE=chat_base \
   mysql:8.0 \
   --character-set-server=utf8mb4 \
@@ -139,7 +139,7 @@ docker run -d --name redis \
   redis:7
 
 # 初始化数据库
-mysql -u root -pzxl123 chat_base < sql/init-schema.sql
+mysql -u root -pyour_password chat_base < sql/init-schema.sql
 ```
 
 ### 3.2 启动后端
@@ -204,7 +204,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/chat_base  # 数据库连接
     username: root
-    password: zxl123
+    password: your_password
   redis:
     host: localhost
     port: 6379
@@ -252,7 +252,7 @@ opencode:
   base-url: "http://127.0.0.1:4096"  # opencode serve 地址
   password: "your-password"       # 与本机 OPENCODE_SERVER_PASSWORD 一致
   username: "opencode"            # Basic Auth 用户名（默认 opencode）
-  default-directory: "D:\\idea_java_project\\chatBase"  # 本机项目根目录
+  default-directory: "<LOCAL_PROJECT_DIR>"  # 本机项目根目录
   default-agent: "build"          # opencode agent 名称
   timeout-seconds: 300            # 等待回复超时（秒）
 ```
@@ -982,8 +982,8 @@ docker compose logs chatbase-frontend
    ```bash
    # 服务器上执行（从宿主机到 frps 映射端口，应能连通到本机 opencode）
    curl http://127.0.0.1:14096/
-   # 后端容器内验证（必须用网桥网关 172.17.0.1，不能用 127.0.0.1）
-   docker compose exec chatbase-backend curl -u opencode:<密码> http://172.17.0.1:14096/
+   # 后端容器内验证（若服务在宿主机，请用 Docker 网桥网关，不能用容器内 127.0.0.1）
+   docker compose exec chatbase-backend curl -u opencode:<密码> http://<docker-gateway>:<remote-port>/
    ```
 
 4. 检查密码是否匹配
@@ -1184,7 +1184,7 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 | v1.0 | 2026-05-07 | 初始版本，完整功能 |
 | v1.1 | 2026-05-09 | 新增用户数据隔离、scope 切换支持、pom.xml 编译参数说明 |
 | v1.2 | 2026-08-01 | 新增私聊采集页面、会话级应用绑定、本地 opencode 远程控制集成 |
-| v1.3 | 2026-08-04 | 部署到服务器：QQ NapCat WebUI 扫码登录、uploads 持久化卷、已有库升级脚本（`sql/upgrade-existing-db.sql`）、opencode 经 frp 隧道（容器内用 `172.17.0.1` 网关地址） |
+| v1.3 | 2026-08-04 | 部署增强：QQ NapCat WebUI 扫码登录、uploads 持久化卷、已有库升级脚本（`sql/upgrade-existing-db.sql`）、可选 opencode 隧道集成 |
 
 ---
 

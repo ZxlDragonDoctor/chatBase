@@ -7,9 +7,9 @@
 # ChatBase · 智能对话客服系统 / Multi-channel AI Customer-Service System
 
 > 把 QQ / 企业微信 / 微信个人号的消息统一接入 Dify 大模型 + 知识库，自动智能回复；
-> 还能将一段私聊会话绑定到**自己电脑上的 opencode**，实现"人在服务器、AI 在本机"的远程编码代理。
+> 还支持将私聊会话绑定到本机 **opencode**，实现远程驱动本地 AI 编程代理。
 >
-> **Turn QQ / WeCom / personal WeChat into an AI assistant** backed by Dify LLM + RAG knowledge — and remote-drive the opencode agent running on your own machine from a private chat, over an frp tunnel.
+> **Turn QQ / WeCom / personal WeChat into an AI assistant** backed by Dify LLM + RAG knowledge — and optionally remote-drive an opencode agent on your own machine.
 
 <div align="center">
 
@@ -24,7 +24,7 @@
 
 **一键 Docker 部署 / One-command deploy**  ·
 **Token·费用看板 / Analytics dashboard**  ·
-**私聊遥控本机 AI / Remote local-agent control**
+**可选远程本地 AI / Optional remote local-agent control**
 
 </div>
 
@@ -42,14 +42,12 @@
 - [数据隔离与权限 · Security & Isolation](#数据隔离与权限--security--isolation)
 - [多渠道 IM 接入 · IM Integration](#多渠道-im-接入--im-integration)
 - [机器人命令 · Bot Commands](#机器人命令--bot-commands)
-- [私聊遥控本机 opencode · Remote opencode](#私聊遥控本机-opencode--remote-opencode)
-- [定时任务 · Scheduled Tasks](#定时任务--scheduled-tasks)
+- [可选：远程 opencode · Optional remote opencode](#可选远程-opencode--optional-remote-opencode)
 - [数据库表 · Database](#数据库表--database)
 - [API 接口 · API](#api-接口--api)
-- [文档 & 常见问题 · Docs & FAQ](#文档--常见问题--docs--faq)
+- [文档 · Docs](#文档--docs)
 - [项目结构 · Project Structure](#项目结构--project-structure)
 - [许可证 · License](#许可证--license)
-- [重要注意事项 · Notes](#重要注意事项--notes)
 
 ---
 
@@ -59,8 +57,9 @@
 
 ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决方案。后端对接 Dify 大模型，前端提供管理看板，把分散在 QQ、企业微信、微信个人号里的用户消息统一汇聚、自动回复、沉淀为知识库，并支持数据统计与反馈闭环。
 
-- 难点在于「多渠道」：QQ 走 NapCat（WebUI 扫码登录）、企业微信走回调模式、微信个人号走 iLink 协议，各通道差异巨大，本项目统一抽象为一套 IM 消息模型。
-- 亮点在于「远程遥控本机 AI」：私聊会话可绑定到开发者自己电脑上运行的 **opencode**，通过 frp 反向隧道，实现服务器端收到聊天 → 本机 AI 编程代理 → 回发的完整闭环。
+- **多渠道统一抽象**：QQ 走 NapCat（WebSocket + WebUI 扫码）、企业微信走回调、微信个人号走 iLink，差异被收敛到同一套 IM 消息模型。
+- **知识库优先**：FAQ 优先命中，未命中再走大模型，并附带引用来源。
+- **可选远程编码代理**：私聊会话可绑定本机 opencode，通过安全隧道远程驱动本地 AI（仅 admin，可关闭）。
 
 **Keywords:** AI chatbot · customer service · RAG knowledge base · Dify · QQ Bot (NapCat) · WeCom · WeChat personal · remote coding agent · opencode · Vue 3 · Spring Boot
 
@@ -73,11 +72,11 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 | <img src="./assets/icons/dialogue.png" width="28" alt=""> **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
 | <img src="./assets/icons/knowledge.png" width="28" alt=""> **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
 | <img src="./assets/icons/channels.png" width="28" alt=""> **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
-| <img src="./assets/icons/remote.png" width="28" alt=""> **远程 opencode / Remote** | 私聊绑定本机 opencode，frp 隧道遥控 | 会话级绑定特殊应用（appId=-1），仅 admin 可用，全程审计落库 |
+| <img src="./assets/icons/remote.png" width="28" alt=""> **远程 opencode / Remote** | 私聊绑定本机 opencode（可选） | 会话级绑定特殊应用（appId=-1），仅 admin，默认关闭 |
 | <img src="./assets/icons/analytics.png" width="28" alt=""> **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
 | <img src="./assets/icons/feedback.png" width="28" alt=""> **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
 | <img src="./assets/icons/commands.png" width="28" alt=""> **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
-| <img src="./assets/icons/security.png" width="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；**关闭自助注册**，仅管理员建号 |
+| <img src="./assets/icons/security.png" width="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；默认关闭自助注册 |
 
 ---
 
@@ -112,61 +111,25 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 
 ## 系统架构 / Architecture
 
-> 交互式架构图（推荐查看）：[docs/chatbase-architecture.html](./docs/chatbase-architecture.html)  
-> 源规格：[docs/chatbase-architecture.json](./docs/chatbase-architecture.json)
+> 交互式架构图：[docs/chatbase-architecture.html](./docs/chatbase-architecture.html)
 
 ```mermaid
 flowchart LR
-  users["用户 / 管理员<br/>浏览器"] -->|HTTPS 443| nginx["宿主机 Nginx<br/>SSL 终止"]
-  nginx -->|反代 :8081| fe["Vue 前端<br/>127.0.0.1:8081"]
-  fe -->|/api| be["Spring Boot<br/>API :8080"]
+  users["用户 / 管理员<br/>浏览器"] -->|HTTPS| proxy["反向代理<br/>（可选 Nginx）"]
+  proxy -->|反代| fe["Vue 前端"]
+  fe -->|/api| be["Spring Boot API"]
 
   qq["NapCat QQ<br/>OneBot WS"] -.->|WS /qq/ws| be
   wecom["企业微信<br/>回调"] -.->|/intellrobot| be
   wx["微信个人号<br/>iLink"] -.->|getUpdates| be
 
-  be --> redis[("Redis<br/>Token / 会话 / 在线")]
-  be --> mysql[("MySQL 8<br/>业务持久化")]
+  be --> redis[("Redis")]
+  be --> mysql[("MySQL 8")]
   be -->|Chat / Dataset| dify["Dify<br/>LLM + RAG"]
-  be -->|私聊绑定 appId=-1| oc["本机 opencode<br/>frp 隧道"]
+  be -.->|可选| oc["本机 opencode<br/>（需自行打通网络）"]
 ```
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    阿里云 ECS · www.zxldragon.fun                 │
-│  宿主机 Nginx(443) → Vue(8081) → Spring Boot(8080)               │
-│  Chat│Dify│KB│IM│QQ│WeCom│Wx│Stats│Opencode│Feedback│User        │
-└───────────────┬──────────────────────────┬────────────────────────┘
-                │                          │
-┌───────────────▼──────────┐   ┌───────────▼────────────────────────┐
-│    数据层 Data            │   │    外部服务 External               │
-│  MySQL 8 · Redis 7        │   │  Dify API · NapCat(QQ, 可选)       │
-└──────────────────────────┘   │  WeCom 回调 · 微信 iLink            │
-                               │  本机 opencode (frp)               │
-                               └────────────────────────────────────┘
-```
-
-### 生产接入（当前部署）
-
-| 层 | 说明 |
-|----|------|
-| TLS | 宿主机 Nginx + Let's Encrypt（`scripts/setup-ssl.sh`） |
-| 前端 | 容器仅绑 `127.0.0.1:8081`，不对公网直出 |
-| 账号 | 关闭自助注册，管理员在控制台建号 |
-| 资源 | 1.6G ECS 建议停用 NapCat 以降低 OOM 风险 |
-
-### 私聊遥控本机 opencode（特色数据流）
-
-```
-管理员私聊消息 → IM通道(QQ WebSocket / 企微回调 / 微信iLink)
-  → 会话绑定判定 isOpencodeBound()（appId = -1）
-  → OpencodeService.chat()
-  → frp 反向隧道 → 本机 opencode serve (127.0.0.1:4096)
-  → 创建会话 → 发送消息 → 轮询回复 → 回复落 kb_conversation 审计
-  → 回发私聊
-```
-
-> 注意：后端运行在容器内，访问宿主机 frps 必须用网桥网关 `http://172.17.0.1:14096`，**不能用 `127.0.0.1`**（容器内回环是容器自身）。详见 [DEPLOY.md](./DEPLOY.md)。
+典型部署：反向代理 → 前端 → 后端 API；数据层为 MySQL + Redis；外部依赖为 Dify，以及可选的 NapCat / 企微回调 / iLink / opencode。
 
 ---
 
@@ -199,13 +162,13 @@ docker compose logs -f chatbase-backend
 
 ```bash
 # 1. 启动 MySQL 和 Redis
-docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=zxl123 -e MYSQL_DATABASE=chat_base mysql:8.0
+docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=your_root_password -e MYSQL_DATABASE=chat_base mysql:8.0
 docker run -d --name redis -p 6379:6379 redis:7
 
 # 2. 初始化数据库
-mysql -u root -pzxl123 chat_base < sql/init-schema.sql
+mysql -u root -pyour_root_password chat_base < sql/init-schema.sql
 
-# 3. 启动后端（local profile，参考 application-local.yaml，该文件被 git 忽略需自建）
+# 3. 启动后端（local profile；application-local.yaml 被 git 忽略，需自建）
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 # 4. 启动前端
@@ -214,19 +177,7 @@ cd web && npm install && npm run dev
 
 访问 **http://localhost:5173** 打开前端页面。
 
-### 本机对接 opencode（可选）
-
-```bash
-# 本机启动 opencode serve（带密码鉴权）
-$env:OPENCODE_SERVER_PASSWORD="your-password"
-opencode serve --port 4096
-
-# 配置 application-local.yaml 启用并指向本机
-# opencode.enabled=true / base-url=http://127.0.0.1:4096 / password=<同上> / username=opencode
-
-# 生产环境：用 frp 将本机 4096 隧道映射到服务器，再配置：
-# OPENCODE_ENABLED=true / OPENCODE_BASE_URL=http://172.17.0.1:14096 / OPENCODE_PASSWORD=<同密码>
-```
+> 生产环境 TLS、服务编排、可选组件与排错，请阅读 [DEPLOY.md](./DEPLOY.md)。
 
 ---
 
@@ -236,9 +187,9 @@ opencode serve --port 4096
 
 | 环境变量 Env | 说明 | 示例 |
 |--------------|------|------|
-| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | `root123` |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | `your_root_password` |
 | `MYSQL_USER` | 数据库用户名 | `chatbase` |
-| `MYSQL_PASSWORD` | 数据库密码 | `chatbase123` |
+| `MYSQL_PASSWORD` | 数据库密码 | `your_password` |
 | `DIFYAPP_API_KEY` | Dify Chat API Key | `app-xxxxxxxx` |
 | `DIFYAPP_DATASET_API_KEY` | Dify Dataset API Key | `dataset-xxxxxxxx` |
 
@@ -263,8 +214,8 @@ opencode serve --port 4096
 | `WX_BOT_BOT_ID` | 微信机器人 ID | - |
 | `WX_BOT_NICKNAME` | 微信机器人昵称 | `微信机器人` |
 | `OPENCODE_ENABLED` | 启用本地 opencode 集成 | `false` |
-| `OPENCODE_BASE_URL` | opencode serve 地址（容器内访问宿主机 frps） | `http://172.17.0.1:14096` |
-| `OPENCODE_PASSWORD` | opencode serve 密码（对应 `OPENCODE_SERVER_PASSWORD`） | - |
+| `OPENCODE_BASE_URL` | opencode serve 地址 | - |
+| `OPENCODE_PASSWORD` | opencode serve 密码 | - |
 | `OPENCODE_USERNAME` | opencode Basic Auth 用户名 | `opencode` |
 | `OPENCODE_DEFAULT_DIRECTORY` | 本机项目根目录 | - |
 | `OPENCODE_DEFAULT_AGENT` | opencode agent | `build` |
@@ -272,7 +223,7 @@ opencode serve --port 4096
 | `JAVA_OPTS` | JVM 参数 | `-Xms512m -Xmx2048m` |
 | `NAPCAT_IMAGE` | NapCat 镜像名称 | `mlikiowa/napcat-docker:v4.17.46` |
 
-> 完整配置说明请参考 [USER_GUIDE.md](./USER_GUIDE.md#4-配置说明)。
+> 完整配置说明见 [USER_GUIDE.md](./USER_GUIDE.md)。**请勿将真实密钥写入仓库；使用 `.env`（已 gitignore）。**
 
 ---
 
@@ -284,8 +235,8 @@ opencode serve --port 4096
 | **dify** | `com.zxl.chatbase.dify` | Dify API 集成、对话、文件上传 |
 | **kb** | `com.zxl.chatbase.kb` | 知识库、分类、文档、FAQ、应用、关键词 |
 | **im** | `com.zxl.chatbase.im` | IM 消息采集、会话绑定、机器人管理 |
-| **command** | `com.zxl.chatbase.command` | 机器人交互命令框架（/help /new /status 等） |
-| **opencode** | `com.zxl.chatbase.opencode` | 本地 opencode serve 集成（远程遥控本机 AI） |
+| **command** | `com.zxl.chatbase.command` | 机器人交互命令框架 |
+| **opencode** | `com.zxl.chatbase.opencode` | 可选：本地 opencode serve 集成 |
 | **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket + WebUI 扫码登录代理 |
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词聚合 |
@@ -300,9 +251,9 @@ opencode serve --port 4096
 |-----------|-----------|------|------|
 | 登录 | `/login` | 公开 | 用户登录（无自助注册入口） |
 | 系统概览 | `/console/dashboard` | 登录 | 统计卡片、快捷导航 |
-| 数据统计 | `/console/statistics` | 登录 | Token/费用趋势、词云、活跃度（admin 可切换全部/个人） |
+| 数据统计 | `/console/statistics` | 登录 | Token/费用趋势、词云、活跃度 |
 | 群聊采集 | `/console/im` | 登录 | 群列表、消息查询、应用绑定 |
-| 私聊采集 | `/console/im/single` | 登录 | 私聊会话列表、Dify/opencode 应用绑定（opencode 仅 admin） |
+| 私聊采集 | `/console/im/single` | 登录 | 私聊会话、应用/opencode 绑定（opencode 仅 admin） |
 | 知识库管理 | `/console/knowledge` | 登录 | 分类、知识库、文档、FAQ |
 | 应用管理 | `/console/app` | 登录 | Dify 应用配置、API Key 验证 |
 | 机器人管理 | `/console/bots` | 登录 | 机器人状态、消息统计、扫码登录 |
@@ -321,13 +272,12 @@ opencode serve --port 4096
 - **角色模型**：`admin` / `user`，`AuthInterceptor` + `AdminInterceptor` 双重校验
 - **数据隔离规则**：`created_by = 当前用户 OR created_by IS NULL`（系统级记录所有人可见）
 - **统计页**：admin 默认看全部（`scope=all`），可切 `scope=mine`；普通用户始终只看自己
-- **群聊可见性**：`created_by IS NULL`（公共/未认领）或 `created_by = 当前用户`（已认领）
-- **分类可见性**：`create_by = 当前用户` 或 `create_by IS NULL`（系统默认分类如"群聊消息"）
-- **应用/知识库**：按 `created_by = 当前用户` 过滤；admin 管理端 `/api/kb/app/admin/**`、`/api/kb/admin/**` 看全部
-- **账号策略**：关闭公开注册；`POST /api/user/register` 仅返回提示；管理员通过 `POST /api/user/create` 在后台建号
-- **认证排除**：登录、Web 聊天、反馈提交、QQ WebSocket、企微回调等为公开路径
+- **群聊可见性**：`created_by IS NULL`（公共/未认领）或 `created_by = 当前用户`
+- **应用/知识库**：按 `created_by` 过滤；admin 管理端看全部
+- **账号策略**：默认关闭公开注册，管理员在后台建号
+- **密钥管理**：Dify / IM / opencode 密钥均通过环境变量注入，勿提交到仓库
 
-> 注意：`pom.xml` 的 `maven-compiler-plugin` 必须配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 运行时报 `Name not specified` 异常。
+> 开发提示：`pom.xml` 的 `maven-compiler-plugin` 需配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 可能报 `Name not specified`。
 
 ---
 
@@ -335,122 +285,92 @@ opencode serve --port 4096
 
 | 平台 Platform | 接入方式 | 功能 |
 |---------------|----------|------|
-| **QQ 群聊** | NapCat 反向 WebSocket | 扫码登录、消息收集、智能回复、在线监控 |
-| **QQ 私聊** | NapCat 反向 WebSocket | 会话级应用绑定、opencode 远程控制 |
+| **QQ 群聊** | NapCat 反向 WebSocket | 扫码登录、消息收集、智能回复 |
+| **QQ 私聊** | NapCat 反向 WebSocket | 会话级应用绑定 |
 | **企业微信** | 回调模式 | 消息收集、智能回复、AES 加解密 |
-| **微信个人号** | iLink 协议 | 扫码登录、消息收集、智能回复 |
+| **微信个人号** | iLink 协议 | 消息收集、智能回复 |
 
-### QQ 机器人配置（NapCat）
+### QQ 机器人（NapCat）
 
 ```bash
 docker compose --profile qq up -d
 ```
 
-**WebUI 扫码登录**：在「机器人管理」页点击 QQ 卡片「扫码登录」，后端代理 NapCat WebUI API 一键扫码；也可直接访问 `http://<server>:6099`。
+- **WebUI 扫码登录**：在「机器人管理」页操作，或直接访问 NapCat WebUI
+- **反向 WebSocket**：`ws://chatbase-backend:8080/qq/ws`
+- **HTTP**：端口 `3000`；WebUI：端口 `6099`
+- **ChatBase 配置**：`QQ_BOT_*` 环境变量（见配置表）
 
-**反向 WebSocket**：`ws://chatbase-backend:8080/qq/ws`
-**HTTP 服务器**：端口 `3000`
-**ChatBase 配置**：`QQ_BOT_ENABLE` / `QQ_BOT_SELF_ID` / `QQ_BOT_ACCESS_TOKEN` / `QQ_BOT_HTTP_BASE_URL` / `QQ_BOT_WEBUI_BASE_URL` / `QQ_BOT_WEBUI_TOKEN`
+> 建议使用 QQ **小号** 以降低封号风险。群聊回复默认在消息 **@机器人** 时触发。
 
-> 注意：务必使用 QQ **小号**，防止封号。回复仅在消息 **@机器人** 时触发。
+### 企业微信
 
-### 企业微信配置
-
-- 回调 URL：`http://<server>/intellrobot/callback/handle`
-- 配置 `WECHAT_CORP_STOKEN` / `WECHAT_CORP_S_ENCODING_AES_KEY` / `WECHAT_CORP_BOT_ID` / `WECHAT_CORP_SECRET`
-- 企微要求 5 秒内响应，系统采用异步处理 + Redis 分布式锁防重复
+- 回调 URL：`http://<your-host>/intellrobot/callback/handle`
+- 配置 `WECHAT_CORP_*` 环境变量
+- 企微要求 5 秒内响应，系统采用异步处理 + Redis 锁防重复
 
 ---
 
 ## 机器人命令 / Bot Commands
 
-微信/企微机器人支持交互式命令，以 `/` 开头的消息会被命令分发器拦截处理，不走 Dify/opencode。
+以 `/` 开头的消息由命令分发器处理，不走 Dify/opencode。
 
 | 命令 Command | 别名 Alias | 说明 Description |
 |-------------|-----------|-----------------|
-| `/help` | `/帮助` | 显示所有可用命令列表 |
-| `/new` | `/重置` | 重置会话，开启全新对话上下文 |
-| `/status` | `/状态` | 显示机器人状态、绑定应用、会话信息 |
-| `/history [N]` | `/历史` | 查看最近 N 条对话记录（默认5条，最大20条） |
-| `/feedback <内容>` | `/反馈` | 提交反馈意见 |
+| `/help` | `/帮助` | 显示所有可用命令 |
+| `/new` | `/重置` | 重置会话 |
+| `/status` | `/状态` | 机器人状态、绑定应用、会话信息 |
+| `/history [N]` | `/历史` | 最近 N 条对话（默认 5，最大 20） |
+| `/feedback <内容>` | `/反馈` | 提交反馈 |
 | `/clear` | `/清空` | 清空当前会话上下文 |
-| `/app` | `/应用` | 查看当前绑定的应用信息 |
-| `/stats` | `/统计` | 查看个人使用统计（总对话数、今日对话数） |
+| `/app` | `/应用` | 当前绑定应用信息 |
+| `/stats` | `/统计` | 个人使用统计 |
 
-**架构**：
-
-```
-消息进入 → BotCommandDispatcher.isCommand(text)
-  ├── true  → CommandHandler.execute() → 直接回复，不走 Dify
-  └── false → 原有 Dify/opencode 流程不变
-```
-
-**扩展方式**：实现 `CommandHandler` 接口并标注 `@Component`，自动注册到命令分发器。
-
-> 命令不区分大小写。企微群聊需 @机器人 后输入命令；微信私聊直接输入。
+**扩展**：实现 `CommandHandler` 接口并标注 `@Component`，即可自动注册。
 
 ---
 
-## 私聊遥控本机 opencode / Remote opencode
+## 可选：远程 opencode / Optional remote opencode
 
-> 通过私聊会话远程驱动开发者**本机**的 opencode，实现"人在服务器、代理在本机"的远程编码代理。
+将私聊会话绑定到开发者本机的 `opencode serve`，实现远程驱动本地 AI 编程代理。
 
-**前提条件**：
-1. 本机 `opencode serve --port 4096` 并设置 `OPENCODE_SERVER_PASSWORD`
-2. 服务器经 frp 隧道可达本机，配置 `OPENCODE_ENABLED=true` / `OPENCODE_BASE_URL` / `OPENCODE_PASSWORD`
-3. 以 **admin** 在「私聊采集」会话详情选择 **本地opencode** 绑定（仅 admin 可见该选项）
+**前提**
+1. 本机运行 `opencode serve` 并设置 Basic Auth 密码
+2. 服务器可访问该服务（同机直连，或自行打通隧道/内网）
+3. 配置 `OPENCODE_ENABLED=true`、`OPENCODE_BASE_URL`、`OPENCODE_PASSWORD`
+4. 以 **admin** 在「私聊采集」中绑定「本地opencode」（仅 admin 可见）
 
-**数据流**：见上文架构图。会话映射存 Redis（`opencode:session:<conversationId>`，TTL 7 天），回复写入 `kb_conversation` 审计后回发私聊。
+会话映射存于 Redis（TTL 7 天），回复写入 `kb_conversation` 审计后再回发私聊。
 
-> 部署细节、frp 配置（frpc.toml）、隧道排错见 [DEPLOY.md](./DEPLOY.md)。
-
----
-
-## 定时任务 / Scheduled Tasks
-
-| 任务 Task | 频率 | 功能 | 状态 |
-|-----------|------|------|:----:|
-| Redis Stream 消费 | 每 5 秒 | 实时处理 IM 消息 | 推荐 |
-| 定时同步（废弃） | 每 60 秒 | 批量同步群消息到 Dify | 已过时 |
-| 统计聚合 | 每天 00:05 | 聚合昨日统计数据 | 启用 |
-| 关键词提取 | 每天 05:00 | 从对话中提取关键词 | 启用 |
-| 关键词清理 | 每天 06:00 | 清理 90 天前关键词 | 启用 |
-| 会话清理 | 每天 03:00 | 清理过期会话 | 启用 |
-| 消息清理 | 每天 04:30 | 清理 90 天前消息 | 启用 |
+> 安全提醒：opencode 具备本机执行能力，请仅在可信网络暴露，并强制鉴权。隧道与容器网络等部署细节见 [DEPLOY.md](./DEPLOY.md)。
 
 ---
 
 ## 数据库表 / Database
 
-### 核心表 / Core Tables
-
 | 表名 Table | 说明 |
 |-----------|------|
 | `sys_user` | 系统用户 |
-| `kb_category` | 知识库分类（树形结构） |
-| `kb_knowledge_base` | 知识库管理 |
-| `kb_document` | 文档管理 |
+| `kb_category` | 知识库分类 |
+| `kb_knowledge_base` | 知识库 |
+| `kb_document` | 文档 |
 | `kb_conversation` | 会话记录（含 Token/费用） |
 | `kb_faq` | 常见问答 |
 | `kb_feedback` | 用户反馈 |
 | `kb_statistics` | 每日统计 |
-| `kb_keyword` | 关键词统计 |
+| `kb_keyword` | 关键词 |
 | `kb_app` | 应用配置 |
-| `im_conversation` | IM 单聊会话（opencode 绑定） |
-| `group_message` | IM 群/私聊消息采集 |
-| `im_group` | 群组信息 |
-| `im_user` | 用户信息 |
-| `chat_session` | 聊天会话 |
+| `im_conversation` | IM 单聊会话 |
+| `group_message` | IM 消息采集 |
+| `im_group` / `im_user` | 群组 / 用户 |
+| `chat_session` | Web 聊天会话 |
 | `sys_config` | 系统配置 |
 
-> 完整表结构请参考 [DESIGN.md](./DESIGN.md#4-数据库设计)。
-> 已有部署升级：执行 `sql/upgrade-existing-db.sql`（幂等，可重复）。
+> 表结构详见 [DESIGN.md](./DESIGN.md)。已有库升级：执行 `sql/upgrade-existing-db.sql`（幂等）。
 
 ---
 
 ## API 接口 / API
-
-### 主要分组 / Groups
 
 | 分类 | 路径前缀 | 说明 |
 |------|----------|------|
@@ -467,25 +387,18 @@ docker compose --profile qq up -d
 | 上传进度 | `/api/upload/progress` | SSE 实时推送 |
 | QQ Bot | `/api/qq-bot` | QQ 扫码登录代理 |
 
-> 完整 API 列表请参考 [DESIGN.md](./DESIGN.md#13-api-接口汇总)。
+> 完整 API 列表见 [DESIGN.md](./DESIGN.md)。
 
 ---
 
-## 文档 & 常见问题 / Docs & FAQ
+## 文档 · Docs
 
 | 文档 | 说明 |
 |------|------|
 | [USER_GUIDE.md](./USER_GUIDE.md) | 使用文档：部署、配置、功能、排查、FAQ |
-| [DEPLOY.md](./DEPLOY.md) | 部署指南：Docker、环境变量、服务管理、opencode & frp |
+| [DEPLOY.md](./DEPLOY.md) | 部署指南：Docker、环境变量、服务管理、可选组件 |
 | [DESIGN.md](./DESIGN.md) | 详细设计：架构、模块、数据库、数据流、API |
-
-| 常见问题 Issue | 解决 Fix |
-|----------------|----------|
-| QQ 消息收到但不回复 | 必须 @机器人，检查 NapCat 连接 |
-| 私聊绑定 opencode 回复「未启用」 | 服务器 `OPENCODE_ENABLED=true` 且本机 opencode 经 frp 可达 |
-| opencode 回复「未返回结果」 | 检查本机 serve、`OPENCODE_BASE_URL` 隧道地址、`OPENCODE_PASSWORD` 匹配 |
-| 统计数据为空 | 调用 `/api/statistics/aggregate` 聚合 |
-| Docker 启动后无法访问 | `docker compose logs -f chatbase-backend` 排查 |
+| [OPS_TROUBLESHOOTING.md](./OPS_TROUBLESHOOTING.md) | 运维排障笔记（面向运维，非产品文档） |
 
 ---
 
@@ -496,39 +409,29 @@ chatBase/
 ├── src/main/java/com/zxl/chatbase/
 │   ├── chat/           # 聊天服务
 │   ├── command/        # 机器人交互命令框架
-│   │   ├── CommandHandler.java        # 命令处理接口
-│   │   ├── BotCommandDispatcher.java  # 命令分发器
-│   │   └── handler/                   # 8 个内置命令
 │   ├── dify/           # Dify API 集成
 │   ├── kb/             # 知识库管理
 │   ├── im/             # IM 消息采集
-│   ├── opencode/       # 本地 opencode serve 集成
-│   ├── qq/             # QQ Bot（WebSocket + WebUI 扫码登录代理）
+│   ├── opencode/       # 可选：本地 opencode 集成
+│   ├── qq/             # QQ Bot
 │   ├── wxroboot/       # 企业微信机器人
 │   ├── statistics/     # 统计分析
 │   ├── feedback/       # 用户反馈
 │   ├── user/           # 用户管理
-│   ├── config/         # 配置类（含 OpencodeProperties）
+│   ├── config/         # 配置类
 │   ├── common/         # 通用工具、限流、异常
 │   └── controller/     # API 控制器
 │
 ├── web/                # Vue 3 前端
-│   ├── src/pages/      # 页面组件
-│   ├── src/api/        # API 接口
-│   ├── src/components/ # 公共组件
-│   ├── nginx.conf      # Nginx 配置
-│   └── Dockerfile      # 前端镜像
-│
 ├── sql/                # 数据库脚本
-│   ├── init-schema.sql          # 全新初始化（首次挂载 volume 时执行）
-│   └── upgrade-existing-db.sql  # 已有库升级（幂等）
-│
-├── Dockerfile          # 后端镜像
-├── docker-compose.yml  # 部署编排
-├── .env.example        # 环境变量示例
-├── DESIGN.md           # 详细设计文档
-├── USER_GUIDE.md       # 使用文档
-└── DEPLOY.md           # 部署指南
+├── assets/             # README 图片资源
+├── docs/               # 架构图等
+├── Dockerfile
+├── docker-compose.yml
+├── .env.example
+├── DESIGN.md
+├── USER_GUIDE.md
+└── DEPLOY.md
 ```
 
 ---
@@ -536,17 +439,6 @@ chatBase/
 ## 许可证 / License
 
 [MIT License](./LICENSE) © 2026 ZxlDragonDoctor
-
-使用、修改与分发请保留版权声明与许可证全文。
-
----
-
-## 重要注意事项 / Notes
-
-- **pom.xml 编译参数**：`maven-compiler-plugin` 需配置 `<parameters>true</parameters>`，否则 `@RequestParam` / `@RequestAttribute` 报 `Name not specified`。
-- **数据隔离**：所有业务数据通过 `created_by` 按用户维度过滤；普通用户仅看自己，admin 可在统计页切 `scope=all/mine`。
-- **前端路由**：admin 菜单基于 `localStorage.getItem('chatbase_role')` 动态显示。
-- **容器网络**：`chatbase-napcat` 等跨容器访问用服务名；访问宿主机 frps 用网桥网关 `172.17.0.1`。
 
 ---
 

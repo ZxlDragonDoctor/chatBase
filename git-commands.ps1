@@ -9,8 +9,8 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# Set working directory
-$projectRoot = "D:\idea_java_project\chatBase"
+# Set working directory to current location
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 
 # Initialize git if not already

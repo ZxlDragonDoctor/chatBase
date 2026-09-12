@@ -35,7 +35,7 @@ class ChatBaseApplicationTests {
     void testDifyApi() {
         CloseableHttpClient httpClient = HttpClients.createDefault();
         HttpPost httpPost = new HttpPost("https://api.dify.ai/v1/chat-messages");
-        httpPost.setHeader("Authorization", "Bearer app-x4pDm1oSxDVu9fRLChTGdoFi");
+        httpPost.setHeader("Authorization", "Bearer " + System.getenv().getOrDefault("DIFY_API_KEY", "app-your-key"));
         httpPost.setHeader("Content-Type", "application/json");
         String test = ("{\n  \"inputs\": {\n    \"name\": \"dify\"\n  },\n  \"query\": " +
                 "\"iPhone 13 Pro Max features\",\n  \"response_mode\": \"blocking\",\n  " +
@@ -56,7 +56,7 @@ class ChatBaseApplicationTests {
     @Test
     void testSendMessage(){
         DifyChatRequest difyChatRequest = new DifyChatRequest();
-        difyChatRequest.setQuery("My name is zhuxiaolong");
+        difyChatRequest.setQuery("Hello ChatBase");
         difyChatRequest.setUser("abc-123"); //默认用户
         difyChatRequest.setInputs(new HashMap<>());
         DifyChatResponse difyChatResponse = difyService.sendChatMessage(difyChatRequest);
@@ -75,7 +75,10 @@ class ChatBaseApplicationTests {
 
     @Test
     void testWxGroupUrl(){
-        String url = "https://qyapi.weixin.qq.com/cgi-bin/aibot/response?response_code=quQdPAS5RWm8501EAqcHdgAA_D_S6liLB-p55Y7of2LbD5gUY8mrn9_dtIcXrUeNUdnJpdGtnPNpUDYQL5SfujrP-";
+        String url = System.getenv().getOrDefault("WECOM_BOT_WEBHOOK_URL", "");
+        if (url == null || url.isBlank()) {
+            return;
+        }
         WeChatUtil.sendMarkdown(url, "hello world");
     }
 
