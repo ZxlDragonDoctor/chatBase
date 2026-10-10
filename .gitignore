@@ -35,3 +35,8 @@ application-dev.yaml
 .env.local
 .env.*
 !.env.example
+
+# 本地会话导出/临时资料（含本机路径与密钥，不得提交）
+opencode-session-export.md
+*.session-export.md
+web/dist.tar

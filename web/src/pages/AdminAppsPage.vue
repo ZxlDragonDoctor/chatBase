@@ -3,17 +3,17 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">应用管理</div>
+          <h1 class="anime-card-title">应用管理</h1>
           <div class="anime-card-desc">全部应用 · 含私有应用 · 仅管理员可见</div>
         </div>
       </div>
 
-      <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
+      <div v-if="err" class="anime-error" role="alert" style="margin: 16px 28px;">{{ err }}</div>
 
       <div class="anime-card-body">
         <div class="filter-bar">
           <Search :size="16" class="search-icon" />
-          <input v-model="keyword" class="anime-input" placeholder="搜索应用名称、创建者..." style="max-width: 300px;" />
+          <input v-model="keyword" class="anime-input" aria-label="搜索应用名称或创建者" placeholder="搜索应用名称、创建者..." style="max-width: 300px;" />
           <span class="filter-count">共 {{ filteredList.length }} 个应用</span>
           <button class="anime-btn ghost" :disabled="loading" @click="loadApps">
             <RefreshCw :size="16" />
@@ -32,7 +32,7 @@
         </div>
 
         <div v-else class="kb-grid">
-          <div v-for="app in filteredList" :key="app.id" class="anime-card app-card" @click="openDetail(app.id)">
+          <div v-for="app in filteredList" :key="app.id" class="anime-card app-card" role="button" tabindex="0" @click="openDetail(app.id)" @keydown.enter="!$event.repeat && openDetail(app.id)" @keydown.space.prevent="$event.stopPropagation()" @keyup.space.prevent="openDetail(app.id)">
             <div class="app-header">
               <div class="app-title-row">
                 <span class="app-icon">{{ app.icon || '🤖' }}</span>
@@ -40,7 +40,7 @@
               </div>
               <div class="app-badges">
                 <span class="anime-badge" :class="app.isPublic ? 'green' : 'gray'">{{ app.isPublic ? '公开' : '私有' }}</span>
-                <span class="anime-badge" :class="app.status ? 'green' : 'pink'">{{ app.status ? '启用' : '禁用' }}</span>
+                <span class="anime-badge" :class="app.status ? 'green' : 'danger'">{{ app.status ? '启用' : '禁用' }}</span>
               </div>
             </div>
 
@@ -66,10 +66,10 @@
     </section>
 
     <div v-if="showDetail && detail" class="anime-modal-overlay" @click.self="showDetail = false">
-      <div class="anime-modal detail-modal">
+      <div ref="dialogRef" class="anime-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="app-detail-title" tabindex="-1">
         <div class="anime-modal-header">
-          <span class="modal-title">应用详情 #{{ detail.id }}</span>
-          <button class="anime-modal-close" @click="showDetail = false">✕</button>
+          <span id="app-detail-title" class="modal-title">应用详情 #{{ detail.id }}</span>
+          <button type="button" class="anime-modal-close" aria-label="关闭应用详情" @click="showDetail = false">✕</button>
         </div>
         <div class="anime-modal-body">
           <table class="detail-table">
@@ -107,7 +107,7 @@
             </tr>
             <tr>
               <td class="dt-label">状态</td>
-              <td class="dt-value"><span class="anime-badge" :class="detail.status ? 'green' : 'pink'">{{ detail.status ? '启用' : '禁用' }}</span></td>
+              <td class="dt-value"><span class="anime-badge" :class="detail.status ? 'green' : 'danger'">{{ detail.status ? '启用' : '禁用' }}</span></td>
             </tr>
             <tr>
               <td class="dt-label">创建者</td>
@@ -130,6 +130,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useModalDialog } from '../composables/useModalDialog'
 import { Search, RefreshCw } from 'lucide-vue-next'
 import { api } from '../api/client'
 
@@ -158,6 +159,7 @@ const loading = ref(true)
 const err = ref('')
 const keyword = ref('')
 const showDetail = ref(false)
+const { dialogRef } = useModalDialog(showDetail, () => { showDetail.value = false })
 const detail = ref<KbAppDetail | null>(null)
 
 const filteredList = computed(() => {
@@ -210,17 +212,17 @@ onMounted(loadApps)
   gap: 10px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(79, 195, 247, 0.04), rgba(179, 157, 219, 0.04));
+  background: var(--ui-surface-muted);
   border-radius: var(--anime-radius-lg);
 }
 .search-icon { color: var(--anime-text-muted); flex-shrink: 0; }
 .filter-count { font-size: 13px; color: var(--anime-text-muted); margin-left: auto; }
 .app-card { padding: 20px; background: var(--anime-bg-card); cursor: pointer; transition: all 0.2s; }
-.app-card:hover { box-shadow: var(--anime-shadow-pink); }
+.app-card:hover { box-shadow: var(--ui-shadow-card); }
 .app-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .app-title-row { display: flex; align-items: center; gap: 10px; }
 .app-icon { font-size: 24px; }
-.app-name { font-size: 18px; font-weight: 700; color: var(--anime-pink); }
+.app-name { font-size: 18px; font-weight: 700; color: var(--ui-primary-hover); }
 .app-badges { display: flex; gap: 6px; }
 .app-desc { font-size: 14px; color: var(--anime-text-muted); margin-bottom: 16px; }
 .app-info-section { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--anime-blue-bg); border-radius: var(--anime-radius-lg); }
@@ -235,4 +237,35 @@ onMounted(loadApps)
 .detail-table td { padding: 10px 8px; font-size: 14px; vertical-align: top; }
 .dt-label { color: var(--anime-text-muted); width: 120px; font-weight: 600; white-space: nowrap; }
 .dt-value { color: var(--anime-text-primary); word-break: break-all; }
+
+.filter-bar {
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+.filter-bar .anime-input { flex: 1 1 220px; max-width: 420px; }
+.filter-count { color: var(--ui-text-muted); }
+.app-card { min-width: 0; padding: 18px; background: var(--ui-surface); transition: border-color .16s ease, box-shadow .16s ease; }
+.app-card:hover, .app-card:focus-visible { border-color: #a6d2c8; box-shadow: 0 5px 16px rgb(19 48 41 / 8%); }
+.app-header { align-items: flex-start; gap: 12px; }
+.app-title-row { min-width: 0; }
+.app-name { min-width: 0; color: var(--ui-text); overflow-wrap: anywhere; }
+.app-badges { flex-wrap: wrap; justify-content: flex-end; }
+.app-desc { color: var(--ui-text-secondary); line-height: 1.55; overflow-wrap: anywhere; }
+.app-info-section { background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.info-label { color: var(--ui-text-muted); }
+.info-value { min-width: 0; color: var(--ui-text); overflow-wrap: anywhere; }
+.detail-table { table-layout: fixed; }
+.detail-table tr { border-color: var(--ui-border); }
+.dt-label { color: var(--ui-text-muted); }
+.dt-value { color: var(--ui-text); word-break: break-word; }
+@media (max-width: 700px) {
+  .kb-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-header { flex-direction: column; }
+  .app-badges { justify-content: flex-start; }
+  .filter-count { width: 100%; margin-left: 0; }
+  .detail-table .dt-label { width: 100px; }
+}
 </style>

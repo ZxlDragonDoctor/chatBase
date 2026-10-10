@@ -6,6 +6,11 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zxl.chatbase.config.OpencodeProperties;
 import com.zxl.chatbase.kb.service.IKbConversationService;
+import com.zxl.chatbase.im.service.ImConversationService;
+import com.zxl.chatbase.opencode.bridge.OpencodeBridgeService;
+import com.zxl.chatbase.opencode.bridge.OpencodeBridgeSession;
+import com.zxl.chatbase.opencode.node.OpencodeNodeCommandMapper;
+import com.zxl.chatbase.opencode.node.OpencodeNodeRpcClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -55,15 +60,61 @@ public class OpencodeService {
      * 避免并发向同一 opencode session 发多个 prompt 导致回答错乱/丢失
      */
     private final ConcurrentHashMap<String, Object> conversationLocks = new ConcurrentHashMap<>();
+    private final ThreadLocal<ExecutionContext> executionContext = new ThreadLocal<>();
 
     private final OpencodeProperties properties;
     private final RestTemplate restTemplate;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
     private final IKbConversationService kbConversationService;
+    private final OpencodeBridgeService bridgeService;
+    private final OpencodeNodeRpcClient nodeRpcClient;
+    private final OpencodeNodeCommandMapper nodeCommandMapper;
+    private final ImConversationService imConversationService;
 
     public boolean isEnabled() {
         return properties.isEnabled();
+    }
+
+    /**
+     * 统一的 opencode HTTP 调用入口：
+     * - transport=bridge 或 auto 且桥接已连接 → 走反向 WebSocket 桥接（无需 frp）
+     * - 否则 → 直连 baseUrl（同机 / frp 隧道）
+     */
+    private ResponseEntity<String> callOpencode(String conversationId, HttpMethod method, String path, String body) {
+        Long nodeId = nodeIdForConversation(conversationId);
+        if (nodeId != null) {
+            ExecutionContext context = executionContext.get();
+            java.util.function.Consumer<String> progressListener = context != null
+                    && context.conversationId.equals(conversationId) && context.callback != null
+                    ? context.callback::onUpdate : null;
+            return nodeRpcClient.invoke(nodeId, nodeCommandMapper.map(method, path, body), progressListener);
+        }
+        return callLegacyOpencode(method, path, body);
+    }
+
+    private ResponseEntity<String> callLegacyOpencode(HttpMethod method, String path, String body) {
+        if (bridgeService.shouldUseBridge()) {
+            try {
+                OpencodeBridgeSession.OpencodeBridgeResponse resp =
+                        bridgeService.proxy(method.name(), path, body);
+                return ResponseEntity.status(resp.getStatus()).body(resp.getBody());
+            } catch (Exception e) {
+                if (bridgeService.isBridgeOnly()) {
+                    log.error("opencode 桥接调用失败（bridge-only 模式，不回退直连）: path={}", path, e);
+                    throw new RuntimeException("【opencode 桥接不可用】" + e.getMessage(), e);
+                }
+                log.warn("opencode 桥接调用失败，回退直连: path={}, err={}", path, e.getMessage());
+            }
+        }
+        // 直连 HTTP
+        String url = properties.getBaseUrl() + path;
+        HttpHeaders headers = buildHeaders();
+        if (body != null) {
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            return restTemplate.exchange(url, method, new HttpEntity<>(body, headers), String.class);
+        }
+        return restTemplate.exchange(url, method, new HttpEntity<>(headers), String.class);
     }
 
     /**
@@ -90,7 +141,7 @@ public class OpencodeService {
         }
         Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
         synchronized (lock) {
-            return doChat(conversationId, query, userId, channel, modelId, callback);
+            return runChat(conversationId, query, userId, channel, modelId, callback);
         }
     }
 
@@ -104,8 +155,51 @@ public class OpencodeService {
 
         Object lock = conversationLocks.computeIfAbsent(conversationId, k -> new Object());
         synchronized (lock) {
-            return doChat(conversationId, query, userId, channel, modelId, callback);
+            return runChat(conversationId, query, userId, channel, modelId, callback);
         }
+    }
+
+    private String runChat(String conversationId, String query, String userId, String channel,
+                           String modelId, StreamingCallback callback) {
+        ExecutionContext previous = executionContext.get();
+        ExecutionContext current = new ExecutionContext(conversationId,
+                imConversationService.getOpencodeNodeId(conversationId), callback);
+        executionContext.set(current);
+        try {
+            return doChat(conversationId, query, userId, channel, modelId, callback);
+        } catch (RuntimeException e) {
+            if (current.nodeId != null) {
+                return "【本机节点调用失败】" + safeNodeError(e);
+            }
+            throw e;
+        } finally {
+            if (previous == null) executionContext.remove();
+            else executionContext.set(previous);
+        }
+    }
+
+    private Long nodeIdForConversation(String conversationId) {
+        ExecutionContext context = executionContext.get();
+        if (context != null && context.conversationId.equals(conversationId)) return context.nodeId;
+        return imConversationService.getOpencodeNodeId(conversationId);
+    }
+
+    private static final class ExecutionContext {
+        private final String conversationId;
+        private final Long nodeId;
+        private final StreamingCallback callback;
+
+        private ExecutionContext(String conversationId, Long nodeId, StreamingCallback callback) {
+            this.conversationId = conversationId;
+            this.nodeId = nodeId;
+            this.callback = callback;
+        }
+    }
+
+    private String safeNodeError(RuntimeException error) {
+        String message = error.getMessage();
+        if (!StringUtils.hasText(message)) return "请检查节点连接和批准状态。";
+        return message.length() > 240 ? message.substring(0, 240) : message;
     }
 
     // ---- 模型管理 ----
@@ -134,7 +228,21 @@ public class OpencodeService {
      * 获取当前对话绑定的 opencode sessionId
      */
     public String getCurrentSessionId(String conversationId) {
-        return stringRedisTemplate.opsForValue().get(SESSION_KEY_PREFIX + conversationId);
+        return stringRedisTemplate.opsForValue().get(sessionKey(conversationId));
+    }
+
+    public boolean hasCurrentSession(String conversationId) {
+        return StringUtils.hasText(getCurrentSessionId(conversationId));
+    }
+
+    public void resetConversationSession(String conversationId) {
+        stringRedisTemplate.delete(sessionKey(conversationId));
+    }
+
+    private String sessionKey(String conversationId) {
+        Long nodeId = nodeIdForConversation(conversationId);
+        return nodeId == null ? SESSION_KEY_PREFIX + conversationId
+                : SESSION_KEY_PREFIX + "node:" + nodeId + ":" + conversationId;
     }
 
     /**
@@ -145,11 +253,8 @@ public class OpencodeService {
             return "请指定要切换的会话ID，例如：/session ses_xxx";
         }
         // 验证会话是否存在
-        String url = properties.getBaseUrl() + "/api/session/" + targetSessionId;
         try {
-            HttpHeaders headers = buildHeaders();
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.GET, "/api/session/" + targetSessionId, null);
             JsonNode root = objectMapper.readTree(resp.getBody());
             JsonNode data = root.path("data");
             String sessionId = data.path("id").asText(null);
@@ -159,7 +264,7 @@ public class OpencodeService {
             String title = data.path("title").asText("无标题");
             // 更新 Redis 缓存
             stringRedisTemplate.opsForValue().set(
-                    SESSION_KEY_PREFIX + conversationId, sessionId, Duration.ofDays(7));
+                    sessionKey(conversationId), sessionId, Duration.ofDays(7));
             return "✅ 已切换会话\n📋 " + title + "\n🆔 " + sessionId;
         } catch (Exception e) {
             log.error("切换会话失败: targetSessionId={}", targetSessionId, e);
@@ -173,10 +278,7 @@ public class OpencodeService {
     public String listSessions(String conversationId) {
         String currentSessionId = getCurrentSessionId(conversationId);
         try {
-            HttpHeaders headers = buildHeaders();
-            HttpEntity<Void> request = new HttpEntity<>(headers);
-            String url = properties.getBaseUrl() + "/api/session";
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.GET, "/api/session", null);
             JsonNode root = objectMapper.readTree(resp.getBody());
             JsonNode data = root.path("data");
             if (!data.isArray() || data.size() == 0) {
@@ -289,17 +391,25 @@ public class OpencodeService {
             }
         }
 
-        String sessionId = getOrCreateSession(conversationId);
+        String sessionId;
+        try {
+            sessionId = getOrCreateSession(conversationId);
+        } catch (RuntimeException e) {
+            if (nodeIdForConversation(conversationId) != null) {
+                return "【本机节点调用失败】" + safeNodeError(e);
+            }
+            throw e;
+        }
         if (!StringUtils.hasText(sessionId)) {
             return "【opencode未返回结果】可能是执行超时或出错，请检查本地 opencode 状态。";
         }
 
-        JsonNode pendingQuestion = fetchPendingQuestion(sessionId);
-        String baselineId = getLatestMessageId(sessionId);
+        JsonNode pendingQuestion = fetchPendingQuestion(conversationId, sessionId);
+        String baselineId = getLatestMessageId(conversationId, sessionId);
 
         boolean handled = false;
         if (pendingQuestion != null) {
-            handled = submitQuestionAnswer(sessionId, pendingQuestion, query);
+            handled = submitQuestionAnswer(conversationId, sessionId, pendingQuestion, query);
             if (!handled) {
                 log.warn("opencode 提交问题回答失败，按新任务处理: conversationId={}", conversationId);
             }
@@ -308,14 +418,14 @@ public class OpencodeService {
             sendPrompt(sessionId, query, conversationId);
         }
 
-        PollOutcome outcome = pollAnswer(sessionId, baselineId, callback);
+        PollOutcome outcome = pollAnswer(conversationId, sessionId, baselineId, callback);
         if (outcome.isQuestion()) {
             return outcome.getText();
         }
         String answer = outcome.getText();
         if (!StringUtils.hasText(answer)) {
             // 空回复时清除 session 缓存，下次自动创建新 session
-            stringRedisTemplate.delete(SESSION_KEY_PREFIX + conversationId);
+            stringRedisTemplate.delete(sessionKey(conversationId));
             log.warn("opencode 返回空回复，已清除 session 缓存: conversationId={}, sessionId={}, model={}",
                     conversationId, sessionId, getModel(conversationId));
             answer = "【opencode 未生成回复】当前模型可能不可用（Endpoint unavailable）或任务无文本输出。"
@@ -333,7 +443,7 @@ public class OpencodeService {
     }
 
     private String getOrCreateSession(String conversationId) {
-        String cacheKey = SESSION_KEY_PREFIX + conversationId;
+        String cacheKey = sessionKey(conversationId);
         String sessionId = stringRedisTemplate.opsForValue().get(cacheKey);
         if (StringUtils.hasText(sessionId)) {
             return sessionId;
@@ -369,10 +479,7 @@ public class OpencodeService {
             }
             bodyStr += "}";
 
-            HttpEntity<String> request = new HttpEntity<>(bodyStr, headers);
-
-            String url = properties.getBaseUrl() + "/api/session";
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.POST, "/api/session", bodyStr);
             JsonNode root = objectMapper.readTree(resp.getBody());
             JsonNode data = root.path("data");
             sessionId = data.path("id").asText(null);
@@ -389,6 +496,9 @@ public class OpencodeService {
             return sessionId;
         } catch (Exception e) {
             log.error("opencode 创建会话异常: conversationId={}", conversationId, e);
+            if (nodeIdForConversation(conversationId) != null) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
             return null;
         }
     }
@@ -398,18 +508,18 @@ public class OpencodeService {
             return;
         }
         try {
-            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/prompt";
             String modelJson = buildModelJson(conversationId);
             String body = "{\"prompt\":{\"text\":\"" + escapeJson(query) + "\"}" + modelJson + "}";
-            HttpHeaders headers = buildHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> request = new HttpEntity<>(body, headers);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.POST,
+                    "/api/session/" + sessionId + "/prompt", body);
             log.info("opencode 消息已发送: sessionId={}, status={}, model={}",
                     sessionId, resp.getStatusCodeValue(),
                     StringUtils.hasText(modelJson) ? getModel(conversationId) : "default");
         } catch (Exception e) {
             log.error("opencode 发送消息异常: sessionId={}", sessionId, e);
+            if (nodeIdForConversation(conversationId) != null) {
+                throw new IllegalStateException(e.getMessage(), e);
+            }
         }
     }
 
@@ -417,7 +527,7 @@ public class OpencodeService {
      * 轮询消息，直到 agent 完成（出现 finish=stop）、出现待回答问题或超时。
      * 支持流式回调：轮询过程中通过 callback 实时推送中间结果，带节流控制。
      */
-    private PollOutcome pollAnswer(String sessionId, String baselineId, StreamingCallback callback) {
+    private PollOutcome pollAnswer(String conversationId, String sessionId, String baselineId, StreamingCallback callback) {
         if (!StringUtils.hasText(sessionId)) {
             return PollOutcome.finish(null);
         }
@@ -429,7 +539,7 @@ public class OpencodeService {
         String lastCallbackContent = null;
         try {
             while (System.currentTimeMillis() < deadline) {
-                JsonNode pendingQuestion = fetchPendingQuestion(sessionId);
+                JsonNode pendingQuestion = fetchPendingQuestion(conversationId, sessionId);
                 if (pendingQuestion != null) {
                     log.info("opencode 检测到待回答问题，结束轮询: sessionId={}", sessionId);
                     if (callback != null && StringUtils.hasText(accumulated)
@@ -438,7 +548,7 @@ public class OpencodeService {
                     }
                     return PollOutcome.question(formatQuestionText(pendingQuestion));
                 }
-                PollResult result = fetchLatestAssistantAnswer(sessionId, baselineId);
+                PollResult result = fetchLatestAssistantAnswer(conversationId, sessionId, baselineId);
                 if (StringUtils.hasText(result.answer)) {
                     accumulated = result.answer;
                 }
@@ -478,11 +588,10 @@ public class OpencodeService {
      * 改为记录发送 prompt 前最新一条消息的 id 作为基线（数组 index 0），轮询时从头部
      * 一直遍历到基线 id 为止，中间出现的 assistant 内容即为本次回复，避免串味/重复历史。
      */
-    private PollResult fetchLatestAssistantAnswer(String sessionId, String baselineId) {
+    private PollResult fetchLatestAssistantAnswer(String conversationId, String sessionId, String baselineId) {
         try {
-            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/message";
-            HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.GET,
+                    "/api/session/" + sessionId + "/message", null);
             if (!resp.getStatusCode().is2xxSuccessful()) {
                 return new PollResult(null, false);
             }
@@ -551,6 +660,7 @@ public class OpencodeService {
             return new PollResult(lastText, finished);
         } catch (Exception e) {
             log.warn("opencode 轮询消息异常: sessionId={}", sessionId, e);
+            if (nodeIdForConversation(conversationId) != null) throw new IllegalStateException(e.getMessage(), e);
             return new PollResult(null, false);
         }
     }
@@ -648,11 +758,10 @@ public class OpencodeService {
     /**
      * 获取会话当前待回答的问题请求（question tool），无则返回 null
      */
-    private JsonNode fetchPendingQuestion(String sessionId) {
+    private JsonNode fetchPendingQuestion(String conversationId, String sessionId) {
         try {
-            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/question";
-            HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.GET,
+                    "/api/session/" + sessionId + "/question", null);
             if (!resp.getStatusCode().is2xxSuccessful()) {
                 return null;
             }
@@ -664,6 +773,7 @@ public class OpencodeService {
             return null;
         } catch (Exception e) {
             log.warn("opencode 获取待回答问题异常: sessionId={}", sessionId, e);
+            if (nodeIdForConversation(conversationId) != null) throw new IllegalStateException(e.getMessage(), e);
             return null;
         }
     }
@@ -716,7 +826,7 @@ public class OpencodeService {
      *
      * @return 是否提交成功
      */
-    private boolean submitQuestionAnswer(String sessionId, JsonNode pendingQuestion, String userText) {
+    private boolean submitQuestionAnswer(String conversationId, String sessionId, JsonNode pendingQuestion, String userText) {
         try {
             String requestId = pendingQuestion.path("id").asText(null);
             if (!StringUtils.hasText(requestId)) {
@@ -734,16 +844,15 @@ public class OpencodeService {
             }
             ObjectNode body = objectMapper.createObjectNode();
             body.set("answers", answers);
-            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/question/" + requestId + "/reply";
-            HttpHeaders headers = buildHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.POST,
+                    "/api/session/" + sessionId + "/question/" + requestId + "/reply",
+                    body.toString());
             log.info("opencode 问题回答已提交: sessionId={}, requestId={}, status={}",
                     sessionId, requestId, resp.getStatusCodeValue());
             return resp.getStatusCode().is2xxSuccessful();
         } catch (Exception e) {
             log.error("opencode 提交问题回答异常: sessionId={}", sessionId, e);
+            if (nodeIdForConversation(conversationId) != null) throw new IllegalStateException(e.getMessage(), e);
             return false;
         }
     }
@@ -847,11 +956,10 @@ public class OpencodeService {
     /**
      * 获取当前会话最新一条消息的 id（用于建立消息 id 基线）
      */
-    private String getLatestMessageId(String sessionId) {
+    private String getLatestMessageId(String conversationId, String sessionId) {
         try {
-            String url = properties.getBaseUrl() + "/api/session/" + sessionId + "/message";
-            HttpEntity<String> entity = new HttpEntity<>(buildHeaders());
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            ResponseEntity<String> resp = callOpencode(conversationId, HttpMethod.GET,
+                    "/api/session/" + sessionId + "/message", null);
             if (!resp.getStatusCode().is2xxSuccessful()) {
                 return null;
             }
@@ -863,6 +971,7 @@ public class OpencodeService {
             return null;
         } catch (Exception e) {
             log.warn("opencode 获取最新消息id异常: sessionId={}", sessionId, e);
+            if (nodeIdForConversation(conversationId) != null) throw new IllegalStateException(e.getMessage(), e);
             return null;
         }
     }

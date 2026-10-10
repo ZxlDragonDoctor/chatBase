@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `kb_document` (
 CREATE TABLE IF NOT EXISTS `kb_conversation` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '会话ID',
   `session_id` VARCHAR(64) DEFAULT NULL COMMENT '关联会话ID',
-  `conversation_id` VARCHAR(64) NOT NULL COMMENT '会话唯一标识（Dify返回）',
+  `conversation_id` VARCHAR(64) NOT NULL COMMENT 'Dify会话标识（同一会话可有多条问答记录）',
   `user_id` VARCHAR(64) NOT NULL COMMENT '用户ID',
   `user_nickname` VARCHAR(50) DEFAULT NULL COMMENT '用户昵称',
   `channel` VARCHAR(20) NOT NULL COMMENT '渠道：web/im/wx',
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `kb_conversation` (
   `error_message` TEXT COMMENT '错误信息',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_conversation_id` (`conversation_id`),
+  KEY `idx_conversation_id` (`conversation_id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_channel` (`channel`),
   KEY `idx_knowledge_base_id` (`knowledge_base_id`),
@@ -446,6 +446,33 @@ CREATE TABLE IF NOT EXISTS `im_conversation` (
 ALTER TABLE `im_conversation` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT '绑定应用ID' AFTER `created_by`;
 ALTER TABLE `im_conversation` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT '应用名称（冗余字段）' AFTER `app_id`;
 ALTER TABLE `im_conversation` ADD KEY `idx_app_id` (`app_id`);
+
+CREATE TABLE IF NOT EXISTS `opencode_node` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `node_key` VARCHAR(64) NOT NULL,
+  `name` VARCHAR(100) NOT NULL,
+  `platform` VARCHAR(32) DEFAULT NULL,
+  `agent_version` VARCHAR(40) DEFAULT NULL,
+  `token_hash` CHAR(64) NOT NULL,
+  `capabilities` TEXT NOT NULL,
+  `approved_capabilities` TEXT DEFAULT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `created_by` VARCHAR(64) NOT NULL,
+  `last_seen_at` DATETIME DEFAULT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_opencode_node_key` (`node_key`),
+  KEY `idx_opencode_node_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OpenCode 本机执行节点';
+
+SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='im_conversation' AND COLUMN_NAME='opencode_node_id');
+SET @sql = IF(@has=0, 'ALTER TABLE `im_conversation` ADD COLUMN `opencode_node_id` BIGINT DEFAULT NULL COMMENT ''绑定的本机 opencode 节点'' AFTER `app_name`;', 'SELECT ''im_conversation.opencode_node_id already exists'';');
+PREPARE opencode_node_column_stmt FROM @sql; EXECUTE opencode_node_column_stmt; DEALLOCATE PREPARE opencode_node_column_stmt;
+
+SET @has = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='im_conversation' AND INDEX_NAME='idx_opencode_node_id');
+SET @sql = IF(@has=0, 'ALTER TABLE `im_conversation` ADD KEY `idx_opencode_node_id` (`opencode_node_id`);', 'SELECT ''im_conversation.idx_opencode_node_id already exists'';');
+PREPARE opencode_node_index_stmt FROM @sql; EXECUTE opencode_node_index_stmt; DEALLOCATE PREPARE opencode_node_index_stmt;
 
 -- =============================================
 -- 关键词统计表

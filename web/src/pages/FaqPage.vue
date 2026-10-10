@@ -1,10 +1,10 @@
 <template>
   <div class="anime-page-shell">
-    <section class="anime-card">
+    <section class="anime-card" :aria-busy="loading">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">FAQ 常见问答管理</div>
-          <div class="anime-card-desc">自动提取高频问题 · 手动维护问答内容</div>
+          <h1 class="anime-card-title">FAQ 常见问答管理</h1>
+          <p class="anime-card-desc">自动提取高频问题 · 手动维护问答内容</p>
         </div>
         <div class="anime-card-actions">
           <button class="anime-btn primary" @click="showCreateDialog">
@@ -23,7 +23,7 @@
       </div>
 
       <div class="anime-card-body">
-        <div class="faq-stats">
+        <div class="faq-stats" role="group" aria-label="FAQ 状态概览">
           <div class="stat-item">
             <div class="stat-value">{{ faqStats?.total || 0 }}</div>
             <div class="stat-label">总FAQ数</div>
@@ -46,19 +46,27 @@
             <input 
               v-model="searchKeyword" 
               class="search-input" 
+              aria-label="搜索常见问题"
+              type="search"
               placeholder="搜索问题..." 
               @input="handleSearch"
             />
-            <button v-if="searchKeyword" class="search-clear" @click="clearSearch">✕</button>
+            <button v-if="searchKeyword" class="search-clear" aria-label="清除问题搜索" @click="clearSearch">✕</button>
           </div>
         </div>
 
+        <div v-if="loadError" class="anime-error faq-load-error" role="alert" aria-live="assertive">{{ loadError }}</div>
+
         <div class="faq-list">
-          <div v-for="faq in faqList" :key="faq.id" class="faq-item">
+          <div v-if="loading" class="anime-empty" role="status" aria-live="polite">
+            <span class="anime-loader-spinner" aria-hidden="true"></span>
+            <span class="anime-empty-text">加载中...</span>
+          </div>
+          <article v-for="faq in faqList" :key="faq.id" class="faq-item">
             <div class="faq-header">
               <div class="faq-question">
                 <span class="faq-badge" :class="faq.status ? 'green' : 'muted'">{{ faq.status ? '启用' : '禁用' }}</span>
-                <span class="faq-text">{{ faq.question }}</span>
+                <h2 class="faq-text">{{ faq.question }}</h2>
               </div>
               <div class="faq-meta">
                 <span class="faq-count">命中 {{ faq.hitCount }} 次</span>
@@ -84,8 +92,8 @@
                 <span>删除</span>
               </button>
             </div>
-          </div>
-          <div v-if="faqList.length === 0" class="anime-empty">
+          </article>
+          <div v-if="!loading && !loadError && faqList.length === 0" class="anime-empty">
             <span class="anime-empty-icon">📭</span>
             <span class="anime-empty-text">暂无FAQ数据</span>
           </div>
@@ -93,25 +101,25 @@
       </div>
     </section>
 
-    <div v-if="showExtractDialog" class="dialog-overlay" @click.self="showExtractDialog = false">
-      <div class="dialog-content">
+    <div v-if="showExtractDialog" class="dialog-overlay" @click.self="closeExtractDialog">
+      <div ref="extractDialogRef" class="dialog-content" role="dialog" aria-modal="true" aria-label="自动提取常见问题" tabindex="-1">
         <div class="dialog-header">
           <h3>自动提取FAQ</h3>
-          <button class="dialog-close" @click="showExtractDialog = false">✕</button>
+          <button class="dialog-close" aria-label="关闭自动提取窗口" @click="closeExtractDialog">✕</button>
         </div>
         <div class="dialog-body">
           <div class="form-section">
-            <label class="form-label">最小出现次数</label>
-            <input type="number" v-model="extractMinCount" class="anime-input" min="1" max="10" />
+            <label class="form-label" for="faq-extract-min-count">最小出现次数</label>
+            <input id="faq-extract-min-count" type="number" v-model="extractMinCount" class="anime-input" min="1" max="10" />
             <div class="field-hint">问题至少出现几次才会被提取</div>
           </div>
           <div class="form-section">
-            <label class="form-label">统计天数</label>
-            <input type="number" v-model="extractDays" class="anime-input" min="1" max="90" />
+            <label class="form-label" for="faq-extract-days">统计天数</label>
+            <input id="faq-extract-days" type="number" v-model="extractDays" class="anime-input" min="1" max="90" />
             <div class="field-hint">从最近N天的对话中提取</div>
           </div>
           <div class="dialog-footer">
-            <button class="anime-btn ghost" @click="showExtractDialog = false">取消</button>
+            <button class="anime-btn ghost" @click="closeExtractDialog">取消</button>
             <button class="anime-btn primary" @click="doExtract" :disabled="extracting">
               <Sparkles :size="16" />
               <span>{{ extracting ? '提取中...' : '开始提取' }}</span>
@@ -121,31 +129,31 @@
       </div>
     </div>
 
-    <div v-if="showEditDialog" class="dialog-overlay" @click.self="showEditDialog = false">
-      <div class="dialog-content lg">
+    <div v-if="showEditDialog" class="dialog-overlay" @click.self="closeEditDialog">
+      <div ref="editDialogRef" class="dialog-content lg" role="dialog" aria-modal="true" tabindex="-1" :aria-label="editMode === 'create' ? '新增FAQ' : '编辑FAQ'">
         <div class="dialog-header">
           <h3>{{ editMode === 'create' ? '新增FAQ' : '编辑FAQ' }}</h3>
-          <button class="dialog-close" @click="showEditDialog = false">✕</button>
+          <button class="dialog-close" aria-label="关闭FAQ编辑窗口" @click="closeEditDialog">✕</button>
         </div>
         <div class="dialog-body">
           <div class="form-section">
-            <label class="form-label">问题</label>
-            <input v-model="editForm.question" class="anime-input" placeholder="请输入问题" />
+            <label class="form-label" for="faq-edit-question">问题</label>
+            <input id="faq-edit-question" v-model="editForm.question" class="anime-input" placeholder="请输入问题" />
           </div>
           <div class="form-section">
-            <label class="form-label">答案</label>
-            <textarea v-model="editForm.answer" class="anime-input" rows="6" placeholder="请输入答案"></textarea>
+            <label class="form-label" for="faq-edit-answer">答案</label>
+            <textarea id="faq-edit-answer" v-model="editForm.answer" class="anime-input" rows="6" placeholder="请输入答案"></textarea>
           </div>
           <div class="form-section">
-            <label class="form-label">关键词（逗号分隔）</label>
-            <input v-model="editForm.keywords" class="anime-input" placeholder="关键词1,关键词2" />
+            <label class="form-label" for="faq-edit-keywords">关键词（逗号分隔）</label>
+            <input id="faq-edit-keywords" v-model="editForm.keywords" class="anime-input" placeholder="关键词1,关键词2" />
           </div>
           <div class="form-section">
-            <label class="form-label">优先级</label>
-            <input type="number" v-model="editForm.priority" class="anime-input" min="0" max="100" />
+            <label class="form-label" for="faq-edit-priority">优先级</label>
+            <input id="faq-edit-priority" type="number" v-model="editForm.priority" class="anime-input" min="0" max="100" />
           </div>
           <div class="dialog-footer">
-            <button class="anime-btn ghost" @click="showEditDialog = false">取消</button>
+            <button class="anime-btn ghost" @click="closeEditDialog">取消</button>
             <button class="anime-btn primary" @click="saveFaq" :disabled="saving">
               <Save :size="16" />
               <span>{{ saving ? '保存中...' : '保存' }}</span>
@@ -162,9 +170,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Sparkles, RefreshCw, Edit, Trash2, ToggleLeft, ToggleRight, Save, Plus, Search } from 'lucide-vue-next'
 import { getFaqPage, createFaq, updateFaq, deleteFaq, extractFaqFromConversations, getFaqStats } from '../api/faq'
 import { renderMarkdown } from '../lib/markdown'
+import { useModalDialog } from '../composables/useModalDialog'
 import type { FaqItem, FaqStats } from '../api/faq'
 
 const loading = ref(false)
+const loadError = ref('')
 const faqList = ref<FaqItem[]>([])
 const faqStats = ref<FaqStats | null>(null)
 const total = ref(0)
@@ -174,14 +184,19 @@ const searchKeyword = ref('')
 const searchTimer = ref<number | null>(null)
 
 const showExtractDialog = ref(false)
+const closeExtractDialog = () => { showExtractDialog.value = false }
 const extractMinCount = ref(3)
 const extractDays = ref(30)
 const extracting = ref(false)
 
 const showEditDialog = ref(false)
+const closeEditDialog = () => { showEditDialog.value = false }
 const editMode = ref<'create' | 'edit'>('edit')
 const editForm = ref<Partial<FaqItem>>({})
 const saving = ref(false)
+
+const { dialogRef: extractDialogRef } = useModalDialog(showExtractDialog, closeExtractDialog)
+const { dialogRef: editDialogRef } = useModalDialog(showEditDialog, closeEditDialog)
 
 onMounted(() => {
   loadFaqList()
@@ -190,13 +205,15 @@ onMounted(() => {
 
 async function loadFaqList() {
   loading.value = true
+  loadError.value = ''
   try {
     const keyword = searchKeyword.value.trim()
     const resp = await getFaqPage(undefined, keyword || undefined, pageNum.value, pageSize.value)
     faqList.value = resp.records || []
     total.value = resp.total || 0
-  } catch (e) {
+  } catch (e: any) {
     console.error('加载FAQ失败', e)
+    loadError.value = e?.response?.data?.message || '加载FAQ失败，请稍后重试'
   }
   loading.value = false
 }
@@ -327,8 +344,8 @@ function renderAnswer(answer: string): string {
   color: var(--anime-text-primary);
 }
 
-.stat-value.green { color: var(--anime-green); }
-.stat-value.pink { color: var(--anime-pink); }
+.stat-value.green { color: var(--ui-success); }
+.stat-value.pink { color: var(--ui-danger); }
 
 .stat-label {
   font-size: 12px;
@@ -364,8 +381,8 @@ function renderAnswer(answer: string): string {
   font-weight: 600;
 }
 
-.faq-badge.green { background: var(--anime-green-bg, rgba(34, 197, 94, 0.2)); color: var(--anime-green); }
-.faq-badge.muted { background: rgba(128, 128, 128, 0.2); color: var(--anime-text-muted); }
+.faq-badge.green { background: var(--ui-success-soft); color: var(--ui-success); }
+.faq-badge.muted { background: var(--ui-surface-muted); color: var(--ui-text-secondary); }
 
 .faq-text {
   font-size: 16px;
@@ -381,8 +398,8 @@ function renderAnswer(answer: string): string {
   flex-shrink: 0;
 }
 
-.faq-count { color: var(--anime-blue); }
-.faq-priority { color: var(--anime-purple); }
+.faq-count { color: var(--ui-primary-hover); }
+.faq-priority { color: var(--ui-text-secondary); }
 
 .faq-answer {
   font-size: 14px;
@@ -399,10 +416,10 @@ function renderAnswer(answer: string): string {
 
 .keyword-tag {
   padding: 4px 10px;
-  background: var(--anime-pink-bg);
+  background: var(--ui-primary-soft);
   border-radius: var(--anime-radius-sm);
   font-size: 12px;
-  color: var(--anime-pink);
+  color: var(--ui-primary);
 }
 
 .faq-actions {
@@ -464,7 +481,7 @@ function renderAnswer(answer: string): string {
 }
 
 .dialog-close:hover {
-  color: var(--anime-pink);
+  color: var(--ui-primary);
 }
 
 .dialog-body {
@@ -544,7 +561,7 @@ function renderAnswer(answer: string): string {
 }
 
 .search-clear:hover {
-  color: var(--anime-pink);
+  color: var(--ui-primary);
 }
 
 .faq-answer p {
@@ -578,5 +595,66 @@ function renderAnswer(answer: string): string {
 
 .faq-answer li {
   margin-bottom: 4px;
+}
+</style>
+
+<style scoped>
+.faq-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; }
+.faq-load-error { margin: 0 0 14px; color: var(--ui-danger); background: var(--ui-danger-soft); border: 1px solid var(--ui-danger-border); }
+.anime-card-title { margin: 0; }
+.anime-card-desc { margin: 4px 0 0; }
+.stat-item { min-width: 112px; padding: 12px 16px; text-align: left; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.stat-value { color: var(--ui-text); font-size: 24px; font-weight: 750; }
+.stat-value.green { color: var(--ui-success); }
+.stat-value.pink { color: var(--ui-danger); }
+.stat-label { color: var(--ui-text-secondary); font-size: 12px; }
+.search-section { margin-bottom: 18px; }
+.search-input-wrapper { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.search-input-wrapper:focus-within { border-color: var(--ui-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-focus) 18%, transparent); }
+.search-icon { flex: 0 0 auto; color: var(--ui-text-muted); }
+.search-input { min-width: 0; flex: 1; color: var(--ui-text); }
+.search-input::placeholder { color: var(--ui-text-muted); }
+.search-clear { min-width: 32px; min-height: 32px; border: 0; border-radius: var(--ui-radius-sm); background: transparent; color: var(--ui-text-secondary); cursor: pointer; }
+.search-clear:hover { background: var(--ui-surface-muted); color: var(--ui-text); }
+.faq-list { display: flex; flex-direction: column; gap: 12px; }
+.faq-item { min-width: 0; padding: 18px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-card); }
+.faq-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.faq-question { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.faq-text { margin: 0; color: var(--ui-text); font-size: 16px; line-height: 1.45; font-weight: 700; overflow-wrap: anywhere; }
+.faq-badge { flex: 0 0 auto; padding: 4px 9px; border: 1px solid var(--ui-border); border-radius: 999px; font-size: 12px; font-weight: 650; }
+.faq-badge.green { background: var(--ui-success-soft); border-color: var(--ui-success-border); color: var(--ui-success); }
+.faq-badge.muted { background: var(--ui-surface-muted); color: var(--ui-text-secondary); }
+.faq-meta { display: flex; flex-wrap: wrap; gap: 12px; flex-shrink: 0; color: var(--ui-text-secondary); font-size: 12px; }
+.faq-count { color: var(--ui-primary-hover); }
+.faq-priority { color: var(--ui-text-secondary); }
+.faq-answer { color: var(--ui-text-secondary); font-size: 14px; line-height: 1.65; margin-bottom: 12px; overflow-wrap: anywhere; }
+.faq-keywords { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.keyword-tag { padding: 4px 9px; background: var(--ui-primary-soft); border: 1px solid var(--ui-primary-border); border-radius: 999px; color: var(--ui-primary-hover); font-size: 12px; }
+.faq-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.faq-actions .anime-btn.pink { color: var(--ui-danger) !important; }
+.dialog-overlay { background: rgb(23 35 33 / 38%); backdrop-filter: blur(3px); }
+.dialog-content { width: min(440px, 92vw); max-height: min(88vh, 760px); overflow-y: auto; padding: 22px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-card); }
+.dialog-content.lg { width: min(640px, 92vw); }
+.dialog-header { margin-bottom: 18px; }
+.dialog-header h3 { margin: 0; color: var(--ui-text); font-size: 18px; }
+.dialog-close { min-width: 36px; min-height: 36px; border-radius: var(--ui-radius-sm); color: var(--ui-text-secondary); }
+.dialog-close:hover { color: var(--ui-text); background: var(--ui-surface-muted); }
+.dialog-body { gap: 12px; }
+.form-section { margin-bottom: 4px; }
+.form-label { color: var(--ui-text-secondary); font-weight: 650; }
+.field-hint { color: var(--ui-text-muted); }
+.dialog-footer { flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.faq-answer p { color: inherit; }
+.faq-answer pre { background: var(--ui-surface-muted); border: 1px solid var(--ui-border); }
+.faq-answer code { color: var(--ui-text); background: var(--ui-surface-muted); }
+@media (max-width: 700px) {
+  .faq-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .stat-item { min-width: 0; padding: 10px; }
+  .stat-value { font-size: 21px; }
+  .faq-header { flex-direction: column; }
+  .faq-meta { flex-shrink: 1; }
+  .faq-item { padding: 14px; }
+  .dialog-content, .dialog-content.lg { width: min(100%, 640px); max-width: 100%; padding: 18px; }
+  .dialog-footer .anime-btn { flex: 1 1 auto; }
 }
 </style>

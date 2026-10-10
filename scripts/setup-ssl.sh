@@ -1,9 +1,9 @@
 #!/bin/bash
-# ChatBase SSL bootstrap for www.zxldragon.fun
+# ChatBase SSL bootstrap for your-domain.example.com
 # Usage: bash setup-ssl.sh
 set -e
-DOMAIN="${DOMAIN:-www.zxldragon.fun}"
-EMAIL="${EMAIL:-2252406579@qq.com}"
+DOMAIN="${DOMAIN:-your-domain.example.com}"
+EMAIL="${EMAIL:-you@example.com}"
 WEBROOT="/var/www/certbot"
 
 echo "==> install nginx + certbot"

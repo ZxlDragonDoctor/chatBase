@@ -3,7 +3,7 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">群聊采集</div>
+          <h1 class="anime-card-title">群聊采集</h1>
           <div class="anime-card-desc">
             QQ群/企微群/微信群消息采集记录 · 应用绑定
           </div>
@@ -16,66 +16,62 @@
         </div>
       </div>
 
-      <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
+      <div v-if="err" class="anime-error im-page-error" role="alert">{{ err }}</div>
 
       <div class="anime-card-body">
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-          <select v-model="scope" class="anime-scope-select" style="min-width: 100px;">
+        <div class="im-toolbar">
+          <select v-model="scope" class="anime-scope-select im-scope-select" aria-label="群聊范围">
             <option value="all">全部</option>
             <option value="unassigned">未分配</option>
             <option value="bound">已绑定</option>
           </select>
-          <div class="anime-tabs">
-            <button v-for="t in platformTabs" :key="t.key" class="anime-tab" :class="{ active: platform === t.key }" @click="togglePlatform(t.key)">{{ t.label }}</button>
+          <div class="anime-tabs" role="group" aria-label="按平台筛选群聊">
+            <button v-for="t in platformTabs" :key="t.key" class="anime-tab" :class="{ active: platform === t.key }" :aria-pressed="platform === t.key" @click="togglePlatform(t.key)">{{ t.label }}</button>
           </div>
-          <input v-model="groupSearch" type="text" placeholder="搜索群名或群ID..." class="anime-search-input" style="min-width: 200px; flex: 1;" />
+          <input v-model="groupSearch" type="text" aria-label="搜索群名或群ID" placeholder="搜索群名或群ID..." class="anime-search-input im-list-search" />
         </div>
 
-              <div class="im-split-view">
-                <div class="im-list-panel">
-                  <div v-if="loading && groups.length === 0" class="anime-empty">
-                    <span class="anime-loader-spinner"></span>
-                    <span class="anime-empty-text">加载中...</span>
-                  </div>
-                  <div v-else-if="groups.length === 0" class="anime-empty">
-                    <div class="anime-empty-icon">📭</div>
-                    <div class="anime-empty-text">暂无群聊记录</div>
-                  </div>
-                  <button v-for="g in filteredGroups" :key="g.platform + ':' + g.groupId" class="im-group-item" :class="{ 'active': selected?.groupId === g.groupId && selected?.platform === g.platform }" @click="selectGroup(g)">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                      <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
-                      <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(g) }}</span>
-                      <span v-if="g.appName" class="anime-badge blue" style="margin-left: 4px;">{{ g.appName }}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--anime-text-muted);">
-                      <span style="color: var(--anime-blue);">{{ g.messageCount }} 条消息</span>
-                      <span v-if="g.lastMessageTime">{{ formatTime(g.lastMessageTime) }}</span>
-                    </div>
-                    <div style="font-size: 12px; color: var(--anime-text-muted); margin-top: 4px;">
-                      <span v-if="g.createdBy">归属: {{ g.createdBy }}</span>
-                    </div>
-                  </button>
-                </div>
+        <div class="im-split-view">
+          <div class="im-list-panel">
+            <div v-if="loading && groups.length === 0" class="anime-empty">
+              <span class="anime-loader-spinner"></span>
+              <span class="anime-empty-text">加载中...</span>
+            </div>
+            <div v-else-if="groups.length === 0" class="anime-empty">
+              <div class="anime-empty-text">暂无群聊记录</div>
+            </div>
+            <button v-for="g in filteredGroups" :key="g.platform + ':' + g.groupId" class="im-group-item" :class="{ 'active': selected?.groupId === g.groupId && selected?.platform === g.platform }" :aria-current="selected?.groupId === g.groupId && selected?.platform === g.platform ? 'true' : undefined" @click="selectGroup(g)">
+              <div class="im-item-heading">
+                <span class="anime-badge" :class="getPlatformColor(g.platform)">{{ getPlatformLabel(g.platform) }}</span>
+                <span class="im-item-name">{{ getGroupName(g) }}</span>
+                <span v-if="g.appName" class="anime-badge blue">{{ g.appName }}</span>
+              </div>
+              <div class="im-item-meta">
+                <span class="im-message-count">{{ g.messageCount }} 条消息</span>
+                <span v-if="g.lastMessageTime">{{ formatTime(g.lastMessageTime) }}</span>
+              </div>
+              <div class="im-item-owner">
+                <span v-if="g.createdBy">归属: {{ g.createdBy }}</span>
+              </div>
+            </button>
+          </div>
 
           <div class="im-detail-panel">
             <template v-if="!selected">
               <div class="anime-empty">
-                <div class="anime-empty-icon">👈</div>
-                <div class="anime-empty-text">请选择左侧群聊查看消息 ✿</div>
+                <div class="anime-empty-text">请选择左侧群聊查看消息</div>
               </div>
             </template>
             <template v-else>
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <div class="im-detail-heading">
                 <span class="anime-badge" :class="getPlatformColor(selected.platform)">{{ getPlatformLabel(selected.platform) }}</span>
-                <span style="font-weight: 600; color: var(--anime-text-primary);">{{ getGroupName(selected) }}</span>
+                <span class="im-detail-title">{{ getGroupName(selected) }}</span>
               </div>
               
-              <div v-if="!selected.createdBy || selected.createdBy === currentUserName" style="padding: 16px; background: var(--anime-blue-bg); box-shadow: var(--anime-shadow-sm); border-radius: var(--anime-radius-lg); margin-bottom: 16px;">
-                <div style="font-weight: 600; color: var(--anime-text-primary); margin-bottom: 12px;">
-                  <span style="color: var(--anime-pink);">应用绑定</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <select v-model="bindAppId" class="anime-app-select" style="min-width: 200px;">
+              <div v-if="!selected.createdBy || selected.createdBy === currentUserName" class="im-binding-panel">
+                <div class="im-binding-title">应用绑定</div>
+                <div class="im-binding-controls">
+                  <select v-model="bindAppId" class="anime-app-select im-binding-select" aria-label="选择群聊绑定应用">
                     <option value="">不绑定应用</option>
                     <option v-for="app in appList" :key="app.id" :value="app.id">{{ app.icon || '🤖' }} {{ app.name }}</option>
                   </select>
@@ -84,13 +80,13 @@
                     <span v-else>保存绑定</span>
                   </button>
                 </div>
-                <div v-if="selected.appName" style="margin-top: 10px; font-size: 13px; color: var(--anime-text-muted);">
-                  当前绑定: <span style="color: var(--anime-blue);">{{ selected.appName }}</span>
+                <div v-if="selected.appName" class="im-current-binding">
+                  当前绑定：<span>{{ selected.appName }}</span>
                 </div>
               </div>
               
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                <input v-model="searchKeyword" type="text" placeholder="搜索消息内容或用户ID..." class="anime-search-input" @keyup.enter="searchMessages" style="flex: 1;" />
+              <div class="im-message-toolbar">
+                <input v-model="searchKeyword" type="text" aria-label="搜索群聊消息内容或用户ID" placeholder="搜索消息内容或用户ID..." class="anime-search-input im-message-search" @keyup.enter="searchMessages" />
                 <button class="anime-btn ghost" @click="searchMessages" :disabled="msgLoading">
                   <span>搜索</span>
                 </button>
@@ -104,21 +100,20 @@
                 <span class="anime-empty-text">消息加载中...</span>
               </div>
               <div v-else-if="messages.length === 0" class="anime-empty">
-                <div class="anime-empty-icon">📭</div>
                 <div class="anime-empty-text">{{ searchKeyword ? '未找到匹配消息' : '暂无消息记录' }}</div>
               </div>
               <div v-else class="message-list">
-                <div v-for="m in messages" :key="m.id" style="padding: 14px; background: var(--anime-bg-card); box-shadow: var(--anime-shadow-sm); border-radius: var(--anime-radius-lg); margin-bottom: 12px;">
-                  <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px;">
+                <div v-for="m in messages" :key="m.id" class="im-message-card">
+                  <div class="im-message-meta">
                     <span class="anime-badge blue">用户: {{ m.userId || '未知' }}</span>
                     <span class="anime-badge muted">{{ m.messageType || '文本' }}</span>
-                    <span class="anime-badge" :class="m.synced ? 'green' : 'pink'">{{ m.synced ? '已同步' : '未同步' }}</span>
-                    <span style="font-size: 13px; color: var(--anime-text-muted);">{{ formatTime(m.messageTime) }}</span>
+                    <span class="anime-badge im-sync-state" :class="m.synced ? 'im-sync-state--synced' : 'im-sync-state--unsynced'">{{ m.synced ? '已同步' : '未同步' }}</span>
+                    <span class="im-message-time">{{ formatTime(m.messageTime) }}</span>
                   </div>
-                  <div style="font-size: 14px; color: var(--anime-text-primary); white-space: pre-wrap; line-height: 1.5;">{{ m.rawMessage }}</div>
+                  <div class="im-message-body">{{ m.rawMessage }}</div>
                 </div>
               </div>
-              <div v-if="msgTotal > messages.length" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--anime-border-light);">
+              <div v-if="msgTotal > messages.length" class="im-pagination">
                 <button class="anime-btn ghost" :disabled="msgLoading || page <= 0" @click="page--; loadMessages()">上一页</button>
                 <span class="anime-code">第 {{ page + 1 }} 页 · 共 {{ msgTotal }} 条</span>
                 <button class="anime-btn ghost" :disabled="msgLoading || (page + 1) * pageSize >= msgTotal" @click="page++; loadMessages()">下一页</button>
@@ -293,55 +288,95 @@ onMounted(() => {
 <style scoped>
 @keyframes spin { to { transform: rotate(360deg); } }
 .animate-spin { animation: spin 1s linear infinite; }
-.im-split-view { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 0; min-height: 480px; }
-@media (max-width: 800px) { .im-split-view { grid-template-columns: 1fr; } }
-.im-list-panel { position: relative; max-height: min(70vh, 600px); overflow-y: auto; padding: 12px; }
-.im-list-panel::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 1px; background: linear-gradient(180deg, transparent, var(--anime-border), transparent); }
-.im-group-item { display: flex; flex-direction: column; gap: 10px; width: 100%; padding: 14px; margin-bottom: 10px; background: var(--anime-bg-card); box-shadow: var(--anime-shadow-sm); border-radius: var(--anime-radius-lg); cursor: pointer; transition: all 0.3s ease; border: none; }
-.im-group-item:hover { box-shadow: var(--anime-shadow-pink); transform: translateX(4px); }
-.im-group-item.active { box-shadow: var(--anime-shadow-pink); background: var(--anime-pink-bg); }
-.im-detail-panel { padding: 20px; max-height: min(70vh, 600px); overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-.message-list { display: flex; flex-direction: column; gap: 12px; }
-.anime-app-select {
-  background: var(--anime-bg);
-  box-shadow: var(--anime-shadow-sm);
-  border: none;
-  border-radius: var(--anime-radius-lg);
-  padding: 8px 12px;
-  font-size: 14px;
-  color: var(--anime-text-primary);
+.im-page-error { margin: 0 24px 16px; }
+.im-toolbar, .im-message-toolbar, .im-binding-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.im-toolbar { margin-bottom: 14px; }
+.im-toolbar .anime-tabs { margin: 0; }
+.im-scope-select { flex: 0 0 auto; min-width: 112px; }
+.im-list-search { flex: 1 1 220px; min-width: min(220px, 100%); }
+.im-split-view {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  min-height: 480px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+}
+.im-list-panel { min-width: 0; max-height: min(70vh, 600px); overflow-y: auto; padding: 12px; border-right: 1px solid var(--ui-border); }
+.im-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  margin: 0 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  outline: none;
+  transition: border-color .16s ease, background-color .16s ease;
 }
-.anime-app-select:focus {
-  box-shadow: var(--anime-shadow-pink);
+.im-group-item:hover { border-color: color-mix(in srgb, var(--ui-primary) 45%, var(--ui-border)); background: var(--ui-surface-muted); }
+.im-group-item.active { border-color: var(--ui-primary); background: var(--ui-primary-soft); box-shadow: inset 3px 0 var(--ui-primary); }
+.im-item-heading, .im-item-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.im-item-heading { flex-wrap: wrap; }
+.im-item-name { flex: 1 1 90px; min-width: 0; color: var(--ui-text); font-weight: 650; overflow-wrap: anywhere; }
+.im-item-meta { justify-content: space-between; color: var(--ui-text-muted); font-size: 12px; }
+.im-message-count { color: var(--ui-primary); font-weight: 600; }
+.im-item-owner { min-height: 16px; color: var(--ui-text-muted); font-size: 12px; }
+.im-detail-panel { display: flex; min-width: 0; max-height: min(70vh, 600px); flex-direction: column; gap: 14px; overflow-y: auto; padding: 18px; }
+.im-detail-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.im-detail-title { min-width: 0; color: var(--ui-text); font-weight: 650; overflow-wrap: anywhere; }
+.im-binding-panel { margin-bottom: 2px; padding: 14px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-surface-muted); }
+.im-binding-title { margin-bottom: 10px; color: var(--ui-text-secondary); font-size: 13px; font-weight: 700; }
+.im-binding-controls { align-items: stretch; }
+.im-binding-select { flex: 1 1 220px; min-width: min(200px, 100%); }
+.im-current-binding { margin-top: 9px; color: var(--ui-text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.im-current-binding span { color: var(--ui-primary); font-weight: 600; }
+.im-message-search { flex: 1 1 220px; min-width: min(220px, 100%); }
+.im-message-toolbar .anime-btn { flex: 0 0 auto; }
+.message-list { display: flex; min-width: 0; flex-direction: column; gap: 9px; }
+.im-message-card { min-width: 0; padding: 12px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-surface); }
+.im-message-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; }
+.im-message-time { color: var(--ui-text-muted); font-size: 12px; }
+.im-message-body { color: var(--ui-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.im-sync-state--synced { background: color-mix(in srgb, var(--ui-success) 12%, var(--ui-surface)); color: var(--ui-success); }
+.im-sync-state--unsynced { background: color-mix(in srgb, var(--ui-accent) 14%, var(--ui-surface)); color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-text)); }
+.im-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 12px; border-top: 1px solid var(--ui-border); }
+.anime-app-select, .anime-search-input, .anime-scope-select {
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  box-shadow: none;
 }
-.anime-search-input {
-  background: var(--anime-bg);
-  box-shadow: var(--anime-shadow-sm);
-  border: none;
-  border-radius: var(--anime-radius-lg);
-  padding: 8px 12px;
-  font-size: 14px;
-  color: var(--anime-text-primary);
-  outline: none;
-  transition: box-shadow 0.3s ease;
+.anime-app-select:focus, .anime-search-input:focus, .anime-scope-select:focus { border-color: var(--ui-focus); outline: 2px solid color-mix(in srgb, var(--ui-focus) 18%, transparent); }
+@media (max-width: 800px) {
+  .im-split-view { grid-template-columns: minmax(0, 1fr); }
+  .im-list-panel { max-height: min(34vh, 280px); border-right: 0; border-bottom: 1px solid var(--ui-border); }
+  .im-detail-panel { max-height: min(70vh, 680px); }
 }
-.anime-search-input:focus {
-  box-shadow: var(--anime-shadow-pink);
-}
-.anime-scope-select {
-  background: var(--anime-bg);
-  box-shadow: var(--anime-shadow-sm);
-  border: none;
-  border-radius: var(--anime-radius-lg);
-  padding: 6px 10px;
-  font-size: 14px;
-  color: var(--anime-text-primary);
-  cursor: pointer;
-  outline: none;
-}
-.anime-scope-select:focus {
-  box-shadow: var(--anime-shadow-pink);
+@media (max-width: 480px) {
+  .im-page-error { margin: 0 14px 14px; }
+  .im-toolbar { align-items: stretch; }
+  .im-toolbar .anime-tabs { flex: 1 1 100%; }
+  .im-scope-select { flex: 1 1 100%; }
+  .im-list-search { flex-basis: 100%; }
+  .im-detail-panel { padding: 14px; }
+  .im-binding-controls > * { flex: 1 1 100%; }
+  .im-message-toolbar .anime-btn { flex: 1 1 auto; }
 }
 </style>

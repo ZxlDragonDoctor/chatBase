@@ -21,6 +21,8 @@ public class BotInfoVO {
 
     private boolean online;
 
+    private String statusLabel;
+
     private int groupCount;
 
     private int todayMessages;

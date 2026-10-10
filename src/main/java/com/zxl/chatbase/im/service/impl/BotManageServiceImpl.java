@@ -39,11 +39,13 @@ public class BotManageServiceImpl implements BotManageService {
     }
 
     private BotInfoVO buildQqBot() {
+        boolean online = isQqOnline();
         return BotInfoVO.builder()
                 .platform("qq")
                 .name(getQqBotNickname())
                 .botId(String.valueOf(qqBotProperties.getSelfId()))
-                .online(isQqOnline())
+                .online(online)
+                .statusLabel(online ? "在线" : "离线")
                 .groupCount(botManageMapper.countGroups("qq"))
                 .todayMessages(botManageMapper.countTodayMessages("qq"))
                 .totalMessages(botManageMapper.countTotalMessages("qq"))
@@ -52,11 +54,14 @@ public class BotManageServiceImpl implements BotManageService {
     }
 
     private BotInfoVO buildWeComBot() {
+        boolean configured = wechatConfig.getWxcpt() != null;
         return BotInfoVO.builder()
                 .platform("wecom")
                 .name(wechatConfig.getBotName())
                 .botId(null)
-                .online(true)
+                // 企业微信使用 HTTP 回调，没有长连接；展示配置状态，不冒充机器人在线。
+                .online(false)
+                .statusLabel(configured ? "回调已配置" : "未配置")
                 .groupCount(botManageMapper.countGroups("wecom"))
                 .todayMessages(botManageMapper.countTodayMessages("wecom"))
                 .totalMessages(botManageMapper.countTotalMessages("wecom"))
@@ -65,14 +70,11 @@ public class BotManageServiceImpl implements BotManageService {
     }
 
     private BotInfoVO buildWxBot() {
-        // 优先用 WxIlinkService：扫码成功后立即在线；同时校验凭证
+        // 凭证只代表可以尝试登录；在线状态以 ilink 轮询连接的 Redis 标记为准。
         boolean online;
         String nickname;
         try {
-            online = wxIlinkService.isOnline() || wxIlinkService.hasCredentials();
-            if (online && !wxIlinkService.hasCredentials()) {
-                online = false;
-            }
+            online = wxIlinkService.isOnline();
             nickname = wxIlinkService.getLoginNickname();
         } catch (Exception e) {
             online = "1".equals(stringRedisTemplate.opsForValue().get("bot:wx:online"));
@@ -87,6 +89,7 @@ public class BotManageServiceImpl implements BotManageService {
                 .name(nickname)
                 .botId(wxProperties.getBotId())
                 .online(online)
+                .statusLabel(online ? "在线" : "离线")
                 .groupCount(botManageMapper.countGroups("wx"))
                 .todayMessages(botManageMapper.countTodayMessages("wx"))
                 .totalMessages(botManageMapper.countTotalMessages("wx"))

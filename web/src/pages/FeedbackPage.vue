@@ -3,17 +3,17 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">用户反馈</div>
+          <h1 class="anime-card-title">用户反馈</h1>
           <div class="anime-card-desc">您的意见对我们很重要，帮助我们持续改进服务质量</div>
         </div>
       </div>
 
       <div class="anime-card-body">
         <div class="tab-bar">
-          <button class="tab-btn" :class="{ active: activeTab === 'submit' }" @click="activeTab = 'submit'">
+          <button class="tab-btn" :class="{ active: activeTab === 'submit' }" :aria-pressed="activeTab === 'submit'" @click="activeTab = 'submit'">
             提交反馈
           </button>
-          <button class="tab-btn" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'; loadMyFeedback()">
+          <button class="tab-btn" :class="{ active: activeTab === 'history' }" :aria-pressed="activeTab === 'history'" @click="activeTab = 'history'; loadMyFeedback()">
             我的反馈
             <span v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</span>
           </button>
@@ -22,31 +22,34 @@
         <div v-if="activeTab === 'submit'">
           <form @submit.prevent="handleSubmit" class="feedback-form">
             <div class="form-section">
-              <label class="form-label">满意度评分</label>
-              <div class="rating-stars">
+            <div class="form-label" id="rating-label">满意度评分</div>
+            <div class="rating-stars" role="group" aria-labelledby="rating-label">
                 <button
                   v-for="n in 5"
                   :key="n"
                   type="button"
                   class="star-btn"
                   :class="{ active: rating >= n }"
+                  :aria-label="`${n} 星`"
+                  :aria-pressed="rating === n"
                   @click="rating = n"
                 >
-                  <Star :size="24" :fill="rating >= n ? '#ffb7c5' : 'none'" />
+                  <Star :size="24" :fill="rating >= n ? '#d28a2e' : 'none'" />
                 </button>
                 <span class="rating-text">{{ ratingText }}</span>
               </div>
             </div>
 
             <div class="form-section">
-              <label class="form-label">反馈类型</label>
-              <div class="feedback-types">
+            <div class="form-label" id="feedback-type-label">反馈类型</div>
+              <div class="feedback-types" role="group" aria-labelledby="feedback-type-label">
                 <button
                   v-for="t in feedbackTypes"
                   :key="t.value"
                   type="button"
                   class="type-btn"
                   :class="{ active: feedbackType === t.value }"
+                  :aria-pressed="feedbackType === t.value"
                   @click="feedbackType = t.value"
                 >
                   {{ t.label }}
@@ -55,8 +58,9 @@
             </div>
 
             <div class="form-section">
-              <label class="form-label">详细描述</label>
+              <label class="form-label" for="feedback-content">详细描述</label>
               <textarea
+                id="feedback-content"
                 v-model="content"
                 class="anime-input feedback-textarea"
                 placeholder="请详细描述您的反馈内容，帮助我们更好地了解您的需求..."
@@ -65,21 +69,23 @@
             </div>
 
             <div class="form-section">
-              <label class="form-label">联系方式（可选）</label>
+              <label class="form-label" for="feedback-contact">联系方式（可选）</label>
               <input
+                id="feedback-contact"
                 v-model="contactInfo"
                 type="text"
                 class="anime-input"
+                :aria-describedby="contactError ? 'feedback-contact-hint feedback-contact-error' : 'feedback-contact-hint'"
                 :class="{ 'input-error': contactError }"
                 placeholder="邮箱或手机号，方便我们回复您"
                 @blur="validateContact"
                 @input="contactError = ''"
               />
-              <div v-if="contactError" class="field-error">{{ contactError }}</div>
-              <div class="field-hint">支持邮箱格式（如：user@example.com）或手机号（11位数字）</div>
+              <div v-if="contactError" id="feedback-contact-error" class="field-error" role="alert">{{ contactError }}</div>
+              <div id="feedback-contact-hint" class="field-hint">支持邮箱格式（如：user@example.com）或手机号（11位数字）</div>
             </div>
 
-            <div v-if="error" class="anime-error">{{ error }}</div>
+            <div v-if="error" class="anime-error" role="alert">{{ error }}</div>
 
             <div class="form-actions">
               <button type="button" class="anime-btn ghost" @click="resetForm">
@@ -93,7 +99,7 @@
             </div>
           </form>
 
-          <div v-if="submitted" class="success-message">
+          <div v-if="submitted" class="success-message" role="status" aria-live="polite">
             <CheckCircle :size="48" style="color: var(--anime-green);" />
             <div class="success-title">感谢您的反馈！</div>
             <div class="success-desc">我们会认真对待每一条反馈，持续改进服务质量。</div>
@@ -116,7 +122,7 @@
             <div v-for="item in myFeedbacks" :key="item.id" class="feedback-history-item" :class="{ has_reply: item.adminReply }">
               <div class="history-header">
                 <span class="history-rating">
-                  <Star v-for="n in 5" :key="n" :size="14" :fill="item.rating >= n ? '#ffb7c5' : 'none'" />
+                  <Star v-for="n in 5" :key="n" :size="14" :fill="item.rating >= n ? '#d28a2e' : 'none'" />
                 </span>
                 <span class="history-type">{{ getTypeLabel(item.feedbackType) }}</span>
                 <span class="history-status" :class="{ replied: item.adminReply }">
@@ -318,8 +324,8 @@ onMounted(() => {
 }
 
 .tab-btn.active {
-  color: var(--anime-pink);
-  border-bottom-color: var(--anime-pink);
+  color: var(--ui-primary);
+  border-bottom-color: var(--ui-primary);
 }
 
 .unread-badge {
@@ -329,7 +335,7 @@ onMounted(() => {
   min-width: 18px;
   height: 18px;
   padding: 0 6px;
-  background: var(--anime-pink);
+  background: var(--ui-primary);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -373,7 +379,7 @@ onMounted(() => {
 }
 
 .star-btn.active {
-  color: var(--anime-pink);
+  color: var(--ui-accent);
 }
 
 .rating-text {
@@ -401,13 +407,13 @@ onMounted(() => {
 }
 
 .type-btn:hover {
-  box-shadow: var(--anime-shadow-pink);
+  box-shadow: 0 0 0 2px var(--ui-primary-soft);
 }
 
 .type-btn.active {
-  box-shadow: var(--anime-shadow-pink);
-  background: var(--anime-pink-bg);
-  color: var(--anime-pink);
+  box-shadow: 0 0 0 2px var(--ui-primary-soft);
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary-hover);
 }
 
 .feedback-textarea {
@@ -417,12 +423,12 @@ onMounted(() => {
 }
 
 .input-error {
-  box-shadow: 0 0 0 2px rgba(255, 183, 197, 0.3) !important;
+  box-shadow: 0 0 0 2px var(--ui-danger-border) !important;
 }
 
 .field-error {
   font-size: 12px;
-  color: var(--anime-pink);
+  color: var(--ui-danger);
   margin-top: 6px;
 }
 
@@ -470,8 +476,8 @@ onMounted(() => {
 }
 
 .feedback-history-item.has_reply {
-  box-shadow: 0 2px 12px rgba(129, 199, 132, 0.15);
-  background: rgba(184, 233, 148, 0.03);
+  box-shadow: var(--ui-shadow-card);
+  background: var(--ui-success-soft);
 }
 
 .history-header {
@@ -499,13 +505,13 @@ onMounted(() => {
   padding: 4px 12px;
   border-radius: var(--anime-radius);
   font-size: 12px;
-  background: var(--anime-pink-bg);
-  color: var(--anime-pink);
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
 }
 
 .history-status.replied {
-  background: rgba(184, 233, 148, 0.2);
-  color: var(--anime-green);
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
 }
 
 .history-time {
@@ -553,5 +559,59 @@ onMounted(() => {
   align-items: center;
   gap: 16px;
   margin-top: 20px;
+}
+
+.tab-bar { border-color: var(--ui-border); }
+.tab-btn { color: var(--ui-text-muted); }
+.tab-btn:hover { color: var(--ui-text); }
+.tab-btn.active { color: var(--ui-primary); border-bottom-color: var(--ui-primary); }
+.unread-badge { background: var(--ui-primary); }
+.feedback-form { width: 100%; }
+.form-label { color: var(--ui-text); }
+.star-btn { border-radius: var(--ui-radius-sm); }
+.star-btn.active { color: var(--ui-accent); }
+.star-btn:hover { transform: translateY(-1px); }
+.rating-text, .field-hint { color: var(--ui-text-muted); }
+.type-btn {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  box-shadow: none;
+}
+.type-btn:hover, .type-btn.active {
+  border-color: var(--ui-primary);
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  box-shadow: none;
+}
+.input-error { border-color: var(--ui-danger) !important; box-shadow: 0 0 0 2px rgb(189 60 69 / 14%) !important; }
+.field-error { color: var(--ui-danger); }
+.form-actions { flex-wrap: wrap; }
+.success-title { color: var(--ui-success); }
+.success-desc { color: var(--ui-text-secondary); }
+.feedback-history-list { gap: 10px; }
+.feedback-history-item {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+.feedback-history-item.has_reply { border-color: #c8e7d4; background: #f6fbf8; box-shadow: none; }
+.history-type { background: var(--ui-surface-muted); color: var(--ui-text-secondary); }
+.history-status { background: #fff4df; color: var(--ui-accent); }
+.history-status.replied { background: #eaf6ef; color: var(--ui-success); }
+.history-rating { color: var(--ui-accent); }
+.history-time, .reply-time { color: var(--ui-text-muted); }
+.history-content { color: var(--ui-text-secondary); line-height: 1.6; }
+.admin-reply-section { border-color: var(--ui-border); }
+.reply-label { color: var(--ui-success); }
+.reply-content { border: 1px solid #c8e7d4; background: #eaf6ef; color: var(--ui-text); }
+.pagination { flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .tab-btn { flex: 1 1 50%; padding: 11px 12px; }
+  .rating-stars { flex-wrap: wrap; gap: 4px; }
+  .rating-text { flex-basis: 100%; margin: 6px 0 0; }
+  .form-actions > .anime-btn { flex: 1 1 140px; justify-content: center; }
+  .success-message { padding: 32px 12px; }
 }
 </style>

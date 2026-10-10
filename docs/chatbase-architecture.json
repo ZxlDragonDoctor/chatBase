@@ -42,7 +42,7 @@
   "boundaries": [
     {
       "kind": "region",
-      "label": "阿里云 ECS · www.zxldragon.fun",
+      "label": "服务器 · your-domain.example.com",
       "wraps": ["nginx", "frontend", "backend", "redis", "mysql", "qq"],
       "pad": 18
     },

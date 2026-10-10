@@ -17,6 +17,9 @@ chatBase/
 ├── pom.xml                          # Maven build (requires <parameters>true</parameters>)
 ├── sql/init-schema.sql              # Database initialization
 ├── uploads/                         # File uploads (avatars, etc.)
+├── bridge/                          # opencode 反向桥接 agent（无需 frp）
+│   ├── opencode-bridge.mjs          # Node 22+ 零依赖外连 agent
+│   └── README.md                    # 桥接使用说明
 │
 ├── src/main/java/com/zxl/chatbase/
 │   ├── ChatBaseApplication.java    # Main class
@@ -86,7 +89,13 @@ chatBase/
 │   │       └── StatsCommand.java      # /stats /统计
 │   │
 │   ├── opencode/                    # 本地 opencode serve 集成
-│   │   └── service/OpencodeService.java   # 远程驱动本机 opencode（会话映射/轮询）
+│   │   ├── OpencodeService.java     # 远程驱动本机 opencode（会话映射/轮询）
+│   │   └── bridge/                  # 反向 WebSocket 桥接（无需 frp）
+│   │       ├── OpencodeBridgeProperties.java
+│   │       ├── OpencodeBridgeService.java
+│   │       ├── OpencodeBridgeSession.java
+│   │       ├── OpencodeBridgeWebSocketHandler.java
+│   │       └── OpencodeBridgeWebSocketConfig.java
 │   │
 │   ├── kb/                          # Knowledge Base module
 │   │   ├── service/
@@ -285,11 +294,15 @@ Implemented via query-time filtering in all service layers:
 ### Private Chat → Local Opencode (远程驱动本机 opencode)
 1. 私聊消息到达 QQ/企微/微信处理器后，先经 `ImConversationService.isOpencodeBound(conversationId)` 判断是否绑定 opencode（`appId == -1L`）
 2. 若绑定 → `OpencodeService.chat()` 走 opencode 通道；否则走原 Dify 链路
-3. `OpencodeService`: Redis 中 `opencode:session:<conversationId>` 映射 opencode sessionId（TTL 7 天）
+3. **传输层（二选一）**：
+   - **反向桥接（推荐）**：本机运行 `bridge/opencode-bridge.mjs` 主动外连 `/opencode/bridge`（WebSocket），服务器经 `OpencodeBridgeService` 反向调用本机 —— **无需 frp / 内网穿透**
+   - **直连 HTTP**：`OPENCODE_BASE_URL` 指向 opencode serve（同机 / Tailscale / frp）
+   - 由 `opencode.bridge.transport=auto|bridge|direct` 控制；auto 优先桥接，无桥接回退直连
+4. `OpencodeService`: Redis 中 `opencode:session:<conversationId>` 映射 opencode sessionId（TTL 7 天）
    - `POST /api/session` 创建会话（directory/agent）→ `POST /api/session/{id}/prompt` 发消息 → 每 2s 轮询 `GET /api/session/{id}/message` 取最新 assistant 文本
    - Basic Auth（username=opencode / OPENCODE_SERVER_PASSWORD）
-4. 回复写入 `kb_conversation`（appId=-1, appName=本地opencode），再回发私聊
-5. 绑定「本地opencode」仅 admin 可用（`ImConversationServiceImpl.isAdmin()` 校验 SysUser.role=="admin"）
+5. 回复写入 `kb_conversation`（appId=-1, appName=本地opencode），再回发私聊
+6. 绑定「本地opencode」仅 admin 可用（`ImConversationServiceImpl.isAdmin()` 校验 SysUser.role=="admin"）
 
 ### File Upload
 1. Files uploaded to Dify `/files/upload` API, then synced to dataset
@@ -534,3 +547,9 @@ qq:
 - **Group visibility**: `im_group.created_by` default is NULL (public). `bindApp()` sets `created_by`, `unbindApp()` sets it back to NULL
 - **System categories**: "群聊消息" category has `create_by = NULL` (visible to all, editable by none)
 - **No test suite**: Manual API testing only
+- **Chat session ownership**: `/api/chat/session/**` requires `userId` param; service layer enforces `session.userId == userId`. Public chat endpoints (`/api/chat/web`, `/api/chat/ask`, etc.) stay open.
+- **CORS**: only explicit origins (or `CORS_ALLOWED_ORIGINS` env). Never `allowedOriginPatterns("*")` + `allowCredentials(true)`.
+- **Boolean entity fields**: always use `Boolean.TRUE.equals(x.getStatus())` to avoid NPE on NULL columns.
+- **Token logging**: never log full JWT/session tokens — mask to first 8 chars.
+- **HTML rendering**: user content must be escaped (`escapeHtml` in `web/src/lib/markdown.ts`); user messages use text interpolation, not `v-html`.
+- **Opencode bridge**: `bridge/opencode-bridge.mjs` (Node 22+, zero-dep) dials out to `/opencode/bridge`; token via `OPENCODE_BRIDGE_TOKEN` / `BRIDGE_TOKEN`. See `bridge/README.md`.

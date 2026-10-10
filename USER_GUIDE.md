@@ -9,7 +9,7 @@
 | Docker | 20.10+ | 容器运行时 |
 | Docker Compose | 2.0+ | 服务编排 |
 | Java（本地开发） | 17 | JDK 17 或更高 |
-| Node.js（本地开发） | 18+ | 前端开发环境 |
+| Node.js（本地开发） | 18+ | 前端开发；新版 OpenCode Node Agent 需要 22+ |
 | MySQL | 8.0 | 数据库 |
 | Redis | 7 | 缓存 |
 
@@ -75,6 +75,11 @@ vim .env
 | `OPENCODE_DEFAULT_DIRECTORY` | 否 | 本机项目根目录（创建会话时指定） | `/path/to/project` |
 | `OPENCODE_DEFAULT_AGENT` | 否 | opencode agent 名称 | `build` |
 | `OPENCODE_TIMEOUT_SECONDS` | 否 | 等待 opencode 回复超时（秒） | `300` |
+| `OPENCODE_NODE_ENABLED` | 否 | 启用新版本机节点通道；还需启用 `OPENCODE_ENABLED` | `true` |
+| `OPENCODE_NODE_TIMEOUT_SECONDS` | 否 | 等待本机节点 RPC 的超时（秒） | `320` |
+| `OPENCODE_NODE_HEARTBEAT_SECONDS` | 否 | 节点心跳间隔（秒） | `30` |
+| `OPENCODE_NODE_OFFLINE_AFTER_SECONDS` | 否 | 节点离线判定时间（秒） | `90` |
+| `OPENCODE_NODE_PAIRING_TTL_SECONDS` | 否 | 一次性配对码有效期（秒） | `600` |
 
 ### 2.4 启动服务
 
@@ -245,16 +250,22 @@ wechat:
     sEncodingAESKey: "your-aes-key"  # EncodingAESKey
     botName: "企业内部机器人"      # 机器人显示名称
 
-# 本地 opencode serve 集成配置（可选）
-# 指向本机运行的 opencode serve；生产环境经 frp 隧道访问
+# OpenCode 集成配置（可选）
+# 新版配对节点使用 node 通道；base-url/password 留给 direct HTTP 兼容模式
 opencode:
-  enabled: true                   # 启用（默认 false）
-  base-url: "http://127.0.0.1:4096"  # opencode serve 地址
-  password: "your-password"       # 与本机 OPENCODE_SERVER_PASSWORD 一致
-  username: "opencode"            # Basic Auth 用户名（默认 opencode）
-  default-directory: "<LOCAL_PROJECT_DIR>"  # 本机项目根目录
-  default-agent: "build"          # opencode agent 名称
-  timeout-seconds: 300            # 等待回复超时（秒）
+  enabled: false
+  base-url: "http://127.0.0.1:4096"  # 仅 direct HTTP 兼容模式使用
+  password: "your-password"         # direct HTTP 兼容模式的 Basic Auth 密码
+  username: "opencode"
+  default-directory: "<LOCAL_PROJECT_DIR>"
+  default-agent: "build"
+  timeout-seconds: 300
+  node:
+    enabled: true
+    request-timeout-seconds: 320
+    heartbeat-seconds: 30
+    offline-after-seconds: 90
+    pairing-ttl-seconds: 600
 ```
 
 ### 4.4 生产配置（application-prod.yaml）
@@ -276,7 +287,7 @@ wechat:
     stoken: ${WECHAT_CORP_STOKEN}
     sEncodingAESKey: ${WECHAT_CORP_S_ENCODING_AES_KEY}
 
-# 本地 opencode 集成（经 frp 隧道访问本机，默认关闭）
+# OpenCode 集成（总开关默认关闭）
 opencode:
   enabled: ${OPENCODE_ENABLED:false}
   base-url: ${OPENCODE_BASE_URL:http://127.0.0.1:4096}
@@ -285,7 +296,15 @@ opencode:
   default-directory: ${OPENCODE_DEFAULT_DIRECTORY:}
   default-agent: ${OPENCODE_DEFAULT_AGENT:build}
   timeout-seconds: ${OPENCODE_TIMEOUT_SECONDS:300}
+  node:
+    enabled: ${OPENCODE_NODE_ENABLED:true}
+    request-timeout-seconds: ${OPENCODE_NODE_TIMEOUT_SECONDS:320}
+    heartbeat-seconds: ${OPENCODE_NODE_HEARTBEAT_SECONDS:30}
+    offline-after-seconds: ${OPENCODE_NODE_OFFLINE_AFTER_SECONDS:90}
+    pairing-ttl-seconds: ${OPENCODE_NODE_PAIRING_TTL_SECONDS:600}
 ```
+
+本机节点配对和 Agent 环境变量见 [bridge/README.md](./bridge/README.md)。
 
 ---
 
@@ -662,17 +681,24 @@ WECHAT_CORP_SECRET=your-secret
 2. 左侧显示私聊会话列表（平台：QQ/企微/微信）
 3. 点击会话查看详情与消息
 
-#### 绑定应用（Dify 或 本地opencode）
+#### 绑定应用或本机 OpenCode 节点
 
 1. 点击会话查看详情
 2. 在「应用绑定」区域选择应用：
    - **Dify 应用**：所有用户可见
-   - **🖥️ 本地opencode**：仅 **admin** 可见（远程驱动本机 opencode）
-3. 点击「保存」
-4. 该会话后续私聊消息将使用绑定应用处理
+   - **本机 OpenCode 节点**：仅 **admin** 可见
+3. 点击「保存」。绑定节点后，该私聊会话通过对应电脑上的 OpenCode 处理；未绑定节点的会话仍按原 Dify 流程处理。
 
-> ⚠️ 绑定「本地opencode」需要服务器已启用 `opencode.enabled=true` 且本机 opencode serve 经 frp 隧道可达，否则私聊回复为「【本地opencode未启用】…」。
-> 部署细节见 [DEPLOY.md](./DEPLOY.md)。
+#### 配对本机节点
+
+1. 本机先启动 `opencode serve`，监听 `127.0.0.1` 并配置 `OPENCODE_SERVER_PASSWORD`。
+2. 管理员在私聊页面生成一次性配对码（10 分钟有效）。
+3. 在目标电脑设置 `CHATBASE_NODE_WS_URL`、`OPENCODE_PAIR_CODE`、`OPENCODE_SERVER_PASSWORD` 等变量，然后运行 `node bridge/opencode-node.mjs`。Agent 要求 Node.js 22+。
+4. 回到管理页面批准该节点，再将需要的私聊绑定到此节点。
+
+节点断线后会自动重连；配对凭据保存在当前系统用户目录下的 `.chatbase/opencode-node.json`。撤销后需要重新配对。完整命令和环境变量见 [bridge/README.md](./bridge/README.md)，服务器反向代理配置见 [DEPLOY.md](./DEPLOY.md)。
+
+> 兼容已有部署：旧版 `/opencode/bridge` 反向桥接和 `OPENCODE_BASE_URL` 直连仍可用；新部署推荐使用配对节点通道。
 
 #### 解绑应用
 
@@ -978,7 +1004,13 @@ docker compose logs chatbase-frontend
    curl http://127.0.0.1:4096/                 # 返回 opencode 信息即正常
    ```
 
-3. 检查 frp 隧道连通性
+3. 检查所选执行通道
+
+   - **新版 Node 节点**：管理页面显示节点在线且已批准；本机 `bridge/opencode-node.mjs` 正在运行；`CHATBASE_NODE_WS_URL` 指向可用的 `wss://.../opencode/node`。
+   - **旧版反向桥接**：检查 `/opencode/bridge` WebSocket 与 Agent token 配置。
+   - **直连模式**：检查后端容器是否能访问 `OPENCODE_BASE_URL`。
+
+4. 仅在旧版直连/隧道部署中检查 frp 隧道连通性
    ```bash
    # 服务器上执行（从宿主机到 frps 映射端口，应能连通到本机 opencode）
    curl http://127.0.0.1:14096/
@@ -986,18 +1018,17 @@ docker compose logs chatbase-frontend
    docker compose exec chatbase-backend curl -u opencode:<密码> http://<docker-gateway>:<remote-port>/
    ```
 
-4. 检查密码是否匹配
-   - 本机启动命令的 `OPENCODE_SERVER_PASSWORD`
-   - 服务器配置 `OPENCODE_PASSWORD`
-   - 两者必须一致，否则 401
+5. 检查对应通道使用的密码
+   - **新版 Node 节点**：Agent 的 `OPENCODE_SERVER_PASSWORD` 必须与本机 `opencode serve` 启动密码一致。
+   - **旧版直连/桥接**：服务器 `OPENCODE_PASSWORD` 必须与本机 `opencode serve` 密码一致，否则会返回 401。
 
-5. 查看后端日志
+6. 查看后端日志
    ```bash
    docker compose logs chatbase-backend | grep "opencode"
    # 关键字：创建会话成功 / 消息已发送 / 轮询 / 未返回结果
    ```
 
-6. 确认会话已绑定 opencode
+7. 确认会话已绑定 opencode 节点或兼容通道
    - 需 admin 在「私聊采集」页面选择 **🖥️ 本地opencode** 保存
    - 仅 admin 可见该选项
 
@@ -1006,7 +1037,7 @@ docker compose logs chatbase-frontend
 | 私聊回复 | 原因 |
 |----------|------|
 | 【本地opencode未启用】… | 服务器未开启 `opencode.enabled=true` |
-| 【opencode未返回结果】… | 超时或执行出错，检查本机 serve 状态、隧道连通、密码 |
+| 【opencode未返回结果】… | 超时或执行出错，检查节点在线状态、对应通道连接和本机服务密码 |
 | 空回复 | 中文内容在控制台显示乱码属编码问题，实际已写入 `kb_conversation` |
 
 ---
@@ -1170,7 +1201,7 @@ A：修改 `web/src/styles/cyberpunk.css`，或添加新样式文件。
 A：当前支持 Dify，另支持通过「本地opencode」集成驱动本机 opencode；可扩展 `dify`/`opencode` 模块适配其他平台。
 
 **Q：如何远程控制本机 opencode？**
-A：需满足：① 本机启动 `opencode serve --port 4096`（设置 `OPENCODE_SERVER_PASSWORD`）；② 服务器经 frp 隧道访问本机并配置 `OPENCODE_ENABLED=true`、`OPENCODE_BASE_URL`、`OPENCODE_PASSWORD`；③ admin 在「私聊采集」页面将会话绑定 **🖥️ 本地opencode**。详见 [DEPLOY.md](./DEPLOY.md)。
+A：推荐使用配对节点通道：① 本机在 loopback 地址启动 `opencode serve` 并设置密码；② 管理员生成一次性配对码，目标电脑运行 `bridge/opencode-node.mjs` 完成配对；③ 管理员批准节点并将私聊绑定到该节点。无需 frp。旧部署也可继续使用 `/opencode/bridge` 或 `OPENCODE_BASE_URL` direct HTTP。详见 [bridge/README.md](./bridge/README.md) 和 [DEPLOY.md](./DEPLOY.md)。
 
 **Q：是否支持多语言？**
 A：当前仅支持中文，可扩展 i18n 支持多语言。
@@ -1181,6 +1212,7 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| v1.4 | 2026-10-10 | 全站响应式工作台界面；OpenClaw 式本机节点配对、审批与私聊绑定；保留旧桥接和 direct HTTP 兼容 |
 | v1.0 | 2026-05-07 | 初始版本，完整功能 |
 | v1.1 | 2026-05-09 | 新增用户数据隔离、scope 切换支持、pom.xml 编译参数说明 |
 | v1.2 | 2026-08-01 | 新增私聊采集页面、会话级应用绑定、本地 opencode 远程控制集成 |
@@ -1196,5 +1228,5 @@ A：当前仅支持中文，可扩展 i18n 支持多语言。
 
 ---
 
-*文档版本：v1.3*
-*最后更新：2026-08-04*
+*文档版本：v1.4*
+*最后更新：2026-10-10*

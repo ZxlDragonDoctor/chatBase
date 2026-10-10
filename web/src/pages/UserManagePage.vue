@@ -3,7 +3,7 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">用户管理</div>
+          <h1 class="anime-card-title">用户管理</h1>
           <div class="anime-card-desc">查看和管理所有系统用户</div>
         </div>
         <div class="anime-card-actions">
@@ -18,11 +18,11 @@
         </div>
       </div>
 
-      <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
+      <div v-if="err" class="anime-error" role="alert" style="margin: 16px 28px;">{{ err }}</div>
 
       <div class="anime-card-body">
         <div class="filter-bar">
-          <input v-model="keyword" class="anime-input" placeholder="搜索用户名/昵称/邮箱..." style="max-width: 300px;" @keyup.enter="loadList" />
+          <input v-model="keyword" class="anime-input" aria-label="搜索用户名、昵称或邮箱" placeholder="搜索用户名/昵称/邮箱..." style="max-width: 300px;" @keyup.enter="loadList" />
           <button class="anime-btn ghost" @click="loadList">搜索</button>
         </div>
 
@@ -31,7 +31,8 @@
           <span class="anime-empty-text">加载中...</span>
         </div>
 
-        <table v-else-if="list.length > 0" class="anime-table">
+        <div v-else-if="list.length > 0" class="user-table-scroll">
+          <table class="anime-table user-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -57,19 +58,20 @@
                 </select>
               </td>
               <td>
-                <span class="anime-badge" :class="user.status ? 'green' : 'pink'" style="cursor: pointer;" @click="toggleStatus(user)">
+                <button type="button" class="anime-badge user-status-toggle" :class="user.status ? 'green' : 'danger'" :aria-label="`${user.username}：${user.status ? '启用' : '禁用'}，点击切换状态`" @click="toggleStatus(user)">
                   {{ user.status ? '启用' : '禁用' }}
-                </span>
+                </button>
               </td>
               <td>{{ formatTime(user.createTime) }}</td>
               <td>
-                <button class="anime-btn ghost sm danger" @click="deleteUser(user)">
+                <button class="anime-btn ghost sm danger" :aria-label="`删除用户 ${user.username}`" @click="deleteUser(user)">
                   <Trash2 :size="14" />
                 </button>
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
 
         <div v-else-if="!loading" class="anime-empty">
           <div class="anime-empty-icon">👥</div>
@@ -85,29 +87,29 @@
     </section>
 
     <div v-if="showCreate" class="anime-modal-overlay" @click.self="showCreate = false">
-      <div class="anime-modal">
+      <div ref="dialogRef" class="anime-modal" role="dialog" aria-modal="true" aria-labelledby="create-user-title" tabindex="-1">
         <div class="anime-modal-header">
-          <span class="anime-modal-title">创建用户</span>
-          <button class="anime-modal-close" @click="showCreate = false">✕</button>
+          <span id="create-user-title" class="anime-modal-title">创建用户</span>
+          <button type="button" class="anime-modal-close" aria-label="关闭创建用户窗口" @click="showCreate = false">✕</button>
         </div>
         <div class="anime-modal-body">
           <div class="anime-form-group">
-            <label>用户名 *</label>
-            <input v-model="form.username" class="anime-input" placeholder="登录用户名" />
+            <label for="create-username">用户名 *</label>
+            <input id="create-username" v-model="form.username" class="anime-input" placeholder="登录用户名" />
           </div>
           <div class="anime-form-group">
-            <label>初始密码 *</label>
-            <input v-model="form.password" class="anime-input" type="password" placeholder="至少 6 位" />
+            <label for="create-password">初始密码 *</label>
+            <input id="create-password" v-model="form.password" class="anime-input" type="password" placeholder="至少 6 位" />
           </div>
           <div class="anime-form-group">
-            <label>昵称</label>
-            <input v-model="form.nickname" class="anime-input" placeholder="显示名称（可选）" />
+            <label for="create-nickname">昵称</label>
+            <input id="create-nickname" v-model="form.nickname" class="anime-input" placeholder="显示名称（可选）" />
           </div>
           <div class="anime-form-group">
-            <label>邮箱</label>
-            <input v-model="form.email" class="anime-input" placeholder="可选" />
+            <label for="create-email">邮箱</label>
+            <input id="create-email" v-model="form.email" class="anime-input" placeholder="可选" />
           </div>
-          <div v-if="createErr" class="anime-error" style="margin-bottom: 12px;">{{ createErr }}</div>
+          <div v-if="createErr" class="anime-error" role="alert" style="margin-bottom: 12px;">{{ createErr }}</div>
         </div>
         <div class="anime-modal-footer">
           <button class="anime-btn ghost" @click="showCreate = false">取消</button>
@@ -127,6 +129,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useModalDialog } from '../composables/useModalDialog'
 import { RefreshCw, Trash2, UserPlus } from 'lucide-vue-next'
 import { api } from '../api/client'
 import { createUser } from '../api/user'
@@ -152,6 +155,7 @@ const total = ref(0)
 const editingId = ref<number | null>(null)
 const roleSaving = ref(false)
 const showCreate = ref(false)
+const { dialogRef } = useModalDialog(showCreate, () => { showCreate.value = false })
 const createLoading = ref(false)
 const createErr = ref<string | null>(null)
 const form = ref({ username: '', password: '', nickname: '', email: '' })
@@ -253,6 +257,8 @@ onMounted(loadList)
 <style scoped>
 .filter-bar {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -281,4 +287,42 @@ onMounted(loadList)
   padding: 4px 10px;
   font-size: 13px;
 }
+
+.filter-bar .anime-input {
+  flex: 1 1 240px;
+  max-width: 420px;
+}
+
+.role-select {
+  min-height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface);
+  box-shadow: none;
+  color: var(--ui-text);
+}
+
+.role-select:focus-visible {
+  border-color: var(--ui-focus);
+  outline: 2px solid rgb(8 127 112 / 14%);
+  outline-offset: 1px;
+}
+
+.user-status-toggle {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.user-status-toggle:hover { filter: brightness(.96); }
+
+.user-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+
+.user-table { min-width: 760px; }
+.pagination { flex-wrap: wrap; }
 </style>

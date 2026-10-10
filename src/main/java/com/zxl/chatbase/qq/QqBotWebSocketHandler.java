@@ -430,7 +430,7 @@ public class QqBotWebSocketHandler extends TextWebSocketHandler {
             
             if (group != null && group.getAppId() != null) {
                 KbApp app = kbAppMapper.selectById(group.getAppId());
-                if (app != null && app.getStatus()) {
+                if (app != null && Boolean.TRUE.equals(app.getStatus())) {
                     return app.getId();
                 }
             }

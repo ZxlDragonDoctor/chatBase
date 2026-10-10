@@ -1,53 +1,63 @@
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="visible" class="ac-overlay" @click.self="$emit('cancel')">
+      <div
+        v-if="visible"
+        ref="dialogRef"
+        class="ac-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="avatar-cropper-title"
+        tabindex="-1"
+        @keydown="handleDialogKeydown"
+        @click.self="$emit('cancel')"
+      >
         <div class="ac-modal anime-card">
           <div class="ac-header">
-            <span class="ac-title">✿ 裁切头像 ✿</span>
-            <button class="ac-close" @click="$emit('cancel')">✕</button>
+            <h2 id="avatar-cropper-title" class="ac-title">裁切头像</h2>
+            <button type="button" class="ac-close" aria-label="关闭头像裁切" @click="$emit('cancel')">✕</button>
           </div>
           
           <div class="ac-body">
             <div class="ac-area" ref="containerRef">
-              <img ref="imageRef" :src="imageUrl" alt="avatar" />
+              <img ref="imageRef" :src="imageUrl" alt="待裁切头像" />
             </div>
             
             <div class="ac-preview-panel">
-              <div class="ac-preview-label">预览</div>
+              <div class="ac-preview-label" id="avatar-crop-preview-label">预览</div>
               <div class="ac-preview-circle">
-                <canvas ref="previewRef" width="150" height="150"></canvas>
+                <canvas ref="previewRef" width="150" height="150" role="img" aria-labelledby="avatar-crop-preview-label">头像裁切预览</canvas>
               </div>
             </div>
           </div>
           
           <div class="ac-toolbar">
-            <button class="ac-tbtn" @click="rotate(-90)" title="左旋90°">
-              <span>↺</span>
+            <button type="button" class="ac-tbtn" @click="rotate(-90)" title="左旋90°" aria-label="向左旋转 90 度">
+              <span aria-hidden="true">↺</span>
               <span class="ac-tlabel">左旋</span>
             </button>
-            <button class="ac-tbtn" @click="rotate(90)" title="右旋90°">
-              <span>↻</span>
+            <button type="button" class="ac-tbtn" @click="rotate(90)" title="右旋90°" aria-label="向右旋转 90 度">
+              <span aria-hidden="true">↻</span>
               <span class="ac-tlabel">右旋</span>
             </button>
-            <button class="ac-tbtn" @click="doZoom(0.1)" title="放大">
-              <span>🔍+</span>
+            <button type="button" class="ac-tbtn" @click="doZoom(0.1)" title="放大" aria-label="放大头像">
+              <span aria-hidden="true">🔍+</span>
               <span class="ac-tlabel">放大</span>
             </button>
-            <button class="ac-tbtn" @click="doZoom(-0.1)" title="缩小">
-              <span>🔍-</span>
+            <button type="button" class="ac-tbtn" @click="doZoom(-0.1)" title="缩小" aria-label="缩小头像">
+              <span aria-hidden="true">🔍-</span>
               <span class="ac-tlabel">缩小</span>
             </button>
-            <button class="ac-tbtn" @click="doReset" title="重置">
-              <span>⟳</span>
+            <button type="button" class="ac-tbtn" @click="doReset" title="重置" aria-label="重置头像裁切">
+              <span aria-hidden="true">⟳</span>
               <span class="ac-tlabel">重置</span>
             </button>
           </div>
           
           <div class="ac-footer">
-            <button class="anime-btn ghost" :disabled="processing" @click="$emit('cancel')">取消</button>
-            <button class="anime-btn primary" :disabled="processing" @click="doConfirm">
-              <span v-if="processing" class="anime-loader-spinner" style="width: 14px; height: 14px;"></span>
+            <button type="button" class="anime-btn ghost" :disabled="processing" @click="$emit('cancel')">取消</button>
+            <button type="button" class="anime-btn primary" :disabled="processing" :aria-busy="processing" @click="doConfirm">
+              <span v-if="processing" class="anime-loader-spinner" aria-hidden="true" style="width: 14px; height: 14px;"></span>
               <span v-else>确认裁切</span>
             </button>
           </div>
@@ -58,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import Cropper from 'cropperjs'
 import 'cropperjs/dist/cropper.css'
 
@@ -75,7 +85,9 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement>()
 const imageRef = ref<HTMLImageElement>()
 const previewRef = ref<HTMLCanvasElement>()
+const dialogRef = ref<HTMLDivElement>()
 const processing = ref(false)
+let triggerElement: HTMLElement | null = null
 
 let cropper: Cropper | null = null
 
@@ -193,17 +205,61 @@ function destroyCropper() {
   }
 }
 
+function trapDialogFocus(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !dialogRef.value) return
+
+  const focusableElements = Array.from(dialogRef.value.querySelectorAll<HTMLElement>(
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+  )).filter(element => element.getClientRects().length > 0)
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+
+  if (!first || !last) {
+    event.preventDefault()
+    dialogRef.value.focus()
+    return
+  }
+
+  const focusIsInside = dialogRef.value.contains(document.activeElement)
+  if (event.shiftKey && (!focusIsInside || document.activeElement === first)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (!focusIsInside || document.activeElement === last)) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function handleDialogKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && !processing.value) {
+    event.preventDefault()
+    emit('cancel')
+    return
+  }
+  trapDialogFocus(event)
+}
+
+function focusDialog() {
+  dialogRef.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+}
+
 onMounted(() => {
   if (props.visible) {
+    triggerElement = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : null
     initCropper()
+    nextTick(focusDialog)
   }
 })
 
 watch(() => props.visible, (val) => {
   if (val) {
     initCropper()
+    nextTick(focusDialog)
   } else {
     destroyCropper()
+    if (triggerElement?.isConnected) triggerElement.focus()
   }
 })
 
@@ -215,17 +271,19 @@ watch(() => props.imageUrl, () => {
 
 onBeforeUnmount(() => {
   destroyCropper()
+  if (triggerElement?.isConnected) triggerElement.focus()
 })
 </script>
 
-<style>
+<style scoped>
 .ac-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  padding: 16px;
+  background: rgb(23 35 33 / 48%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -233,13 +291,16 @@ onBeforeUnmount(() => {
 }
 
 .ac-modal {
-  width: 750px;
-  max-width: 95vw;
-  max-height: 90vh;
+  width: min(750px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   padding: 0;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .ac-header {
@@ -247,23 +308,32 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 2px solid var(--anime-border);
-  background: var(--anime-bg);
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
 }
 
 .ac-title {
+  margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--anime-pink);
+  color: var(--ui-text);
 }
 
 .ac-close {
   background: transparent;
   border: none;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 20px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
   cursor: pointer;
-  padding: 4px 8px;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+}
+
+.ac-close:hover {
+  color: var(--ui-primary-hover);
+  background: var(--ui-primary-soft);
 }
 
 .ac-body {
@@ -271,14 +341,14 @@ onBeforeUnmount(() => {
   gap: 20px;
   padding: 20px;
   flex: 1;
-  min-height: 400px;
+  min-height: 350px;
 }
 
 .ac-area {
   flex: 1;
   background: #000;
-  border-radius: var(--anime-radius-lg);
-  border: 2px solid var(--anime-border);
+  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border);
   overflow: hidden;
   min-height: 350px;
 }
@@ -299,17 +369,17 @@ onBeforeUnmount(() => {
 .ac-preview-label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--anime-text-secondary);
+  color: var(--ui-text-secondary);
 }
 
 .ac-preview-circle {
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  border: 3px solid var(--anime-pink);
+  border: 2px solid var(--ui-primary);
   overflow: hidden;
-  box-shadow: var(--anime-shadow-card);
-  background: var(--anime-bg);
+  box-shadow: var(--ui-shadow-card);
+  background: var(--ui-surface);
 }
 
 .ac-preview-circle canvas {
@@ -322,8 +392,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 12px;
   padding: 12px 20px;
-  border-top: 2px solid var(--anime-border);
-  background: var(--anime-bg);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
 }
 
 .ac-tbtn {
@@ -331,19 +401,21 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 16px;
-  background: var(--anime-bg-card);
-  border: 2px solid var(--anime-border);
-  border-radius: var(--anime-radius-lg);
+  min-width: 72px;
+  min-height: 56px;
+  padding: 8px 12px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 16px;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
 }
 
 .ac-tbtn:hover {
-  border-color: var(--anime-pink);
-  background: var(--anime-bg-hover);
+  border-color: var(--ui-primary);
+  background: var(--ui-primary-soft);
 }
 
 .ac-tbtn:active {
@@ -352,7 +424,7 @@ onBeforeUnmount(() => {
 
 .ac-tlabel {
   font-size: 11px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-secondary);
 }
 
 .ac-footer {
@@ -360,27 +432,34 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   gap: 12px;
   padding: 12px 20px;
-  border-top: 2px solid var(--anime-border);
-  background: var(--anime-bg);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
 }
 
-.cropper-view-box {
-  outline: 2px solid var(--anime-pink) !important;
-  outline-color: rgba(255, 107, 157, 0.75) !important;
+.ac-footer .anime-btn { min-height: 44px; }
+
+:deep(.cropper-view-box) {
+  outline: 2px solid var(--ui-focus) !important;
 }
 
-.cropper-face {
+:deep(.cropper-face) {
   background: none !important;
 }
 
-.cropper-line {
-  background: var(--anime-pink) !important;
+:deep(.cropper-line) {
+  background: var(--ui-primary) !important;
   opacity: 0.75 !important;
 }
 
-.cropper-point {
-  background-color: var(--anime-pink) !important;
+:deep(.cropper-point) {
+  background-color: var(--ui-primary) !important;
   opacity: 0.75 !important;
+}
+
+.ac-close:focus-visible,
+.ac-tbtn:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
 
 .fade-enter-active,
@@ -391,5 +470,47 @@ onBeforeUnmount(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 640px) {
+  .ac-body {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .ac-area { min-height: 300px; }
+
+  .ac-preview-panel {
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .ac-preview-circle {
+    width: 96px;
+    height: 96px;
+  }
+
+  .ac-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .ac-tbtn {
+    min-width: 56px;
+    flex: 1 1 56px;
+    padding: 8px;
+  }
+
+  .ac-footer { padding: 12px; }
+  .ac-footer .anime-btn { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ac-tbtn,
+  .fade-enter-active,
+  .fade-leave-active { transition: none; }
+  .ac-tbtn:active { transform: none; }
 }
 </style>

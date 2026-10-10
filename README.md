@@ -34,6 +34,7 @@
 
 - [项目简介 · What is it](#项目简介--what-is-it)
 - [核心特性 · Features](#核心特性--features)
+- [界面与首页统计](#界面与首页统计)
 - [技术栈 · Tech Stack](#技术栈--tech-stack)
 - [系统架构 · Architecture](#系统架构--architecture)
 - [快速开始 · Quick Start](#快速开始--quick-start)
@@ -59,7 +60,8 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 
 - **多渠道统一抽象**：QQ 走 NapCat（WebSocket + WebUI 扫码）、企业微信走回调、微信个人号走 iLink，差异被收敛到同一套 IM 消息模型。
 - **知识库优先**：FAQ 优先命中，未命中再走大模型，并附带引用来源。
-- **可选远程编码代理**：私聊会话可绑定本机 opencode，通过安全隧道远程驱动本地 AI（仅 admin，可关闭）。
+- **统一工作台界面**：登录、聊天、统计、IM、知识库、应用、机器人、FAQ 与管理页面采用一致的响应式浅色界面。
+- **OpenClaw 式本机节点**：电脑通过 WSS 主动连接并用一次性配对码登记，经管理员批准后绑定私聊；原有 direct HTTP 和 V1 桥接仍可使用。
 
 **Keywords:** AI chatbot · customer service · RAG knowledge base · Dify · QQ Bot (NapCat) · WeCom · WeChat personal · remote coding agent · opencode · Vue 3 · Spring Boot
 
@@ -72,11 +74,20 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 | <img src="./assets/icons/dialogue.png" width="28" alt=""> **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
 | <img src="./assets/icons/knowledge.png" width="28" alt=""> **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
 | <img src="./assets/icons/channels.png" width="28" alt=""> **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
-| <img src="./assets/icons/remote.png" width="28" alt=""> **远程 opencode / Remote** | 私聊绑定本机 opencode（可选） | 会话级绑定特殊应用（appId=-1），仅 admin，默认关闭 |
+| <img src="./assets/icons/remote.png" width="28" alt=""> **远程 opencode / Remote** | 私聊绑定已批准的本机节点（可选） | OpenClaw 式主动 WSS 配对；保留 direct HTTP 与 V1 桥接兼容，仅 admin 可管理 |
+| **工作台界面 / Console UI** | 全站统一、响应式的浅色工作台 | 包括窄屏导航、可访问的表单与弹窗、清晰的加载和错误状态 |
 | <img src="./assets/icons/analytics.png" width="28" alt=""> **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
 | <img src="./assets/icons/feedback.png" width="28" alt=""> **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
 | <img src="./assets/icons/commands.png" width="28" alt=""> **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
 | <img src="./assets/icons/security.png" width="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；默认关闭自助注册 |
+
+---
+
+## 界面与首页统计
+
+管理控制台采用统一的浅色工作台布局，覆盖首页、统计、群聊与私聊、知识库、应用、机器人、FAQ、聊天、反馈和管理员页面。窄屏下导航、表格、工具栏和弹窗会调整布局；键盘用户可以使用页面导航和弹窗操作。
+
+首页统计的实现审查发现平台 ID 和用户可见群组范围存在边界问题，详情及建议见[首页统计口径审查](./docs/dashboard-statistics-audit.md)。该审查记录描述当前服务端统计实现。
 
 ---
 
@@ -126,10 +137,10 @@ flowchart LR
   be --> redis[("Redis")]
   be --> mysql[("MySQL 8")]
   be -->|Chat / Dataset| dify["Dify<br/>LLM + RAG"]
-  be -.->|可选| oc["本机 opencode<br/>（需自行打通网络）"]
+  be <-.->|Node RPC / WSS<br/>V1 桥接兼容| oc["本机 opencode<br/>+ Node Agent"]
 ```
 
-典型部署：反向代理 → 前端 → 后端 API；数据层为 MySQL + Redis；外部依赖为 Dify，以及可选的 NapCat / 企微回调 / iLink / opencode。
+典型部署：反向代理 → 前端 → 后端 API；数据层为 MySQL + Redis；外部依赖为 Dify，以及可选的 NapCat / 企微回调 / iLink / opencode 桥接。
 
 ---
 
@@ -220,6 +231,11 @@ cd web && npm install && npm run dev
 | `OPENCODE_DEFAULT_DIRECTORY` | 本机项目根目录 | - |
 | `OPENCODE_DEFAULT_AGENT` | opencode agent | `build` |
 | `OPENCODE_TIMEOUT_SECONDS` | 等待回复超时（秒） | `300` |
+| `OPENCODE_NODE_ENABLED` | 启用新版本机节点通道 | `true`（仍需 `OPENCODE_ENABLED=true`） |
+| `OPENCODE_NODE_TIMEOUT_SECONDS` | 等待本机节点 RPC 超时（秒） | `320` |
+| `OPENCODE_NODE_HEARTBEAT_SECONDS` | 节点心跳间隔（秒） | `30` |
+| `OPENCODE_NODE_OFFLINE_AFTER_SECONDS` | 判定节点离线的时间（秒） | `90` |
+| `OPENCODE_NODE_PAIRING_TTL_SECONDS` | 一次性配对码有效期（秒） | `600` |
 | `JAVA_OPTS` | JVM 参数 | `-Xms512m -Xmx2048m` |
 | `NAPCAT_IMAGE` | NapCat 镜像名称 | `mlikiowa/napcat-docker:v4.17.46` |
 
@@ -236,7 +252,7 @@ cd web && npm install && npm run dev
 | **kb** | `com.zxl.chatbase.kb` | 知识库、分类、文档、FAQ、应用、关键词 |
 | **im** | `com.zxl.chatbase.im` | IM 消息采集、会话绑定、机器人管理 |
 | **command** | `com.zxl.chatbase.command` | 机器人交互命令框架 |
-| **opencode** | `com.zxl.chatbase.opencode` | 可选：本地 opencode serve 集成 |
+| **opencode** | `com.zxl.chatbase.opencode` | 本机 OpenCode direct、V1 桥接与新版配对节点通道 |
 | **qq** | `com.zxl.chatbase.qq` | QQ 机器人 WebSocket + WebUI 扫码登录代理 |
 | **wxroboot** | `com.zxl.chatbase.wxroboot` | 企业微信回调处理、消息加解密 |
 | **statistics** | `com.zxl.chatbase.statistics` | 统计分析、Token、费用、关键词聚合 |
@@ -332,17 +348,22 @@ docker compose --profile qq up -d
 
 ## 可选：远程 opencode / Optional remote opencode
 
-将私聊会话绑定到开发者本机的 `opencode serve`，实现远程驱动本地 AI 编程代理。
+将私聊会话绑定到开发者本机的 `opencode serve`，实现远程驱动本地 AI 编程代理。推荐使用新版 OpenClaw 式 Node 通道：本机 Agent 主动连接服务端，不需要开放本机入站端口或配置 frp。
 
-**前提**
-1. 本机运行 `opencode serve` 并设置 Basic Auth 密码
-2. 服务器可访问该服务（同机直连，或自行打通隧道/内网）
-3. 配置 `OPENCODE_ENABLED=true`、`OPENCODE_BASE_URL`、`OPENCODE_PASSWORD`
-4. 以 **admin** 在「私聊采集」中绑定「本地opencode」（仅 admin 可见）
+**新版 Node 通道**
 
-会话映射存于 Redis（TTL 7 天），回复写入 `kb_conversation` 审计后再回发私聊。
+1. 服务器设置 `OPENCODE_ENABLED=true`、`OPENCODE_NODE_ENABLED=true`，并为 `/opencode/node` 配置 HTTPS/WSS 反向代理。
+2. 本机运行 `opencode serve`，并启动 `bridge/opencode-node.mjs`（需要 Node.js 22+）。
+3. 管理员在「私聊采集」生成一次性配对码，在本机 Agent 输入配对码后批准新节点。
+4. 管理员将指定私聊绑定到已批准的节点。未绑定节点的会话继续使用原 Dify 流程。
 
-> 安全提醒：opencode 具备本机执行能力，请仅在可信网络暴露，并强制鉴权。隧道与容器网络等部署细节见 [DEPLOY.md](./DEPLOY.md)。
+节点通道只开放固定的 OpenCode 命令；配对、审批、撤销及 Agent 环境变量见 [bridge/README.md](./bridge/README.md)，部署配置见 [DEPLOY.md](./DEPLOY.md)。
+
+**兼容方式**
+
+已有部署仍可使用旧版 `/opencode/bridge` 反向桥接或 `OPENCODE_BASE_URL` 直连。V1 桥接和直连配置说明见 [DEPLOY.md](./DEPLOY.md)。
+
+> 安全提醒：opencode 具备本机执行能力。新版 Agent 只连接 loopback 上的 OpenCode 服务；请保护服务器登录账号，并只批准可信电脑。
 
 ---
 
@@ -398,6 +419,8 @@ docker compose --profile qq up -d
 | [USER_GUIDE.md](./USER_GUIDE.md) | 使用文档：部署、配置、功能、排查、FAQ |
 | [DEPLOY.md](./DEPLOY.md) | 部署指南：Docker、环境变量、服务管理、可选组件 |
 | [DESIGN.md](./DESIGN.md) | 详细设计：架构、模块、数据库、数据流、API |
+| [bridge/README.md](./bridge/README.md) | 本机 OpenCode Node 配对、审批与旧版桥接说明 |
+| [docs/dashboard-statistics-audit.md](./docs/dashboard-statistics-audit.md) | 首页统计口径审查及修正建议 |
 | [OPS_TROUBLESHOOTING.md](./OPS_TROUBLESHOOTING.md) | 运维排障笔记（面向运维，非产品文档） |
 
 ---
@@ -423,9 +446,10 @@ chatBase/
 │   └── controller/     # API 控制器
 │
 ├── web/                # Vue 3 前端
+├── bridge/             # 本机 OpenCode Node Agent 与兼容 V1 Agent
 ├── sql/                # 数据库脚本
 ├── assets/             # README 图片资源
-├── docs/               # 架构图等
+├── docs/               # 架构图、统计口径审查等
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
@@ -442,4 +466,4 @@ chatBase/
 
 ---
 
-*最后更新 / Last updated：2026-09-12 · 中文为主 / Chinese-primary, English-mirror*
+*最后更新 / Last updated：2026-10-10 · 中文为主 / Chinese-primary, English-mirror*

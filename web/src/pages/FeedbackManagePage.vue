@@ -3,7 +3,7 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">反馈管理</div>
+          <h1 class="anime-card-title">反馈管理</h1>
           <div class="anime-card-desc">查看用户反馈，回复并处理</div>
         </div>
         <div class="stats-overview" v-if="stats">
@@ -28,7 +28,7 @@
 
       <div class="anime-card-body">
         <div class="filter-bar">
-          <select v-model="filterStatus" class="anime-input" @change="loadList">
+          <select v-model="filterStatus" class="anime-input" aria-label="按处理状态筛选反馈" @change="loadList">
             <option :value="undefined">全部</option>
             <option :value="0">待处理</option>
             <option :value="1">已处理</option>
@@ -47,11 +47,11 @@
         </div>
 
         <div v-else class="feedback-list">
-          <div v-for="item in list" :key="item.id" class="feedback-item" @click="openDetail(item)">
+          <div v-for="item in list" :key="item.id" class="feedback-item" role="button" tabindex="0" @click="openDetail(item)" @keydown.enter="!$event.repeat && openDetail(item)" @keydown.space.prevent="$event.stopPropagation()" @keyup.space.prevent="openDetail(item)">
             <div class="feedback-header">
               <span class="feedback-id">#{{ item.id }}</span>
               <span class="feedback-rating">
-                <Star v-for="n in 5" :key="n" :size="14" :fill="item.rating >= n ? '#ffb7c5' : 'none'" />
+                <Star v-for="n in 5" :key="n" :size="14" :fill="item.rating >= n ? '#d28a2e' : 'none'" />
               </span>
               <span class="feedback-type-badge" :class="item.feedbackType">{{ getTypeLabel(item.feedbackType) }}</span>
               <span class="feedback-status" :class="{ pending: !item.status, done: item.status }">
@@ -75,16 +75,16 @@
     </section>
 
     <div v-if="showDetail" class="anime-modal-overlay" @click.self="showDetail = false">
-      <div class="anime-modal feedback-detail-modal">
+      <div ref="dialogRef" class="anime-modal feedback-detail-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-detail-title" tabindex="-1">
         <div class="anime-modal-header">
-          <span class="modal-title">反馈详情 #{{ detail?.id }}</span>
-          <button class="anime-modal-close" @click="showDetail = false">✕</button>
+          <span id="feedback-detail-title" class="modal-title">反馈详情 #{{ detail?.id }}</span>
+          <button type="button" class="anime-modal-close" aria-label="关闭反馈详情" @click="showDetail = false">✕</button>
         </div>
         <div class="anime-modal-body" v-if="detail">
           <div class="detail-section">
             <label>满意度评分</label>
             <div class="rating-stars">
-              <Star v-for="n in 5" :key="n" :size="20" :fill="detail.rating >= n ? '#ffb7c5' : 'none'" />
+              <Star v-for="n in 5" :key="n" :size="20" :fill="detail.rating >= n ? '#d28a2e' : 'none'" />
               <span>{{ ratingTexts[detail.rating] }}</span>
             </div>
           </div>
@@ -114,7 +114,8 @@
 
           <div class="reply-section" v-if="!detail.status">
             <label>回复用户</label>
-            <textarea v-model="replyContent" class="anime-input reply-textarea" placeholder="输入回复内容..." rows="4"></textarea>
+            <label class="reply-field-label" for="feedback-reply">回复内容</label>
+            <textarea id="feedback-reply" v-model="replyContent" class="anime-input reply-textarea" placeholder="输入回复内容..." rows="4"></textarea>
             <div class="reply-actions">
               <button class="anime-btn primary" :disabled="replying || !replyContent.trim()" @click="submitReply">
                 <Send :size="18" />
@@ -134,6 +135,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useModalDialog } from '../composables/useModalDialog'
 import { Star, RefreshCw, Send, CheckCircle } from 'lucide-vue-next'
 import {
   fetchFeedbackPage,
@@ -150,6 +152,7 @@ const detail = ref<KbFeedback | null>(null)
 const loading = ref(false)
 const replying = ref(false)
 const showDetail = ref(false)
+const { dialogRef } = useModalDialog(showDetail, () => { showDetail.value = false })
 const replyContent = ref('')
 const filterStatus = ref<number | undefined>(undefined)
 const pageNum = ref(1)
@@ -271,7 +274,7 @@ onMounted(() => {
   box-shadow: var(--anime-shadow-sm);
 }
 
-.stat-item.pending .stat-value { color: var(--anime-pink); }
+.stat-item.pending .stat-value { color: var(--ui-warning); }
 .stat-item.done .stat-value { color: var(--anime-green); }
 
 .stat-label {
@@ -340,8 +343,8 @@ onMounted(() => {
   color: var(--anime-text-secondary);
 }
 
-.feedback-type-badge.inaccurate { background: var(--anime-pink-bg); color: var(--anime-pink); }
-.feedback-type-badge.accurate { background: rgba(184, 233, 148, 0.2); color: var(--anime-green); }
+.feedback-type-badge.inaccurate { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.feedback-type-badge.accurate { background: var(--ui-success-soft); color: var(--ui-success); }
 
 .feedback-status {
   padding: 4px 12px;
@@ -350,13 +353,13 @@ onMounted(() => {
 }
 
 .feedback-status.pending {
-  background: var(--anime-pink-bg);
-  color: var(--anime-pink);
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning);
 }
 
 .feedback-status.done {
-  background: rgba(184, 233, 148, 0.2);
-  color: var(--anime-green);
+  background: var(--ui-success-soft);
+  color: var(--ui-success);
 }
 
 .feedback-content {
@@ -450,5 +453,57 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   margin-top: 12px;
+}
+
+.stats-overview { gap: 10px; }
+.stat-item {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  box-shadow: none;
+}
+.stat-item.pending .stat-value { color: var(--ui-accent); }
+.stat-item.done .stat-value { color: var(--ui-success); }
+.stat-label { color: var(--ui-text-muted); }
+.stat-value { color: var(--ui-text); }
+.filter-bar { align-items: center; }
+.feedback-list { gap: 10px; }
+.feedback-item {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  box-shadow: none;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.feedback-item:hover, .feedback-item:focus-visible {
+  border-color: #a6d2c8;
+  box-shadow: 0 5px 16px rgb(19 48 41 / 8%);
+}
+.feedback-id { color: var(--ui-text); }
+.feedback-type-badge { background: var(--ui-surface-muted); color: var(--ui-text-secondary); }
+.feedback-type-badge.inaccurate { background: #fff0f0; color: var(--ui-danger); }
+.feedback-type-badge.accurate { background: #eaf6ef; color: var(--ui-success); }
+.feedback-status.pending { background: #fff4df; color: var(--ui-accent); }
+.feedback-status.done { background: #eaf6ef; color: var(--ui-success); }
+.feedback-content { color: var(--ui-text-secondary); }
+.feedback-meta { flex-wrap: wrap; color: var(--ui-text-muted); gap: 8px 16px; }
+.feedback-rating, .rating-stars { color: var(--ui-accent); }
+.detail-content-box, .detail-reply-box {
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  box-shadow: none;
+  color: var(--ui-text);
+}
+.detail-reply-box { background: #eaf6ef; border-color: #c8e7d4; }
+.reply-section { border-color: var(--ui-border); }
+.pagination { flex-wrap: wrap; }
+.reply-actions { flex-wrap: wrap; }
+.filter-bar select.anime-input { width: auto; min-width: 140px; }
+@media (max-width: 800px) {
+  .anime-card-header { align-items: flex-start; flex-direction: column; }
+  .stats-overview { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat-item { min-width: 0; padding: 10px 12px; }
+  .reply-actions > .anime-btn { flex: 1 1 150px; }
 }
 </style>

@@ -20,13 +20,19 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/health",
             "/api/user/login",
             "/api/user/register", // 保留路径但仅返回「已关闭」提示，不再放行业务
-            "/api/chat/**",
+            // 仅放行 ChatController 的问答/上传端点；会话管理 /api/chat/session/** 必须鉴权
+            "/api/chat/ask",
+            "/api/chat/message",
+            "/api/chat/web",
+            "/api/chat/web/session",
+            "/api/chat/im",
+            "/api/chat/v1/files/**",
             "/api/upload/**",
             "/api/uploads/**",
             "/api/feedback/submit",
-            "/api/feedback/user/**",
             "/qq/**",
             "/intellrobot/**",
+            "/opencode/bridge",
             "/error",
             "/uploads/**"
     );
@@ -43,7 +49,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/user/*/status",
             "/api/user/*/remove",
             "/api/kb/app/admin/**",
-            "/api/kb/admin/**"
+            "/api/kb/admin/**",
+            "/api/opencode/**",
+            "/api/console/conversations/*/opencode-node"
     );
 
     @Override

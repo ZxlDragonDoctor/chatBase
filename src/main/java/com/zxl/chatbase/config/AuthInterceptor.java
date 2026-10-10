@@ -23,13 +23,10 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         String authHeader = request.getHeader("Authorization");
         String token = null;
-        
+
+        // 仅接受 Authorization 头，禁止 URL query 携带 token（会进 access log / Referer）
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-        }
-        
-        if (token == null) {
-            token = request.getParameter("token");
         }
 
         if (token == null || !tokenService.validateToken(token)) {

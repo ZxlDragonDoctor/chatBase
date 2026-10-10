@@ -69,7 +69,7 @@ public class ChatServiceImpl implements ChatService {
         KbApp app = null;
         if (appId != null) {
             app = appService.getById(appId);
-            if (app != null && app.getStatus()) {
+            if (app != null && Boolean.TRUE.equals(app.getStatus())) {
                 apiKey = app.getDifyApiKey();
             }
         }
@@ -83,7 +83,7 @@ public class ChatServiceImpl implements ChatService {
         
         try {
             KbFaq faq = faqService.findSimilar(query);
-            if (faq != null && faq.getStatus() && faq.getAnswer() != null) {
+            if (faq != null && Boolean.TRUE.equals(faq.getStatus()) && faq.getAnswer() != null) {
                 log.info("从FAQ匹配到答案: question={}, faqId={}", query, faq.getId());
                 
                 DifyChatResponse faqResponse = new DifyChatResponse();
@@ -280,7 +280,7 @@ public class ChatServiceImpl implements ChatService {
         KbApp app = null;
         if (appId != null) {
             app = appService.getById(appId);
-            if (app != null && app.getStatus()) {
+            if (app != null && Boolean.TRUE.equals(app.getStatus())) {
                 apiKey = app.getDifyApiKey();
             }
         }
@@ -294,7 +294,7 @@ public class ChatServiceImpl implements ChatService {
         
         try {
             KbFaq faq = faqService.findSimilar(query);
-            if (faq != null && faq.getStatus() && faq.getAnswer() != null) {
+            if (faq != null && Boolean.TRUE.equals(faq.getStatus()) && faq.getAnswer() != null) {
                 log.info("从FAQ匹配到答案: sessionId={}, question={}, faqId={}", sessionId, query, faq.getId());
                 
                 DifyChatResponse faqResponse = new DifyChatResponse();

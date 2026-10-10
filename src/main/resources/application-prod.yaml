@@ -66,7 +66,9 @@ wx:
     bot-id: ${WX_BOT_BOT_ID:}
     nickname: ${WX_BOT_NICKNAME:微信机器人}
 
-# 本地 opencode serve 集成配置（经 frp 隧道访问本机 opencode）
+# 本地 opencode serve 集成配置
+# 新版推荐：本机 Node Agent 外连 /opencode/node，经配对和能力批准后按私聊绑定
+# /opencode/bridge 是旧版 V1 兼容通道；直连模式仍由 base-url 配置
 opencode:
   enabled: ${OPENCODE_ENABLED:false}
   base-url: ${OPENCODE_BASE_URL:http://127.0.0.1:4096}
@@ -76,6 +78,18 @@ opencode:
   default-agent: ${OPENCODE_DEFAULT_AGENT:build}
   default-model: ${OPENCODE_DEFAULT_MODEL:opencode/mimo-v2.5-free}
   timeout-seconds: ${OPENCODE_TIMEOUT_SECONDS:300}
+  bridge:
+    enabled: ${OPENCODE_BRIDGE_ENABLED:true}
+    token: ${OPENCODE_BRIDGE_TOKEN:}
+    transport: ${OPENCODE_BRIDGE_TRANSPORT:auto}
+    request-timeout-seconds: ${OPENCODE_BRIDGE_TIMEOUT_SECONDS:320}
+    heartbeat-seconds: ${OPENCODE_BRIDGE_HEARTBEAT_SECONDS:30}
+  node:
+    enabled: ${OPENCODE_NODE_ENABLED:true}
+    request-timeout-seconds: ${OPENCODE_NODE_TIMEOUT_SECONDS:320}
+    heartbeat-seconds: ${OPENCODE_NODE_HEARTBEAT_SECONDS:30}
+    offline-after-seconds: ${OPENCODE_NODE_OFFLINE_AFTER_SECONDS:90}
+    pairing-ttl-seconds: ${OPENCODE_NODE_PAIRING_TTL_SECONDS:600}
 
 chat:
   max-turns-per-session: 20

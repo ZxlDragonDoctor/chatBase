@@ -1,7 +1,7 @@
 package com.zxl.chatbase.command.handler;
 
 import com.zxl.chatbase.command.CommandHandler;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import com.zxl.chatbase.opencode.OpencodeService;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -9,10 +9,8 @@ import javax.annotation.Resource;
 @Component
 public class ClearCommand implements CommandHandler {
 
-    private static final String OPCODE_SESSION_PREFIX = "opencode:session:";
-
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private OpencodeService opencodeService;
 
     @Override
     public String name() { return "clear"; }
@@ -26,7 +24,7 @@ public class ClearCommand implements CommandHandler {
     @Override
     public String execute(String args, String channel, String userId, String conversationId) {
         // Clear opencode session
-        stringRedisTemplate.delete(OPCODE_SESSION_PREFIX + conversationId);
+        opencodeService.resetConversationSession(conversationId);
 
         // Clear any other session-related keys for this conversation
         // (could extend to clear Dify conversation ID if needed)

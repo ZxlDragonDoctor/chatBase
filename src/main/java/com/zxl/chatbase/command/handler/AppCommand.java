@@ -48,7 +48,7 @@ public class AppCommand implements CommandHandler {
                 return "📱 当前使用默认应用:\n" +
                         "名称: " + defaultApp.getName() + "\n" +
                         "ID: " + defaultApp.getId() + "\n" +
-                        "状态: " + (defaultApp.getStatus() ? "启用" : "停用");
+                        "状态: " + (Boolean.TRUE.equals(defaultApp.getStatus()) ? "启用" : "停用");
             }
             return "📱 当前未绑定任何应用";
         }
@@ -61,7 +61,7 @@ public class AppCommand implements CommandHandler {
         return "📱 当前绑定应用:\n" +
                 "名称: " + app.getName() + "\n" +
                 "ID: " + app.getId() + "\n" +
-                "状态: " + (app.getStatus() ? "启用" : "停用") +
+                "状态: " + (Boolean.TRUE.equals(app.getStatus()) ? "启用" : "停用") +
                 (app.getIsDefault() ? " (默认)" : "");
     }
 }

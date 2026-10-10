@@ -1,8 +1,8 @@
 <template>
-  <div class="anime-stat-card" :class="{ 'loading': loading }">
+  <div class="anime-stat-card" :class="{ loading }" :aria-busy="loading">
     <div class="anime-stat-value" :class="colorClass">
       <template v-if="loading">
-        <span class="anime-loader-spinner"></span>
+        <span class="anime-loader-spinner" aria-hidden="true"></span>
       </template>
       <template v-else>
         {{ formattedValue }}
@@ -58,5 +58,17 @@ function formatTokens(n: number): string {
 </script>
 
 <style scoped>
-.anime-stat-card.loading { opacity: 0.7; }
+.anime-stat-card.loading { opacity: 0.78; }
+.anime-stat-label { color: var(--ui-text-secondary); }
+
+.anime-stat-value {
+  background: none;
+  color: var(--ui-primary);
+  -webkit-text-fill-color: currentColor;
+}
+
+.anime-stat-value.blue { background: none; color: var(--ui-primary); }
+.anime-stat-value.green { background: none; color: var(--ui-success); }
+.anime-stat-value.purple { background: none; color: var(--ui-text-secondary); }
+.anime-stat-value.yellow { background: none; color: var(--ui-accent); }
 </style>

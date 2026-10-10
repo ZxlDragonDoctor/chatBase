@@ -79,7 +79,7 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
             return null;
         }
 
-        if (!user.getStatus()) {
+        if (!Boolean.TRUE.equals(user.getStatus())) {
             log.warn("用户已被禁用: username={}", request.getUsername());
             return null;
         }

@@ -5,6 +5,7 @@ export interface BotInfo {
   name: string
   botId: string | null
   online: boolean
+  statusLabel?: string
   groupCount: number
   todayMessages: number
   totalMessages: number

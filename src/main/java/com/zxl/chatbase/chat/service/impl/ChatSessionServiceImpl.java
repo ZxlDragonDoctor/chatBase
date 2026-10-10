@@ -53,6 +53,15 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
     }
 
     @Override
+    public ChatSession getSessionForUser(String sessionId, String userId) {
+        ChatSession session = getSessionById(sessionId);
+        if (session == null || userId == null || !userId.equals(session.getUserId())) {
+            return null;
+        }
+        return session;
+    }
+
+    @Override
     public Page<ChatSession> listUserSessions(String userId, String channel, Integer pageNum, Integer pageSize) {
         Page<ChatSession> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
@@ -82,10 +91,34 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
 
     @Override
     @Transactional
+    public boolean deleteSessionForUser(String sessionId, String userId) {
+        ChatSession session = getSessionForUser(sessionId, userId);
+        if (session == null) {
+            return false;
+        }
+        session.setStatus(false);
+        session.setUpdateTime(LocalDateTime.now());
+        return updateById(session);
+    }
+
+    @Override
+    @Transactional
     public boolean updateSessionTitle(String sessionId, String title) {
         LambdaQueryWrapper<ChatSession> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ChatSession::getSessionId, sessionId);
         ChatSession session = getOne(wrapper);
+        if (session == null) {
+            return false;
+        }
+        session.setTitle(title);
+        session.setUpdateTime(LocalDateTime.now());
+        return updateById(session);
+    }
+
+    @Override
+    @Transactional
+    public boolean updateSessionTitleForUser(String sessionId, String title, String userId) {
+        ChatSession session = getSessionForUser(sessionId, userId);
         if (session == null) {
             return false;
         }
@@ -104,6 +137,14 @@ public class ChatSessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatS
                 .eq(KbConversation::getStatus, true)
                 .orderByAsc(KbConversation::getCreateTime);
         return conversationMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<KbConversation> getSessionMessagesForUser(String sessionId, String userId) {
+        if (getSessionForUser(sessionId, userId) == null) {
+            return List.of();
+        }
+        return getSessionMessages(sessionId);
     }
 
     @Override

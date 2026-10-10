@@ -9,6 +9,9 @@ public class SystemOverviewVO {
     private Long totalMessages;
     private Long totalConversations;
     private Long totalTokens;
+    private Long todayConversations;
+    private Long todayTokens;
+    private BigDecimal todaySuccessRate;
     private Integer activeGroups;
     private Integer activeUsers;
     private Integer knowledgeBases;

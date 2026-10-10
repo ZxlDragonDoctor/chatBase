@@ -6,6 +6,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * 本地 opencode serve 集成配置
+ *
+ * 两种接入方式（无需同时配置）：
+ * 1. 桥接模式（推荐，无需 frp / 内网穿透）：本机运行 bridge/opencode-bridge.mjs 主动外连服务器
+ * 2. 直连模式：baseUrl 直接指向 opencode serve（同机 / frp 隧道 / Tailscale）
  */
 @Data
 @Component
@@ -13,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class OpencodeProperties {
 
     /**
-     * opencode serve 服务地址（服务器经 frp 隧道访问本机）
+     * opencode serve 服务地址（直连模式使用）
      */
     private String baseUrl = "http://127.0.0.1:4096";
 
@@ -51,4 +55,9 @@ public class OpencodeProperties {
      * 是否启用 opencode 集成（未配置时提示不可用）
      */
     private boolean enabled = false;
+
+    /**
+     * 桥接子配置（见 opencode.bridge.* / OpencodeBridgeProperties）
+     * 这里仅作文档占位，实际绑定在 OpencodeBridgeProperties
+     */
 }

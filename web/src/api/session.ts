@@ -48,17 +48,23 @@ export async function listSessions(userId: string, channel: string = 'web', page
   return resp.data
 }
 
-export async function getSession(sessionId: string): Promise<ChatSession> {
-  const resp = await api.get<ChatSession>(`/chat/session/${sessionId}`)
+export async function getSession(sessionId: string, userId: string): Promise<ChatSession> {
+  const resp = await api.get<ChatSession>(`/chat/session/${sessionId}`, {
+    params: { userId }
+  })
   return resp.data
 }
 
-export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
-  const resp = await api.get<ChatMessage[]>(`/chat/session/${sessionId}/messages`)
+export async function getSessionMessages(sessionId: string, userId: string): Promise<ChatMessage[]> {
+  const resp = await api.get<ChatMessage[]>(`/chat/session/${sessionId}/messages`, {
+    params: { userId }
+  })
   return resp.data
 }
 
-export async function deleteSession(sessionId: string): Promise<{ success: boolean; message: string }> {
-  const resp = await api.delete<{ success: boolean; message: string }>(`/chat/session/${sessionId}`)
+export async function deleteSession(sessionId: string, userId: string): Promise<{ success: boolean; message: string }> {
+  const resp = await api.delete<{ success: boolean; message: string }>(`/chat/session/${sessionId}`, {
+    params: { userId }
+  })
   return resp.data
 }

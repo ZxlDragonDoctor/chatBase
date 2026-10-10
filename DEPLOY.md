@@ -37,18 +37,32 @@ DIFYAPP_DATASET_API_KEY=your_dify_dataset_api_key
 REDIS_PASSWORD=
 ```
 
-### 3. 构建并启动服务
-
-首次部署需要先构建镜像：
+### 3. 一键启动
 
 ```bash
-# 构建镜像并启动（首次部署）
+# 推荐：一键脚本（自动检查 .env、构建、启动、健康检查）
+bash scripts/deploy.sh
+
+# 同时启动 QQ Bot
+bash scripts/deploy.sh --with-qq
+
+# 强制重新构建
+bash scripts/deploy.sh --rebuild
+
+# 停止
+bash scripts/deploy.sh --down
+```
+
+或手动 docker compose：
+
+```bash
+# 首次部署构建并启动
 docker compose up --build -d
 
 # 仅启动（镜像已存在时）
 docker compose up -d
 
-# 启动包含QQ Bot的服务（首次）
+# 启动包含 QQ Bot 的服务（首次）
 docker compose --profile qq up --build -d
 ```
 
@@ -112,15 +126,57 @@ DOMAIN=your-domain.example.com EMAIL=you@example.com bash scripts/setup-ssl.sh
 
 > 通过私聊会话远程驱动开发者**本机**的 opencode，实现"人在服务器、代理在本机"的远程编码代理。
 
-#### 1. 架构
+#### 新版 OpenClaw 式 Node 通道（推荐）
+
+本机 Agent 以固定能力 RPC 主动连到 `/opencode/node`。配对码由管理员在 `/console/im/single` 生成，电脑登记后还需管理员批准；随后将指定私聊绑定到该节点。没有入站端口或 frp，也不会改变未绑定 OpenCode 会话的 Dify 行为。
+
+后端环境变量：
+
+```env
+OPENCODE_ENABLED=true
+OPENCODE_NODE_ENABLED=true
+OPENCODE_NODE_TIMEOUT_SECONDS=320
+OPENCODE_NODE_HEARTBEAT_SECONDS=30
+OPENCODE_NODE_OFFLINE_AFTER_SECONDS=90
+OPENCODE_NODE_PAIRING_TTL_SECONDS=600
+```
+
+在目标电脑的第一个终端启动 `opencode serve`：
+
+```powershell
+$env:OPENCODE_SERVER_PASSWORD = "与 OpenCode 本机服务使用的强密码"
+opencode serve --hostname 127.0.0.1 --port 4096
+```
+
+在第二个 PowerShell 终端设置配对码并启动 Agent：
+
+```powershell
+$env:CHATBASE_NODE_WS_URL = "wss://your-domain.com/opencode/node"
+$env:OPENCODE_PAIR_CODE = "从 ChatBase 管理页复制的一次性配对码"
+$env:OPENCODE_URL = "http://127.0.0.1:4096"
+$env:OPENCODE_DEFAULT_DIRECTORY = "D:\Projects\my-repo"
+$env:OPENCODE_SERVER_USERNAME = "opencode"
+$env:OPENCODE_SERVER_PASSWORD = "与第一个终端相同的密码"
+node bridge\opencode-node.mjs
+```
+
+配对码 10 分钟后过期且只能使用一次。批准节点后，私聊详情可选择该节点；离线节点可以绑定，但执行时会立即提示离线。Agent 凭据保存在当前 Windows 用户目录 `%USERPROFILE%\.chatbase\opencode-node.json`，重连无需再次输入配对码。公网部署需要为 `/opencode/node` 配置 HTTPS/WSS，详见 [bridge/README.md](./bridge/README.md)。
+
+#### 旧版 V1 反向桥接（兼容）
 
 ```
-服务器 ChatBase ──frp 反向隧道──▶ 开发者本机 opencode serve (127.0.0.1:4096)
+开发者本机                              云服务器
+┌─────────────────────┐                ┌──────────────────────┐
+│  opencode serve     │◄──HTTP──┐      │                      │
+│  127.0.0.1:4096     │         │      │   ChatBase Backend   │
+│  opencode-bridge ───┼──WSS──────────►│   /opencode/bridge   │
+└─────────────────────┘                └──────────────────────┘
 ```
 
-- opencode serve 只绑定本机 127.0.0.1，不暴露公网
-- 服务器通过 frp 将本机 4096 端口映射为内网可访问的隧道地址
-- 请求路径：私聊消息 → ChatBase 判断会话绑定（appId=-1）→ OpencodeService → frp → 本机 opencode
+本机 agent **主动外连**服务器 WebSocket（对齐 OpenClaw Node / GitHub Runner 模式）：
+- 无需 frp、无需公网入站端口、无需内网穿透
+- 断线自动重连，token 鉴权
+- 详见 [bridge/README.md](./bridge/README.md)
 
 #### 2. 本机启动 opencode serve
 
@@ -133,27 +189,17 @@ opencode serve --port 4096
 - 用户名固定为 `opencode`（除非设置 `OPENCODE_SERVER_USERNAME`）
 - 密码 `OPENCODE_PASSWORD` 必须与此处的 `OPENCODE_SERVER_PASSWORD` 一致
 
-#### 3. frp 反向隧道（可选，生产环境必配）
+#### 3. 本机启动反向桥接 agent（Node.js 22+）
 
-在**开发者本机**运行 frp 客户端，将本机 opencode serve 暴露给服务器：
-
-```toml
-# frpc.toml（本机，frp v0.58+）
-serverAddr = "<服务器公网IP>"
-serverPort = 7000          # frps 的 bindPort
-auth.token = "<frps 设置的 token>"
-
-[[proxies]]
-name = "opencode-serve"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = 4096
-remotePort = 14096         # 服务器上开放的端口（frps allowPorts 需含此端口）
+```bash
+BRIDGE_URL=wss://your-domain.com/opencode/bridge \
+BRIDGE_TOKEN=please-change-me-to-a-long-random-string \
+OPENCODE_URL=http://127.0.0.1:4096 \
+node bridge/opencode-bridge.mjs
 ```
 
-服务器 frps 需开放 `bindPort`（如 7000）与 `remotePort`（如 14096），并配置相同 token；云服务器还需在安全组放行这两个端口。
-
-> 若服务器与 opencode 在同一台机器，可省略 frp，直接将 `OPENCODE_BASE_URL` 指向本机地址。
+生产走 Nginx/WSS（`web/nginx.conf` 已代理 `/opencode/bridge`）；
+本机开发可用 `ws://127.0.0.1:8080/opencode/bridge`。
 
 #### 4. 服务器配置环境变量
 
@@ -161,23 +207,32 @@ remotePort = 14096         # 服务器上开放的端口（frps allowPorts 需�
 
 ```env
 OPENCODE_ENABLED=true
-# ⚠️ 后端运行在 Docker 容器内，访问宿主机上的 frps 必须用网桥网关地址 172.17.0.1，
-#    不能用 127.0.0.1（容器内 127.0.0.1 是容器自身）。端口为 frps 映射的 remote_port。
-OPENCODE_BASE_URL=http://172.17.0.1:14096
+OPENCODE_BRIDGE_ENABLED=true
+OPENCODE_BRIDGE_TOKEN=please-change-me-to-a-long-random-string
+OPENCODE_BRIDGE_TRANSPORT=auto    # auto=优先桥接，无桥接回退直连
+# 可选：直连回退地址（同机 / Tailscale / frp）
+OPENCODE_BASE_URL=http://127.0.0.1:4096
 OPENCODE_PASSWORD=your-strong-password
-OPENCODE_DEFAULT_DIRECTORY=/path/to/project    # 本机项目根目录（可选）
+OPENCODE_DEFAULT_DIRECTORY=/path/to/project
 OPENCODE_TIMEOUT_SECONDS=300
 ```
 
-> 若在本机直接跑后端（非容器），才使用 `http://127.0.0.1:4096`。
-
-#### 5. 使用
+#### V1 使用
 
 1. 以 **admin** 登录 Web 控制台 → 「私聊采集」`/console/im/single`
-2. 在会话详情「应用绑定」下拉中选择 **🖥️ 本地opencode** 并保存
+2. 在会话详情「消息执行端」下拉中选择 **旧版 OpenCode 通道** 并保存
 3. 通过该平台私聊消息，即可远程驱动本机 opencode（回复写入 `kb_conversation` 审计）
 
-⚠️ 只有 admin 用户能看到并绑定「本地opencode」选项。
+⚠️ 新版节点配对、批准和节点绑定仅对 admin 开放。
+
+#### 备选：直连 HTTP（同机 / frp / Tailscale）
+
+若服务器与 opencode 同机，直接 `OPENCODE_BASE_URL=http://127.0.0.1:4096`、
+`OPENCODE_BRIDGE_TRANSPORT=direct`，无需 agent。
+
+若坚持 frp 反向隧道（不推荐，运维成本高），见
+[OPS_TROUBLESHOOTING.md](./OPS_TROUBLESHOOTING.md) 第 1 节历史方案；
+更轻量的替代是 Tailscale：两台机器加入同一 tailnet，`OPENCODE_BASE_URL=http://<tailscale-ip>:4096`。
 
 ## 常用命令
 

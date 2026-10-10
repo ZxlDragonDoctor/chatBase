@@ -36,6 +36,8 @@ public class ImConversation {
 
     private String appName;
 
+    private Long opencodeNodeId;
+
     private Boolean status;
 
     private LocalDateTime createTime;

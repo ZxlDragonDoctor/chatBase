@@ -93,6 +93,23 @@ public class ImConsoleController {
         imConversationService.unbindApp(id, userId);
     }
 
+    @PutMapping("/conversations/{id}/opencode-node")
+    public void bindConversationOpencodeNode(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            @RequestAttribute("currentUser") String userId) {
+        Object value = body.get("nodeId");
+        if (value == null) throw new IllegalArgumentException("nodeId 不能为空");
+        imConversationService.bindOpencodeNode(id, Long.valueOf(value.toString()), userId);
+    }
+
+    @DeleteMapping("/conversations/{id}/opencode-node")
+    public void unbindConversationOpencodeNode(
+            @PathVariable Long id,
+            @RequestAttribute("currentUser") String userId) {
+        imConversationService.unbindOpencodeNode(id, userId);
+    }
+
     @PutMapping("/groups/{id}/app")
     public void bindApp(
             @PathVariable Long id,

@@ -21,7 +21,7 @@ public class TokenService {
         String token = UUID.randomUUID().toString();
         String key = TOKEN_PREFIX + token;
         redisTemplate.opsForValue().set(key, username, TOKEN_EXPIRE);
-        log.info("创建token: username={}, token={}", username, token);
+        log.info("创建token: username={}, tokenPrefix={}", username, maskToken(token));
         return token;
     }
 
@@ -41,7 +41,7 @@ public class TokenService {
         if (token != null && !token.isBlank()) {
             String key = TOKEN_PREFIX + token;
             redisTemplate.delete(key);
-            log.info("删除token: token={}", token);
+            log.info("删除token: tokenPrefix={}", maskToken(token));
         }
     }
 
@@ -50,5 +50,13 @@ public class TokenService {
             String key = TOKEN_PREFIX + token;
             redisTemplate.expire(key, TOKEN_EXPIRE);
         }
+    }
+
+    /** 日志脱敏：只保留前 8 位 */
+    private static String maskToken(String token) {
+        if (token == null || token.length() <= 8) {
+            return "***";
+        }
+        return token.substring(0, 8) + "****";
     }
 }

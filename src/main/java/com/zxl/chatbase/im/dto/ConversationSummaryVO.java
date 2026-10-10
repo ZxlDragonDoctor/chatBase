@@ -18,4 +18,5 @@ public class ConversationSummaryVO {
     private String createdBy;
     private Long appId;
     private String appName;
+    private Long opencodeNodeId;
 }

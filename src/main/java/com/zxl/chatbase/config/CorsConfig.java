@@ -10,21 +10,31 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                // 开发 + 生产域名；IP 直连等场景用 originPatterns 兜底
-                .allowedOrigins(
-                        "http://localhost:5173",
-                        "http://127.0.0.1:5173",
-                        "http://localhost",
-                        "http://127.0.0.1",
-                        "https://www.zxldragon.fun",
-                        "http://www.zxldragon.fun"
-                )
-                .allowedOriginPatterns("*")
+                // 仅显式白名单；生产域名通过 CORS_ALLOWED_ORIGINS 注入（逗号分隔）
+                // 禁止 allowedOriginPatterns("*") + allowCredentials(true) 的组合
+                .allowedOrigins(resolveOrigins())
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .exposedHeaders("*")
+                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With")
+                .exposedHeaders("Content-Disposition")
                 .allowCredentials(true)
                 .maxAge(3600);
+    }
+
+    private String[] resolveOrigins() {
+        String env = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (env != null && !env.isBlank()) {
+            return java.util.Arrays.stream(env.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toArray(String[]::new);
+        }
+        // 默认本地开发源
+        return new String[]{
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost",
+                "http://127.0.0.1"
+        };
     }
 }
 

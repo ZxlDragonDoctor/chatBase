@@ -69,11 +69,6 @@ class ChatBaseApplicationTests {
     }
 
     @Test
-    void testUploadFile(){
-
-    }
-
-    @Test
     void testWxGroupUrl(){
         String url = System.getenv().getOrDefault("WECOM_BOT_WEBHOOK_URL", "");
         if (url == null || url.isBlank()) {

@@ -57,6 +57,26 @@ SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='
 SET @sql = IF(@has=0, 'ALTER TABLE `im_group` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT ''绑定的应用ID'' AFTER `kb_id`;', 'SELECT ''im_group.app_id already exists'';');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
+-- OpenCode 节点表与单聊节点绑定（可重复执行）
+CREATE TABLE IF NOT EXISTS `opencode_node` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `node_key` VARCHAR(64) NOT NULL,
+  `name` VARCHAR(100) NOT NULL,
+  `platform` VARCHAR(32) DEFAULT NULL,
+  `agent_version` VARCHAR(40) DEFAULT NULL,
+  `token_hash` CHAR(64) NOT NULL,
+  `capabilities` TEXT NOT NULL,
+  `approved_capabilities` TEXT DEFAULT NULL,
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `created_by` VARCHAR(64) NOT NULL,
+  `last_seen_at` DATETIME DEFAULT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_opencode_node_key` (`node_key`),
+  KEY `idx_opencode_node_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OpenCode 本机执行节点';
+
 SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='im_group' AND COLUMN_NAME='app_name');
 SET @sql = IF(@has=0, 'ALTER TABLE `im_group` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT ''应用名称（冗余字段）'' AFTER `app_id`;', 'SELECT ''im_group.app_name already exists'';');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
@@ -78,6 +98,14 @@ SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='
 SET @sql = IF(@has=0, 'ALTER TABLE `im_conversation` ADD COLUMN `app_name` VARCHAR(100) DEFAULT NULL COMMENT ''应用名称（冗余字段）'' AFTER `app_id`;', 'SELECT ''im_conversation.app_name already exists'';');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
+SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='im_conversation' AND COLUMN_NAME='opencode_node_id');
+SET @sql = IF(@has=0, 'ALTER TABLE `im_conversation` ADD COLUMN `opencode_node_id` BIGINT DEFAULT NULL COMMENT ''绑定的本机 opencode 节点'' AFTER `app_name`;', 'SELECT ''im_conversation.opencode_node_id already exists'';');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @has = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='im_conversation' AND INDEX_NAME='idx_opencode_node_id');
+SET @sql = IF(@has=0, 'ALTER TABLE `im_conversation` ADD KEY `idx_opencode_node_id` (`opencode_node_id`);', 'SELECT ''im_conversation.idx_opencode_node_id already exists'';');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
 -- kb_conversation：应用关联 + session_id + 费用字段
 SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='kb_conversation' AND COLUMN_NAME='app_id');
 SET @sql = IF(@has=0, 'ALTER TABLE `kb_conversation` ADD COLUMN `app_id` BIGINT DEFAULT NULL COMMENT ''使用的应用ID'' AFTER `knowledge_base_id`;', 'SELECT ''kb_conversation.app_id already exists'';');
@@ -93,6 +121,15 @@ PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 SET @has = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='kb_conversation' AND COLUMN_NAME='prompt_tokens');
 SET @sql = IF(@has=0, 'ALTER TABLE `kb_conversation` ADD COLUMN `prompt_tokens` INT DEFAULT 0 COMMENT ''提示词tokens'' AFTER `tokens`, ADD COLUMN `completion_tokens` INT DEFAULT 0 COMMENT ''完成tokens'' AFTER `prompt_tokens`, ADD COLUMN `prompt_price` DECIMAL(10,6) DEFAULT 0 COMMENT ''提示词费用'' AFTER `completion_tokens`, ADD COLUMN `completion_price` DECIMAL(10,6) DEFAULT 0 COMMENT ''完成费用'' AFTER `prompt_price`, ADD COLUMN `total_price` DECIMAL(10,6) DEFAULT 0 COMMENT ''总费用'' AFTER `completion_price`;', 'SELECT ''kb_conversation cost fields already exist'';');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+-- 同一个 Dify 会话会包含多轮问答；conversation_id 是会话标识，不应设为唯一键
+SET @has = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='kb_conversation' AND INDEX_NAME='uk_conversation_id' AND NON_UNIQUE=0);
+SET @sql = IF(@has>0, 'ALTER TABLE `kb_conversation` DROP INDEX `uk_conversation_id`;', 'SELECT ''kb_conversation.uk_conversation_id already removed'';');
+PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
+
+SET @has = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='chat_base' AND TABLE_NAME='kb_conversation' AND INDEX_NAME='idx_conversation_id');
+SET @sql = IF(@has=0, 'ALTER TABLE `kb_conversation` ADD KEY `idx_conversation_id` (`conversation_id`);', 'SELECT ''kb_conversation.idx_conversation_id already exists'';');
 PREPARE s FROM @sql; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- kb_statistics：应用维度 + 费用统计（注意：列在 init 中已有，部分为增量）

@@ -1,10 +1,10 @@
 <template>
   <div class="anime-page-shell">
-    <section class="anime-card">
+    <section class="anime-card" :aria-busy="loading">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">应用管理</div>
-          <div class="anime-card-desc">Dify应用配置 · 知识库关联 · 机器人绑定</div>
+          <h1 class="anime-card-title">应用管理</h1>
+          <p class="anime-card-desc">Dify应用配置 · 知识库关联 · 机器人绑定</p>
         </div>
         <div class="anime-card-actions">
           <button class="anime-btn primary" @click="openCreateModal">
@@ -14,14 +14,14 @@
         </div>
       </div>
 
-      <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
+      <div v-if="err" class="anime-error page-error" role="alert" aria-live="assertive">{{ err }}</div>
 
       <div class="anime-card-body">
-        <div class="anime-tabs" style="margin-bottom: 16px;">
-          <button class="anime-tab" :class="{ active: activeTab === 'mine' }" @click="activeTab = 'mine'">我的应用</button>
-          <button class="anime-tab" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">应用大厅</button>
+        <div class="anime-tabs page-tabs" role="group" aria-label="应用范围">
+          <button class="anime-tab" :class="{ active: activeTab === 'mine' }" :aria-pressed="activeTab === 'mine'" @click="activeTab = 'mine'">我的应用</button>
+          <button class="anime-tab" :class="{ active: activeTab === 'all' }" :aria-pressed="activeTab === 'all'" @click="activeTab = 'all'">应用大厅</button>
         </div>
-        <div v-if="loading" class="anime-empty">
+        <div v-if="loading" class="anime-empty" role="status" aria-live="polite">
           <span class="anime-loader-spinner"></span>
           <span class="anime-empty-text">加载中...</span>
         </div>
@@ -31,7 +31,7 @@
           <div class="anime-empty-text">{{ activeTab === 'mine' ? '暂无应用，点击上方按钮创建' : '暂无公开应用' }}</div>
         </div>
 
-        <div v-else class="kb-grid">
+        <div v-else class="app-grid">
           <div v-for="app in filteredAppList" :key="app.id" class="anime-card app-card">
             <div class="app-header">
               <div class="app-title-row">
@@ -52,7 +52,7 @@
                 <span class="info-label">Dify应用:</span>
                 <span class="anime-code">{{ app.difyAppName || '未验证' }}</span>
                 <span class="anime-badge blue">{{ app.difyAppMode || '-' }}</span>
-                <a :href="difyConsoleUrl" target="_blank" class="dify-link">
+                  <a :href="difyConsoleUrl" target="_blank" rel="noopener noreferrer" class="dify-link">
                   <ExternalLink :size="14" />
                   <span>控制台</span>
                 </a>
@@ -106,11 +106,11 @@
     </section>
 
     <!-- 创建/编辑应用弹窗 -->
-    <div v-if="showCreateModal" class="anime-modal-overlay" @click.self="closeModal">
-      <div class="anime-modal" style="max-width: 650px;">
+      <div v-if="showCreateModal" class="anime-modal-overlay" @click.self="closeModal">
+      <div ref="appDialogRef" class="anime-modal" role="dialog" aria-modal="true" tabindex="-1" :aria-label="editingApp ? '编辑应用' : '创建应用'" style="max-width: 650px;">
         <div class="anime-modal-header">
           <span>{{ editingApp ? '编辑应用' : '创建应用' }}</span>
-          <button class="anime-modal-close" @click="closeModal">✕</button>
+          <button class="anime-modal-close" aria-label="关闭应用设置窗口" @click="closeModal">✕</button>
         </div>
         <div class="anime-modal-body">
           <!-- 步骤指引 -->
@@ -120,7 +120,7 @@
               <div class="step-content">
                 <div class="step-title">前往Dify控制台创建应用</div>
                 <div class="step-desc">在Dify中创建Chatbot或Agent应用，配置知识库和参数</div>
-                <a :href="difyConsoleUrl" target="_blank" class="anime-btn blue step-btn">
+                <a :href="difyConsoleUrl" target="_blank" rel="noopener noreferrer" class="anime-btn blue step-btn">
                   <ExternalLink :size="16" />
                   <span>打开Dify控制台</span>
                 </a>
@@ -147,19 +147,19 @@
           </div>
 
           <div class="anime-form-group">
-            <label>应用名称 *</label>
-            <input v-model="form.name" class="anime-input" placeholder="如：医疗助手、群聊助手" />
+            <label for="app-name">应用名称 *</label>
+            <input id="app-name" v-model="form.name" class="anime-input" aria-label="应用名称" placeholder="如：医疗助手、群聊助手" />
           </div>
           <div class="anime-form-group">
-            <label>应用描述</label>
-            <textarea v-model="form.description" class="anime-input" rows="2" placeholder="应用用途说明"></textarea>
+            <label for="app-description">应用描述</label>
+            <textarea id="app-description" v-model="form.description" class="anime-input" aria-label="应用描述" rows="2" placeholder="应用用途说明"></textarea>
           </div>
           <div class="anime-form-group">
-            <label>应用图标</label>
-            <input v-model="form.icon" class="anime-input" placeholder="如：🏥、💬、🤖、📚" />
+            <label for="app-icon">应用图标</label>
+            <input id="app-icon" v-model="form.icon" class="anime-input" aria-label="应用图标" placeholder="如：🏥、💬、🤖、📚" />
           </div>
           <div class="anime-form-group">
-            <label>创建者</label>
+            <div class="form-field-label">创建者</div>
             <div class="creator-display">
               <User :size="16" />
               <span>{{ currentUserName }}</span>
@@ -167,19 +167,26 @@
             <div class="form-hint">应用公开后，其他用户将看到此创建者信息</div>
           </div>
           <div class="anime-form-group">
-            <label>Dify API Key *</label>
-            <input v-model="form.difyApiKey" class="anime-input" placeholder="从Dify控制台获取，格式：app-xxxxx" />
+            <label for="app-dify-api-key">Dify API Key *</label>
+            <div class="api-key-input-row">
+              <input id="app-dify-api-key" v-model="form.difyApiKey" class="anime-input" :type="showApiKey ? 'text' : 'password'" autocomplete="new-password" aria-label="Dify API Key" placeholder="从Dify控制台获取，格式：app-xxxxx" />
+              <button type="button" class="anime-btn ghost" :aria-label="showApiKey ? '隐藏 Dify API Key' : '显示 Dify API Key'" :aria-pressed="showApiKey" @click="showApiKey = !showApiKey">
+                <EyeOff v-if="showApiKey" :size="16" aria-hidden="true" />
+                <Eye v-else :size="16" aria-hidden="true" />
+                <span>{{ showApiKey ? '隐藏' : '显示' }}</span>
+              </button>
+            </div>
             <div class="api-key-actions">
               <button class="anime-btn ghost" @click="verifyApiKey">
                 <RefreshCw :size="16" />
                 <span>验证API Key</span>
               </button>
-              <a :href="difyConsoleUrl" target="_blank" class="anime-btn blue">
+              <a :href="difyConsoleUrl" target="_blank" rel="noopener noreferrer" class="anime-btn blue">
                 <ExternalLink :size="16" />
                 <span>获取API Key</span>
               </a>
             </div>
-            <div v-if="verifiedInfo" class="verified-info">
+            <div v-if="verifiedInfo" class="verified-info" role="status" aria-live="polite">
               <div class="verified-success">
                 <CheckCircle :size="16" />
                 <span>验证成功</span>
@@ -191,14 +198,14 @@
                 <span>请确保应用已在Dify控制台发布，否则API调用会失败</span>
               </div>
             </div>
-            <div v-if="verifyError" class="verified-error">
+            <div v-if="verifyError" class="verified-error" role="alert" aria-live="assertive">
               <XCircle :size="16" />
               <span>{{ verifyError }}</span>
             </div>
           </div>
           <div class="anime-form-group">
-            <label>关联知识库分类（可选）</label>
-            <select v-model="form.categoryId" class="anime-input">
+            <label for="app-category">关联知识库分类（可选）</label>
+            <select id="app-category" v-model="form.categoryId" class="anime-input" aria-label="关联知识库分类">
               <option value="">不关联分类（使用Dify应用配置的知识库）</option>
               <option v-for="cat in categoryList" :key="cat.id" :value="cat.id">
                 {{ cat.name }} ({{ cat.kbCount || 0 }} 知识库)
@@ -208,7 +215,7 @@
           </div>
           <div class="anime-form-group">
             <label style="display: flex; align-items: center; gap: 8px;">
-              <input type="checkbox" v-model="form.isPublic" />
+              <input type="checkbox" v-model="form.isPublic" aria-label="公开应用" />
               公开应用（其他用户可使用）
             </label>
           </div>
@@ -224,18 +231,18 @@
     </div>
 
     <!-- 绑定群组详情弹窗 -->
-    <div v-if="showGroupsModal" class="anime-modal-overlay" @click.self="showGroupsModal = false">
-      <div class="anime-modal" style="max-width: 700px;">
+    <div v-if="showGroupsModal" class="anime-modal-overlay" @click.self="closeGroupsModal">
+      <div ref="groupsDialogRef" class="anime-modal" role="dialog" aria-modal="true" tabindex="-1" :aria-label="`绑定群组详情：${selectedApp?.name || ''}`" style="max-width: 700px;">
         <div class="anime-modal-header">
           <span>绑定群组详情 - {{ selectedApp?.name }}</span>
-          <button class="anime-modal-close" @click="showGroupsModal = false">✕</button>
+          <button class="anime-modal-close" aria-label="关闭绑定群组详情" @click="closeGroupsModal">✕</button>
         </div>
         <div class="anime-modal-body">
-<div class="groups-tabs">
-              <button class="anime-tab" :class="{ active: groupsTab === 'qq' }" @click="groupsTab = 'qq'">
+<div class="groups-tabs" role="group" aria-label="群组平台">
+              <button class="anime-tab" :class="{ active: groupsTab === 'qq' }" :aria-pressed="groupsTab === 'qq'" @click="groupsTab = 'qq'">
                 QQ群 ({{ qqGroups.length }})
               </button>
-              <button class="anime-tab" :class="{ active: groupsTab === 'wx' }" @click="groupsTab = 'wx'">
+              <button class="anime-tab" :class="{ active: groupsTab === 'wx' }" :aria-pressed="groupsTab === 'wx'" @click="groupsTab = 'wx'">
                 企微群 ({{ wxGroups.length }})
               </button>
             </div>
@@ -270,11 +277,11 @@
     </div>
 
     <!-- 分类知识库列表弹窗 -->
-    <div v-if="showKbModal" class="anime-modal-overlay" @click.self="showKbModal = false">
-      <div class="anime-modal" style="max-width: 600px;">
+    <div v-if="showKbModal" class="anime-modal-overlay" @click.self="closeKbListModal">
+      <div ref="kbListDialogRef" class="anime-modal" role="dialog" aria-modal="true" tabindex="-1" :aria-label="`知识库列表：${selectedApp?.name || ''}`" style="max-width: 600px;">
         <div class="anime-modal-header">
           <span>知识库列表 - {{ selectedApp?.name }} ({{ selectedCategory?.name }})</span>
-          <button class="anime-modal-close" @click="showKbModal = false">✕</button>
+          <button class="anime-modal-close" aria-label="关闭知识库列表" @click="closeKbListModal">✕</button>
         </div>
         <div class="anime-modal-body">
           <div v-if="categoryKbList.length === 0" class="anime-empty">
@@ -295,8 +302,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useModalDialog } from '../composables/useModalDialog'
 import { RouterLink } from 'vue-router'
-import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle, User } from 'lucide-vue-next'
+import { Plus, RefreshCw, Edit3, Trash2, Star, Users, BookOpen, ExternalLink, CheckCircle, XCircle, AlertCircle, User, Eye, EyeOff } from 'lucide-vue-next'
 import { api } from '../api/client'
 import { getCurrentUser } from '../lib/user'
 
@@ -361,8 +369,11 @@ const kbList = ref<KbKnowledgeBase[]>([])
 const loading = ref(true)
 const err = ref('')
 const showCreateModal = ref(false)
+const showApiKey = ref(false)
 const showGroupsModal = ref(false)
 const showKbModal = ref(false)
+const closeGroupsModal = () => { showGroupsModal.value = false }
+const closeKbListModal = () => { showKbModal.value = false }
 const editingApp = ref<KbApp | null>(null)
 const selectedApp = ref<KbApp | null>(null)
 const selectedCategory = ref<Category | null>(null)
@@ -459,6 +470,7 @@ const getCategoryKbList = (id: number) => {
 
 const openCreateModal = () => {
   editingApp.value = null
+  showApiKey.value = false
   verifiedInfo.value = null
   verifyError.value = ''
   form.value = { name: '', description: '', icon: '', difyApiKey: '', categoryId: '', isPublic: true }
@@ -529,6 +541,7 @@ const setDefaultApp = async (app: KbApp) => {
 
 const editApp = (app: KbApp) => {
   editingApp.value = app
+  showApiKey.value = false
   form.value = {
     name: app.name,
     description: app.description || '',
@@ -586,12 +599,17 @@ const saveApp = async () => {
 
 const closeModal = () => {
   showCreateModal.value = false
+  showApiKey.value = false
   editingApp.value = null
   verifiedInfo.value = null
   verifyError.value = ''
   form.value = { name: '', description: '', icon: '', difyApiKey: '', categoryId: '', isPublic: true }
   err.value = ''
 }
+
+const { dialogRef: appDialogRef } = useModalDialog(showCreateModal, closeModal)
+const { dialogRef: groupsDialogRef } = useModalDialog(showGroupsModal, closeGroupsModal)
+const { dialogRef: kbListDialogRef } = useModalDialog(showKbModal, closeKbListModal)
 
 onMounted(() => {
   loadApps()
@@ -603,9 +621,9 @@ onMounted(() => {
 <style scoped>
 .app-card {
   padding: 20px;
-  background: #ffffff;
-  border: 1px solid var(--anime-border);
-  box-shadow: var(--anime-shadow-sm);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .app-header {
@@ -628,7 +646,7 @@ onMounted(() => {
 .app-name {
   font-size: 18px;
   font-weight: 700;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
 }
 
 .app-badges {
@@ -638,7 +656,7 @@ onMounted(() => {
 
 .app-desc {
   font-size: 14px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
   margin-bottom: 16px;
 }
 
@@ -648,8 +666,8 @@ onMounted(() => {
   gap: 10px;
   margin-bottom: 16px;
   padding: 14px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: var(--anime-radius);
+  background: var(--ui-surface-muted);
+  border-radius: var(--ui-radius-md);
 }
 
 .info-row {
@@ -661,23 +679,23 @@ onMounted(() => {
 }
 
 .info-label {
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
   min-width: 80px;
 }
 
 .info-value {
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
 }
 
 .info-muted {
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
 }
 
 .dify-link {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #4fc3f7;
+  color: var(--ui-primary-hover);
   font-size: 13px;
   text-decoration: none;
 }
@@ -693,20 +711,20 @@ onMounted(() => {
 }
 
 .danger {
-  color: #ef4444 !important;
+  color: var(--ui-danger) !important;
 }
 
 .danger:hover {
-  background: rgba(239, 68, 68, 0.08) !important;
-  border-color: #ef4444 !important;
-  color: #ef4444 !important;
+  background: var(--ui-danger-soft) !important;
+  border-color: var(--ui-danger-border) !important;
+  color: var(--ui-danger) !important;
 }
 
 .create-steps {
   margin-bottom: 20px;
   padding: 16px;
-  background: rgba(79, 195, 247, 0.06);
-  border-radius: var(--anime-radius);
+  background: var(--ui-surface-muted);
+  border-radius: var(--ui-radius-md);
 }
 
 .step-item {
@@ -725,7 +743,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--anime-gradient-pink);
+  background: var(--ui-primary);
   color: white;
   border-radius: 50%;
   font-size: 12px;
@@ -740,13 +758,13 @@ onMounted(() => {
 .step-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
   margin-bottom: 4px;
 }
 
 .step-desc {
   font-size: 13px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
   margin-bottom: 8px;
 }
 
@@ -756,12 +774,23 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+.api-key-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-key-input-row .anime-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .verified-info {
   margin-top: 12px;
   padding: 12px;
-  background: rgba(129, 199, 132, 0.08);
-  border: 1px solid rgba(129, 199, 132, 0.3);
-  border-radius: var(--anime-radius);
+  background: var(--ui-success-soft);
+  border: 1px solid var(--ui-success-border);
+  border-radius: var(--ui-radius-md);
   font-size: 13px;
 }
 
@@ -769,7 +798,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #388e3c;
+  color: var(--ui-success);
   font-weight: 700;
   margin-bottom: 8px;
 }
@@ -777,31 +806,31 @@ onMounted(() => {
 .verified-error {
   margin-top: 12px;
   padding: 10px;
-  background: rgba(255, 107, 157, 0.08);
-  border: 1px solid var(--anime-border-accent);
-  border-radius: var(--anime-radius);
+  background: var(--ui-danger-soft);
+  border: 1px solid var(--ui-danger-border);
+  border-radius: var(--ui-radius-md);
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--anime-pink);
+  color: var(--ui-danger);
   font-size: 13px;
 }
 
 .verified-warning {
   margin-top: 8px;
   padding: 8px;
-  background: rgba(255, 183, 77, 0.1);
-  border-radius: var(--anime-radius);
+  background: var(--ui-warning-soft);
+  border-radius: var(--ui-radius-md);
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #e6a700;
+  color: var(--ui-warning);
   font-size: 13px;
 }
 
 .form-hint {
   font-size: 12px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
   margin-top: 4px;
 }
 
@@ -810,11 +839,11 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--anime-border);
-  border-radius: var(--anime-radius);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
   font-weight: 600;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
   font-size: 14px;
 }
 
@@ -834,21 +863,21 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--anime-border);
-  border-radius: var(--anime-radius);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
   margin-bottom: 8px;
 }
 
 .group-name {
   font-weight: 600;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
   flex: 1;
 }
 
 .group-members {
   font-size: 13px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-muted);
 }
 
 .kb-list-modal {
@@ -861,15 +890,77 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.02);
-  border: 1px solid var(--anime-border);
-  border-radius: var(--anime-radius);
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
   margin-bottom: 8px;
 }
 
 .kb-title {
   font-weight: 600;
-  color: var(--anime-text-primary);
+  color: var(--ui-text);
   flex: 1;
+}
+</style>
+
+<style scoped>
+.page-error { margin: 0 28px 16px; }
+.anime-card-title { margin: 0; }
+.anime-card-desc { margin: 4px 0 0; }
+.page-tabs { margin-bottom: 18px; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 390px), 1fr)); gap: 16px; }
+.app-card { min-width: 0; padding: 18px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-card); }
+.app-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.app-title-row { min-width: 0; }
+.app-icon { display: grid; place-items: center; width: 36px; height: 36px; background: var(--ui-primary-soft); border-radius: var(--ui-radius-md); font-size: 20px; }
+.app-name { color: var(--ui-text); font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.app-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.app-desc { color: var(--ui-text-secondary); font-size: 14px; line-height: 1.55; margin-bottom: 14px; overflow-wrap: anywhere; }
+.app-info-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; padding: 12px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.info-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.info-label { color: var(--ui-text-secondary); min-width: 90px; font-weight: 600; }
+.info-value { color: var(--ui-text); overflow-wrap: anywhere; }
+.info-muted { color: var(--ui-text-muted); }
+.dify-link { color: var(--ui-primary-hover); font-size: 13px; text-decoration: none; }
+.dify-link:hover { color: var(--ui-primary); text-decoration: underline; }
+.app-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.app-actions .anime-btn { min-height: 36px; }
+.danger { color: var(--ui-danger) !important; }
+.danger:hover { background: var(--ui-danger-soft) !important; border-color: var(--ui-danger-border) !important; color: var(--ui-danger) !important; }
+.create-steps { margin-bottom: 20px; padding: 16px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.step-item { display: flex; gap: 12px; margin-bottom: 16px; }
+.step-item:last-child { margin-bottom: 0; }
+.step-num { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; background: var(--ui-primary); color: #fff; border-radius: 50%; font-size: 12px; font-weight: 700; }
+.step-content { flex: 1; min-width: 0; }
+.step-title { color: var(--ui-text); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.step-desc, .step-hint { color: var(--ui-text-secondary); font-size: 13px; margin-bottom: 8px; }
+.api-key-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.verified-info, .verified-error, .verified-warning { margin-top: 10px; padding: 12px; border-radius: var(--ui-radius-md); font-size: 13px; }
+.verified-info { background: var(--ui-success-soft); border: 1px solid var(--ui-success-border); color: var(--ui-text); }
+.verified-success { display: flex; align-items: center; gap: 6px; color: var(--ui-success); font-weight: 700; margin-bottom: 8px; }
+.verified-error { display: flex; align-items: center; gap: 6px; color: var(--ui-danger); background: var(--ui-danger-soft); border: 1px solid var(--ui-danger-border); }
+.verified-warning { display: flex; align-items: center; gap: 6px; color: var(--ui-warning); background: var(--ui-warning-soft); border: 1px solid var(--ui-warning-soft); }
+.form-hint { color: var(--ui-text-muted); font-size: 12px; margin-top: 4px; }
+.form-field-label { color: var(--ui-text-secondary); font-size: 13px; margin-bottom: 6px; font-weight: 600; }
+.creator-display { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); color: var(--ui-text); font-size: 14px; }
+.groups-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.groups-list, .kb-list-modal { max-height: 400px; overflow-y: auto; }
+.group-item, .kb-item { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px; margin-bottom: 8px; background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); }
+.group-name, .kb-title { color: var(--ui-text); font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.group-members { color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
+.anime-page-shell .anime-badge.blue, .anime-page-shell .anime-badge.purple { background: var(--ui-surface-muted); color: var(--ui-text-secondary); border: 1px solid var(--ui-border); }
+.anime-page-shell .anime-badge.green { background: var(--ui-success-soft); color: var(--ui-success); border: 1px solid var(--ui-success-border); }
+.anime-page-shell .anime-badge.pink { background: var(--ui-danger-soft); color: var(--ui-danger); border: 1px solid var(--ui-danger-border); }
+.anime-page-shell .anime-badge.yellow { background: var(--ui-warning-soft); color: var(--ui-warning); border: 1px solid var(--ui-warning-soft); }
+.anime-page-shell .anime-badge.gray, .anime-page-shell .anime-badge.muted { background: var(--ui-surface-muted); color: var(--ui-text-secondary); border: 1px solid var(--ui-border); }
+@media (max-width: 760px) {
+  .page-error { margin: 0 16px 14px; }
+  .app-grid { grid-template-columns: minmax(0, 1fr); }
+  .app-header { flex-direction: column; }
+  .info-label { min-width: 100%; }
+  .app-actions .anime-btn { flex: 1 1 calc(50% - 8px); }
+  .api-key-actions > * { flex: 1 1 100%; }
+  .group-item, .kb-item { flex-wrap: wrap; }
+  .group-name, .kb-title { flex-basis: 100%; }
 }
 </style>

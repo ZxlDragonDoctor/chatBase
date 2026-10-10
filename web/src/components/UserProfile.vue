@@ -1,34 +1,44 @@
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="show" class="user-profile-overlay" @click.self="$emit('close')">
+      <div
+        v-if="show"
+        class="user-profile-overlay"
+        role="dialog"
+        ref="profileDialogRef"
+        tabindex="-1"
+        :aria-modal="showEditModal || showPasswordModal ? 'false' : 'true'"
+        aria-labelledby="user-profile-title"
+        @click.self="$emit('close')"
+        @keydown="handleProfileDialogKeydown"
+      >
         <div class="user-profile-card anime-card" @click.stop>
           <div class="user-profile-header">
-            <span class="user-profile-title">✿ 用户信息 ✿</span>
-            <button class="user-profile-close" @click="$emit('close')">✕</button>
+            <h2 id="user-profile-title" class="user-profile-title">用户信息</h2>
+            <button type="button" class="user-profile-close" aria-label="关闭用户信息" @click="$emit('close')">✕</button>
           </div>
           
           <div class="user-profile-body">
-            <div v-if="!user" class="user-loading-state">
-              <span class="anime-loader-spinner" style="width: 32px; height: 32px;"></span>
+            <div v-if="!user" class="user-loading-state" role="status" aria-live="polite">
+              <span class="anime-loader-spinner" aria-hidden="true" style="width: 32px; height: 32px;"></span>
               <div>正在加载用户信息...</div>
             </div>
             <template v-else>
               <div class="user-avatar-section">
-                <div class="user-avatar-large" @click="openCropper">
+                <button ref="avatarTriggerRef" type="button" class="user-avatar-large" aria-label="更换头像" :aria-describedby="avatarUploading ? 'avatar-upload-status' : undefined" @click="openCropper">
                   <img v-if="user.avatar" :src="getAvatarUrl(user.avatar)" alt="头像" class="avatar-img" />
                   <template v-else>
                     <span v-if="user.nickname">{{ user.nickname.charAt(0).toUpperCase() }}</span>
                     <span v-else>{{ (user.username || 'U').charAt(0).toUpperCase() }}</span>
                   </template>
-                  <div class="avatar-upload-overlay">
+                  <div class="avatar-upload-overlay" aria-hidden="true">
                     <Camera :size="20" />
                   </div>
-                </div>
+                </button>
                 <div class="user-avatar-info">
                   <div class="user-display-name">{{ user.nickname || user.username || '未知用户' }}</div>
                   <span class="anime-badge" :class="roleBadgeClass">{{ roleLabel }}</span>
-                  <span v-if="avatarUploading" class="avatar-upload-hint">上传中...</span>
+                  <span v-if="avatarUploading" id="avatar-upload-status" class="avatar-upload-hint" role="status" aria-live="polite">上传中...</span>
                 </div>
               </div>
               
@@ -56,18 +66,18 @@
                 <div class="user-info-item">
                   <span class="user-info-label"><Clock :size="14" /> 在线状态</span>
                   <span class="user-info-value user-online-status">
-                    <span class="status-dot online"></span>
+                    <span class="status-dot online" aria-hidden="true"></span>
                     在线
                   </span>
                 </div>
               </div>
               
               <div class="user-profile-actions">
-                <button class="anime-btn primary" @click="showEditModal = true">
+                <button ref="editTriggerRef" class="anime-btn primary" @click="showEditModal = true">
                   <Edit :size="16" />
                   <span>修改资料</span>
                 </button>
-                <button class="anime-btn ghost" @click="showPasswordModal = true">
+                <button ref="passwordTriggerRef" class="anime-btn ghost" @click="showPasswordModal = true">
                   <Key :size="16" />
                   <span>修改密码</span>
                 </button>
@@ -77,28 +87,28 @@
         </div>
         
         <!-- 修改资料弹窗 -->
-        <div v-if="showEditModal" class="edit-modal-overlay" @click.self="showEditModal = false">
-          <div class="edit-modal anime-card">
+        <div v-if="showEditModal" ref="editDialogRef" class="edit-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-profile-edit-title" tabindex="-1" @keydown="handleEditDialogKeydown" @click.self="showEditModal = false">
+          <div class="edit-modal anime-card" @click.stop>
             <div class="edit-modal-header">
-              <span class="edit-modal-title">✿ 修改资料 ✿</span>
-              <button class="edit-modal-close" @click="showEditModal = false">✕</button>
+              <h3 id="user-profile-edit-title" class="edit-modal-title">修改资料</h3>
+              <button type="button" class="edit-modal-close" aria-label="关闭修改资料" @click="showEditModal = false">✕</button>
             </div>
             <div class="edit-modal-body">
               <div class="form-group">
-                <label class="form-label">昵称</label>
-                <input v-model="editForm.nickname" class="anime-input" placeholder="请输入昵称" />
+                <label class="form-label" for="user-profile-nickname">昵称</label>
+                <input id="user-profile-nickname" v-model="editForm.nickname" class="anime-input" placeholder="请输入昵称" />
               </div>
               <div class="form-group">
-                <label class="form-label">邮箱</label>
-                <input v-model="editForm.email" class="anime-input" type="email" placeholder="请输入邮箱" />
+                <label class="form-label" for="user-profile-email">邮箱</label>
+                <input id="user-profile-email" v-model="editForm.email" class="anime-input" type="email" placeholder="请输入邮箱" />
               </div>
               <div class="form-group">
-                <label class="form-label">手机号</label>
-                <input v-model="editForm.phone" class="anime-input" placeholder="请输入手机号" />
+                <label class="form-label" for="user-profile-phone">手机号</label>
+                <input id="user-profile-phone" v-model="editForm.phone" class="anime-input" placeholder="请输入手机号" />
               </div>
             </div>
-            <div v-if="editError" class="anime-error" style="margin: 12px 0;">{{ editError }}</div>
-            <div v-if="editSuccess" class="anime-success" style="margin: 12px 0;">{{ editSuccess }}</div>
+            <div v-if="editError" class="anime-error" role="alert" style="margin: 12px 0;">{{ editError }}</div>
+            <div v-if="editSuccess" class="anime-success" role="status" aria-live="polite" style="margin: 12px 0;">{{ editSuccess }}</div>
             <div class="edit-modal-footer">
               <button class="anime-btn primary" :disabled="editLoading" @click="handleUpdateProfile">
                 <span v-if="editLoading" class="anime-loader-spinner" style="width: 14px; height: 14px;"></span>
@@ -110,28 +120,28 @@
         </div>
         
         <!-- 修改密码弹窗 -->
-        <div v-if="showPasswordModal" class="edit-modal-overlay" @click.self="showPasswordModal = false">
-          <div class="edit-modal anime-card">
+        <div v-if="showPasswordModal" ref="passwordDialogRef" class="edit-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="user-password-edit-title" tabindex="-1" @keydown="handlePasswordDialogKeydown" @click.self="showPasswordModal = false">
+          <div class="edit-modal anime-card" @click.stop>
             <div class="edit-modal-header">
-              <span class="edit-modal-title">✿ 修改密码 ✿</span>
-              <button class="edit-modal-close" @click="showPasswordModal = false">✕</button>
+              <h3 id="user-password-edit-title" class="edit-modal-title">修改密码</h3>
+              <button type="button" class="edit-modal-close" aria-label="关闭修改密码" @click="showPasswordModal = false">✕</button>
             </div>
             <div class="edit-modal-body">
               <div class="form-group">
-                <label class="form-label">当前密码</label>
-                <input v-model="passwordForm.oldPassword" class="anime-input" type="password" placeholder="请输入当前密码" />
+                <label class="form-label" for="user-current-password">当前密码</label>
+                <input id="user-current-password" v-model="passwordForm.oldPassword" class="anime-input" type="password" placeholder="请输入当前密码" />
               </div>
               <div class="form-group">
-                <label class="form-label">新密码</label>
-                <input v-model="passwordForm.newPassword" class="anime-input" type="password" placeholder="请输入新密码" />
+                <label class="form-label" for="user-new-password">新密码</label>
+                <input id="user-new-password" v-model="passwordForm.newPassword" class="anime-input" type="password" placeholder="请输入新密码" />
               </div>
               <div class="form-group">
-                <label class="form-label">确认新密码</label>
-                <input v-model="passwordForm.confirmPassword" class="anime-input" type="password" placeholder="请再次输入新密码" />
+                <label class="form-label" for="user-confirm-password">确认新密码</label>
+                <input id="user-confirm-password" v-model="passwordForm.confirmPassword" class="anime-input" type="password" placeholder="请再次输入新密码" />
               </div>
             </div>
-            <div v-if="passwordError" class="anime-error" style="margin: 12px 0;">{{ passwordError }}</div>
-            <div v-if="passwordSuccess" class="anime-success" style="margin: 12px 0;">{{ passwordSuccess }}</div>
+            <div v-if="passwordError" class="anime-error" role="alert" style="margin: 12px 0;">{{ passwordError }}</div>
+            <div v-if="passwordSuccess" class="anime-success" role="status" aria-live="polite" style="margin: 12px 0;">{{ passwordSuccess }}</div>
             <div class="edit-modal-footer">
               <button class="anime-btn primary" :disabled="passwordLoading" @click="handleChangePassword">
                 <span v-if="passwordLoading" class="anime-loader-spinner" style="width: 14px; height: 14px;"></span>
@@ -150,13 +160,13 @@
       :image-url="selectedImageUrl"
       :visible="showCropper"
       @confirm="handleAvatarCrop"
-      @cancel="showCropper = false"
+      @cancel="closeCropper"
     />
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { User, Hash, Mail, Phone, Calendar, Clock, Edit, Key, Camera } from 'lucide-vue-next'
 import { getCurrentUser, updateUserProfile, changePassword, uploadAvatar, type UserVO } from '../api/user'
 import AvatarCropper from './AvatarCropper.vue'
@@ -182,6 +192,96 @@ const passwordLoading = ref(false)
 const passwordError = ref<string | null>(null)
 const passwordSuccess = ref<string | null>(null)
 const avatarUploading = ref(false)
+const profileDialogRef = ref<HTMLDivElement>()
+const editDialogRef = ref<HTMLDivElement>()
+const passwordDialogRef = ref<HTMLDivElement>()
+const avatarTriggerRef = ref<HTMLButtonElement>()
+const editTriggerRef = ref<HTMLButtonElement>()
+const passwordTriggerRef = ref<HTMLButtonElement>()
+let profileTrigger: HTMLElement | null = null
+
+function trapDialogFocus(event: KeyboardEvent, dialog: HTMLElement | undefined) {
+  if (event.key !== 'Tab' || !dialog) return
+
+  const focusableElements = Array.from(dialog.querySelectorAll<HTMLElement>(
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+  )).filter(element => element.getClientRects().length > 0)
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+
+  if (!first || !last) {
+    event.preventDefault()
+    dialog.focus()
+    return
+  }
+
+  const focusIsInside = dialog.contains(document.activeElement)
+  if (event.shiftKey && (!focusIsInside || document.activeElement === first)) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (!focusIsInside || document.activeElement === last)) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
+function handleProfileDialogKeydown(event: KeyboardEvent) {
+  if (showEditModal.value || showPasswordModal.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+    return
+  }
+  trapDialogFocus(event, profileDialogRef.value)
+}
+
+function handleEditDialogKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    showEditModal.value = false
+    return
+  }
+  trapDialogFocus(event, editDialogRef.value)
+}
+
+function handlePasswordDialogKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    showPasswordModal.value = false
+    return
+  }
+  trapDialogFocus(event, passwordDialogRef.value)
+}
+
+onMounted(async () => {
+  profileTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  await nextTick()
+  profileDialogRef.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+})
+
+onBeforeUnmount(() => {
+  if (profileTrigger?.isConnected) profileTrigger.focus()
+})
+
+watch(showEditModal, async (isOpen) => {
+  await nextTick()
+  if (isOpen) {
+    editDialogRef.value?.querySelector<HTMLInputElement>('input:not(:disabled)')?.focus()
+  } else {
+    editTriggerRef.value?.focus()
+  }
+})
+
+watch(showPasswordModal, async (isOpen) => {
+  await nextTick()
+  if (isOpen) {
+    passwordDialogRef.value?.querySelector<HTMLInputElement>('input:not(:disabled)')?.focus()
+  } else {
+    passwordTriggerRef.value?.focus()
+  }
+})
 
 const editForm = ref({
   nickname: '',
@@ -255,6 +355,11 @@ function openCropper() {
   input.click()
 }
 
+function closeCropper() {
+  showCropper.value = false
+  nextTick(() => avatarTriggerRef.value?.focus())
+}
+
 async function handleAvatarCrop(croppedBlob: Blob) {
   const file = new File([croppedBlob], 'avatar.jpg', { type: 'image/jpeg' })
   avatarUploading.value = true
@@ -274,6 +379,7 @@ async function handleAvatarCrop(croppedBlob: Blob) {
   } finally {
     avatarUploading.value = false
     showCropper.value = false
+    nextTick(() => avatarTriggerRef.value?.focus())
   }
 }
 
@@ -376,52 +482,84 @@ async function handleChangePassword() {
 </script>
 
 <style scoped>
-.user-profile-overlay {
+.user-profile-overlay,
+.edit-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  background: rgb(23 35 33 / 42%);
+}
+
+.user-profile-overlay { z-index: 1000; }
+.edit-modal-overlay { z-index: 1001; }
+
+.user-profile-card,
+.edit-modal {
+  padding: 0;
+  overflow: auto;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow-card);
 }
 
 .user-profile-card {
-  width: 480px;
-  max-width: 90vw;
-  padding: 0;
-  overflow: hidden;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
 }
 
-.user-profile-header {
+.user-profile-header,
+.edit-modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 2px solid var(--anime-border);
-  background: var(--anime-bg);
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface-muted);
 }
 
-.user-profile-title {
+.user-profile-title,
+.edit-modal-title {
+  margin: 0;
+  color: var(--ui-text);
   font-size: 18px;
   font-weight: 700;
-  color: var(--anime-pink);
 }
 
-.user-profile-close {
+.edit-modal-title { font-size: 16px; }
+
+.user-profile-close,
+.edit-modal-close {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
   background: transparent;
-  border: none;
+  color: var(--ui-text-muted);
   font-size: 20px;
-  color: var(--anime-text-muted);
   cursor: pointer;
 }
 
-.user-profile-body {
-  padding: 24px;
+.user-profile-close:hover,
+.edit-modal-close:hover {
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary-hover);
 }
+
+.user-profile-close:focus-visible,
+.edit-modal-close:focus-visible,
+.user-avatar-large:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.user-profile-body { padding: 24px; }
 
 .user-avatar-section {
   display: flex;
@@ -431,49 +569,49 @@ async function handleChangePassword() {
 }
 
 .user-avatar-large {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: var(--anime-gradient-pink);
+  position: relative;
   display: grid;
   place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 50%;
+  background: var(--ui-primary-soft);
+  color: var(--ui-primary);
+  box-shadow: var(--ui-shadow-card);
+  font: inherit;
   font-size: 28px;
   font-weight: 700;
-  color: var(--anime-bg);
-  box-shadow: var(--anime-shadow-card);
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
 }
 
-.user-avatar-large:hover .avatar-upload-overlay {
-  opacity: 1;
-}
+.user-avatar-large:hover .avatar-upload-overlay,
+.user-avatar-large:focus-visible .avatar-upload-overlay { opacity: 1; }
 
 .avatar-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   border-radius: 50%;
+  object-fit: cover;
 }
 
 .avatar-upload-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  inset: 0;
   display: grid;
   place-items: center;
+  background: rgb(23 35 33 / 58%);
+  color: var(--ui-surface);
   opacity: 0;
-  transition: opacity 0.2s;
-  color: white;
+  transition: opacity 0.2s ease;
 }
 
 .avatar-upload-hint {
+  color: var(--ui-primary-hover);
   font-size: 12px;
-  color: var(--anime-pink);
 }
 
 .user-avatar-info {
@@ -483,52 +621,55 @@ async function handleChangePassword() {
 }
 
 .user-display-name {
+  color: var(--ui-text);
   font-size: 20px;
   font-weight: 700;
-  color: var(--anime-text-primary);
 }
 
 .user-info-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 24px;
 }
 
 .user-info-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: var(--anime-bg);
-  border-radius: var(--anime-radius-lg);
-  border: 2px solid var(--anime-border);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface-muted);
 }
 
 .user-info-label {
   display: flex;
   align-items: center;
   gap: 8px;
+  color: var(--ui-text-secondary);
   font-size: 14px;
   font-weight: 600;
-  color: var(--anime-text-secondary);
 }
 
 .user-info-value {
+  color: var(--ui-text);
   font-size: 14px;
   font-weight: 600;
-  color: var(--anime-text-primary);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .user-info-code {
-  font-family: monospace;
-  color: var(--anime-purple);
+  color: var(--ui-text-secondary);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
 .user-online-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #22c55e;
+  color: var(--ui-success);
 }
 
 .status-dot {
@@ -537,74 +678,36 @@ async function handleChangePassword() {
   border-radius: 50%;
 }
 
-.status-dot.online {
-  background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
-}
+.status-dot.online { background: var(--ui-success); }
 
 .user-profile-actions {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 10px;
 }
 
-/* Edit & Password Modal */
-.edit-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1001;
-}
+.user-profile-actions .anime-btn,
+.edit-modal-footer .anime-btn { min-height: 44px; }
 
 .edit-modal {
-  width: 400px;
-  max-width: 90vw;
-  padding: 0;
-  overflow: hidden;
-}
-
-.edit-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 2px solid var(--anime-border);
-  background: var(--anime-bg);
-}
-
-.edit-modal-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--anime-pink);
-}
-
-.edit-modal-close {
-  background: transparent;
-  border: none;
-  font-size: 18px;
-  color: var(--anime-text-muted);
-  cursor: pointer;
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
 }
 
 .edit-modal-body {
-  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 20px;
 }
 
 .edit-modal-footer {
   display: flex;
-  gap: 12px;
   justify-content: flex-end;
+  gap: 12px;
   padding: 12px 20px;
-  border-top: 2px solid var(--anime-border);
+  border-top: 1px solid var(--ui-border);
 }
 
 .form-group {
@@ -614,20 +717,9 @@ async function handleChangePassword() {
 }
 
 .form-label {
+  color: var(--ui-text-secondary);
   font-size: 13px;
   font-weight: 600;
-  color: var(--anime-text-secondary);
-}
-
-/* Transitions */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 
 .user-loading-state {
@@ -637,7 +729,29 @@ async function handleChangePassword() {
   justify-content: center;
   gap: 16px;
   padding: 48px 24px;
-  color: var(--anime-text-muted);
+  color: var(--ui-text-secondary);
   font-size: 14px;
+}
+
+.user-avatar-info :deep(.anime-badge.muted) {
+  color: var(--ui-text-secondary);
+}
+
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.2s ease; }
+
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }
+
+@media (max-width: 480px) {
+  .user-profile-body { padding: 18px; }
+  .user-info-item { align-items: flex-start; }
+  .edit-modal-footer .anime-btn { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-enter-active,
+  .fade-leave-active,
+  .avatar-upload-overlay { transition: none; }
 }
 </style>

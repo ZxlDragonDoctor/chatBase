@@ -32,5 +32,11 @@ public interface ImConversationService {
 
     void unbindApp(Long id, String userId);
 
+    void bindOpencodeNode(Long id, Long nodeId, String userId);
+
+    void unbindOpencodeNode(Long id, String userId);
+
+    Long getOpencodeNodeId(String conversationId);
+
     Long getAppIdForConversation(String conversationId);
 }

@@ -5,9 +5,10 @@ import com.zxl.chatbase.command.CommandHandler;
 import com.zxl.chatbase.im.entity.ImGroup;
 import com.zxl.chatbase.im.mapper.ImGroupMapper;
 import com.zxl.chatbase.im.service.ImConversationService;
+import com.zxl.chatbase.opencode.OpencodeService;
+import com.zxl.chatbase.opencode.node.OpencodeNodeService;
 import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -18,7 +19,9 @@ public class StatusCommand implements CommandHandler {
     @Resource
     private ImConversationService imConversationService;
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private OpencodeService opencodeService;
+    @Resource
+    private OpencodeNodeService opencodeNodeService;
     @Resource
     private KbAppMapper kbAppMapper;
     @Resource
@@ -44,6 +47,10 @@ public class StatusCommand implements CommandHandler {
         // opencode binding status
         boolean opencodeBound = imConversationService.isOpencodeBound(conversationId);
         sb.append("opencode绑定: ").append(opencodeBound ? "✅ 已绑定" : "❌ 未绑定").append("\n");
+        Long nodeId = imConversationService.getOpencodeNodeId(conversationId);
+        if (nodeId != null) {
+            sb.append("本机节点: ").append(opencodeNodeService.getNodeStatus(nodeId)).append(" (ID: ").append(nodeId).append(")\n");
+        }
 
         // app info
         Long appId = imConversationService.getAppIdForConversation(conversationId);
@@ -58,8 +65,7 @@ public class StatusCommand implements CommandHandler {
 
         // opencode session status
         if (opencodeBound) {
-            String sessionId = stringRedisTemplate.opsForValue().get("opencode:session:" + conversationId);
-            sb.append("opencode会话: ").append(sessionId != null ? "活跃" : "无").append("\n");
+            sb.append("opencode会话: ").append(opencodeService.hasCurrentSession(conversationId) ? "活跃" : "无").append("\n");
         }
 
         return sb.toString().trim();

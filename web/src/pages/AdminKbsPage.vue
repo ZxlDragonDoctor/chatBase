@@ -3,17 +3,17 @@
     <section class="anime-card">
       <div class="anime-card-header">
         <div>
-          <div class="anime-card-title">知识库管理</div>
+          <h1 class="anime-card-title">知识库管理</h1>
           <div class="anime-card-desc">全部知识库 · 含私有知识库 · 仅管理员可见</div>
         </div>
       </div>
 
-      <div v-if="err" class="anime-error" style="margin: 16px 28px;">{{ err }}</div>
+      <div v-if="err" class="anime-error" role="alert" style="margin: 16px 28px;">{{ err }}</div>
 
       <div class="anime-card-body">
         <div class="filter-bar">
           <Search :size="16" class="search-icon" />
-          <input v-model="keyword" class="anime-input" placeholder="搜索知识库名称、描述、创建者..." style="max-width: 350px;" />
+          <input v-model="keyword" class="anime-input" aria-label="搜索知识库名称、描述或创建者" placeholder="搜索知识库名称、描述、创建者..." style="max-width: 350px;" />
           <span class="filter-count">共 {{ filteredList.length }} 个知识库</span>
           <button class="anime-btn ghost" :disabled="loading" @click="loadKbList">
             <RefreshCw :size="16" />
@@ -32,7 +32,7 @@
         </div>
 
         <div v-else class="kb-grid">
-          <div v-for="kb in filteredList" :key="kb.id" class="anime-card kb-card" @click="openDetail(kb.id)">
+          <div v-for="kb in filteredList" :key="kb.id" class="anime-card kb-card" role="button" tabindex="0" @click="openDetail(kb.id)" @keydown.enter="!$event.repeat && openDetail(kb.id)" @keydown.space.prevent="$event.stopPropagation()" @keyup.space.prevent="openDetail(kb.id)">
             <div class="kb-header">
               <span class="kb-name">{{ kb.name }}</span>
               <div class="kb-badges">
@@ -42,7 +42,7 @@
             </div>
             <div class="kb-desc">{{ kb.description || '无描述' }}</div>
             <div class="kb-meta">
-              <span class="anime-badge" :class="kb.status ? 'green' : 'pink'">{{ kb.status ? '启用' : '禁用' }}</span>
+              <span class="anime-badge" :class="kb.status ? 'green' : 'danger'">{{ kb.status ? '启用' : '禁用' }}</span>
               <span v-if="kb.isPublic !== undefined" class="anime-badge" :class="kb.isPublic ? 'green' : 'gray'">{{ kb.isPublic ? '公开' : '私有' }}</span>
               <span class="anime-code">{{ kb.sourceType || '手动' }}</span>
               <span class="kb-time">创建者: {{ kb.createBy || '-' }}</span>
@@ -53,15 +53,15 @@
       </div>
     </section>
 
-    <div v-if="showDetail && detail" class="anime-modal-overlay" @click.self="showDetail = false">
-      <div class="anime-modal detail-modal">
+      <div v-if="showDetail && detail" class="anime-modal-overlay" @click.self="showDetail = false">
+      <div ref="dialogRef" class="anime-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="kb-detail-title" tabindex="-1">
         <div class="anime-modal-header">
-          <span class="modal-title">知识库详情 #{{ detail.id }}</span>
-          <button class="anime-modal-close" @click="showDetail = false">✕</button>
+          <span id="kb-detail-title" class="modal-title">知识库详情 #{{ detail.id }}</span>
+          <button type="button" class="anime-modal-close" aria-label="关闭知识库详情" @click="showDetail = false">✕</button>
         </div>
         <div class="anime-tabs" style="padding: 0 24px; margin-bottom: 0;">
-          <button class="anime-tab" :class="{ active: detailTab === 'info' }" @click="detailTab = 'info'">基本信息</button>
-          <button class="anime-tab" :class="{ active: detailTab === 'docs' }" @click="switchDocTab">文档列表 ({{ detail.docCount || 0 }})</button>
+          <button class="anime-tab" :class="{ active: detailTab === 'info' }" :aria-pressed="detailTab === 'info'" @click="detailTab = 'info'">基本信息</button>
+          <button class="anime-tab" :class="{ active: detailTab === 'docs' }" :aria-pressed="detailTab === 'docs'" @click="switchDocTab">文档列表 ({{ detail.docCount || 0 }})</button>
         </div>
         <div class="anime-modal-body" style="border-top: 2px solid var(--anime-border); padding-top: 16px;">
           <template v-if="detailTab === 'info'">
@@ -77,7 +77,7 @@
               <tr><td class="dt-label">自动同步</td><td class="dt-value"><span class="anime-badge" :class="detail.autoSync ? 'green' : 'gray'">{{ detail.autoSync ? '开启' : '关闭' }}</span></td></tr>
               <tr v-if="detail.autoSync"><td class="dt-label">同步间隔</td><td class="dt-value">{{ detail.syncInterval || '-' }} 分钟</td></tr>
               <tr><td class="dt-label">公开</td><td class="dt-value"><span class="anime-badge" :class="detail.isPublic ? 'green' : 'gray'">{{ detail.isPublic ? '是' : '否' }}</span></td></tr>
-              <tr><td class="dt-label">状态</td><td class="dt-value"><span class="anime-badge" :class="detail.status ? 'green' : 'pink'">{{ detail.status ? '启用' : '禁用' }}</span></td></tr>
+              <tr><td class="dt-label">状态</td><td class="dt-value"><span class="anime-badge" :class="detail.status ? 'green' : 'danger'">{{ detail.status ? '启用' : '禁用' }}</span></td></tr>
               <tr><td class="dt-label">文档数</td><td class="dt-value">{{ detail.docCount || 0 }}</td></tr>
               <tr><td class="dt-label">片段数</td><td class="dt-value">{{ detail.chunkCount || 0 }}</td></tr>
               <tr><td class="dt-label">创建者</td><td class="dt-value">{{ detail.createBy || '-' }}</td></tr>
@@ -130,6 +130,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useModalDialog } from '../composables/useModalDialog'
 import { Search, RefreshCw } from 'lucide-vue-next'
 import { api } from '../api/client'
 
@@ -183,6 +184,7 @@ const loading = ref(true)
 const err = ref('')
 const keyword = ref('')
 const showDetail = ref(false)
+const { dialogRef } = useModalDialog(showDetail, () => { showDetail.value = false })
 const detail = ref<KbKnowledgeBaseDetail | null>(null)
 const detailTab = ref<'info' | 'docs'>('info')
 const docList = ref<KbDocument[]>([])
@@ -314,15 +316,15 @@ onMounted(async () => {
   gap: 10px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(79, 195, 247, 0.04), rgba(179, 157, 219, 0.04));
+  background: var(--ui-surface-muted);
   border-radius: var(--anime-radius-lg);
 }
 .search-icon { color: var(--anime-text-muted); flex-shrink: 0; }
 .filter-count { font-size: 13px; color: var(--anime-text-muted); margin-left: auto; }
 .kb-card { padding: 20px; cursor: pointer; transition: all 0.2s; }
-.kb-card:hover { box-shadow: var(--anime-shadow-pink); }
+.kb-card:hover { box-shadow: var(--ui-shadow-card); }
 .kb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.kb-name { font-size: 18px; font-weight: 700; color: var(--anime-pink); }
+.kb-name { font-size: 18px; font-weight: 700; color: var(--ui-primary-hover); }
 .kb-badges { display: flex; gap: 6px; }
 .kb-desc { font-size: 14px; color: var(--anime-text-muted); margin-bottom: 12px; }
 .kb-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -341,4 +343,39 @@ onMounted(async () => {
 .doc-title-cell { font-weight: 600; color: var(--anime-text-primary); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-time { font-size: 12px; color: var(--anime-text-muted); white-space: nowrap; }
 .doc-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--anime-border-light); }
+
+.filter-bar {
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--ui-surface-muted);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+}
+.filter-bar .anime-input { flex: 1 1 240px; max-width: 460px; }
+.filter-count { color: var(--ui-text-muted); }
+.kb-card { min-width: 0; padding: 18px; transition: border-color .16s ease, box-shadow .16s ease; }
+.kb-card:hover, .kb-card:focus-visible { border-color: #a6d2c8; box-shadow: 0 5px 16px rgb(19 48 41 / 8%); }
+.kb-header { align-items: flex-start; gap: 10px; }
+.kb-name { min-width: 0; color: var(--ui-text); overflow-wrap: anywhere; }
+.kb-badges { flex-wrap: wrap; justify-content: flex-end; }
+.kb-desc { color: var(--ui-text-secondary); line-height: 1.55; overflow-wrap: anywhere; }
+.kb-grid { grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+.detail-table { table-layout: fixed; }
+.anime-modal-body { max-width: 100%; overflow-x: auto; }
+.detail-table tr { border-color: var(--ui-border); }
+.detail-table td { overflow-wrap: anywhere; }
+.dt-label { color: var(--ui-text-muted); }
+.dt-value { color: var(--ui-text); word-break: break-word; }
+.doc-table { min-width: 620px; }
+.doc-table th { color: var(--ui-text-muted); background: var(--ui-surface-muted); border-color: var(--ui-border); }
+.doc-table td { color: var(--ui-text); border-color: var(--ui-border); }
+.doc-title-cell { color: var(--ui-text); }
+.doc-pagination { flex-wrap: wrap; border-color: var(--ui-border); }
+@media (max-width: 700px) {
+  .kb-grid { grid-template-columns: minmax(0, 1fr); }
+  .kb-header { flex-direction: column; }
+  .kb-badges { justify-content: flex-start; }
+  .filter-count { width: 100%; margin-left: 0; }
+  .detail-modal { max-height: calc(100dvh - 32px); }
+}
 </style>

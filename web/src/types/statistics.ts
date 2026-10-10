@@ -58,6 +58,9 @@ export type SystemOverview = {
   totalMessages: number
   totalConversations: number
   totalTokens: number
+  todayConversations: number
+  todayTokens: number
+  todaySuccessRate: number
   activeGroups: number
   activeUsers: number
   knowledgeBases: number

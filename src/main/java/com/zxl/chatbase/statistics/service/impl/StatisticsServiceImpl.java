@@ -444,8 +444,30 @@ public class StatisticsServiceImpl implements StatisticsService {
         Long totalConversations = ((Number) convStats.getOrDefault("total", 0L)).longValue();
         Long totalTokens = ((Number) convStats.getOrDefault("totalTokens", 0L)).longValue();
 
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        QueryWrapper<KbConversation> todayWrapper = new QueryWrapper<>();
+        todayWrapper.select("COUNT(1) as todayConversations", "IFNULL(SUM(tokens), 0) as todayTokens")
+                .ge("create_time", todayStart)
+                .lt("create_time", tomorrowStart);
+        if (!appIds.isEmpty()) {
+            todayWrapper.in("app_id", appIds);
+        }
+        Map<String, Object> todayStats = (empty && appIds.isEmpty())
+                ? Map.of("todayConversations", 0L, "todayTokens", 0L)
+                : conversationMapper.selectMaps(todayWrapper).stream().findFirst()
+                .orElse(Map.of("todayConversations", 0L, "todayTokens", 0L));
+        Long todayConversations = ((Number) todayStats.getOrDefault("todayConversations", 0L)).longValue();
+        Long todayTokens = ((Number) todayStats.getOrDefault("todayTokens", 0L)).longValue();
+
         QueryWrapper<GroupMessage> groupWrapper = new QueryWrapper<>();
-        groupWrapper.select("COUNT(DISTINCT group_id) as activeGroups", "COUNT(DISTINCT user_id) as activeUsers");
+        groupWrapper.select("COUNT(DISTINCT group_id) as activeGroups", "COUNT(DISTINCT user_id) as activeUsers")
+                .eq("conversation_type", "group")
+                .isNotNull("group_id")
+                .ne("group_id", "single")
+                .ge("message_time", today.minusDays(29).atStartOfDay())
+                .lt("message_time", tomorrowStart);
         if (!groupIds.isEmpty()) {
             groupWrapper.in("group_id", groupIds);
         }
@@ -478,7 +500,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         }
 
         QueryWrapper<KbConversation> avgLatencyWrapper = new QueryWrapper<>();
-        avgLatencyWrapper.select("IFNULL(AVG(latency_ms), 0) as avgLatency").isNotNull("latency_ms");
+        avgLatencyWrapper.select("IFNULL(AVG(latency_ms), 0) as avgLatency").gt("latency_ms", 0);
         if (!appIds.isEmpty()) {
             avgLatencyWrapper.in("app_id", appIds);
         }
@@ -508,6 +530,20 @@ public class StatisticsServiceImpl implements StatisticsService {
                 ? BigDecimal.valueOf(successCount * 100).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
+        QueryWrapper<KbConversation> todaySuccessWrapper = new QueryWrapper<>();
+        todaySuccessWrapper.ge("create_time", todayStart)
+                .lt("create_time", tomorrowStart)
+                .eq("status", true);
+        if (!appIds.isEmpty()) {
+            todaySuccessWrapper.in("app_id", appIds);
+        }
+        Long todaySuccessCount = (empty && appIds.isEmpty())
+                ? 0L : conversationMapper.selectCount(todaySuccessWrapper);
+        BigDecimal todaySuccessRate = todayConversations > 0
+                ? BigDecimal.valueOf(todaySuccessCount * 100)
+                .divide(BigDecimal.valueOf(todayConversations), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
         SystemOverviewVO.BotStatusVO botStatus = new SystemOverviewVO.BotStatusVO();
         botStatus.setQqEnabled(true);
         botStatus.setQqSelfId("configured");
@@ -521,6 +557,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         vo.setTotalMessages(totalMessages);
         vo.setTotalConversations(totalConversations);
         vo.setTotalTokens(totalTokens);
+        vo.setTodayConversations(todayConversations);
+        vo.setTodayTokens(todayTokens);
+        vo.setTodaySuccessRate(todaySuccessRate);
         vo.setActiveGroups(activeGroups);
         vo.setActiveUsers(activeUsers);
         vo.setKnowledgeBases(knowledgeBases.intValue());

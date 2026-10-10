@@ -1,21 +1,4 @@
 <template>
-  <div class="anime-bg-decor"></div>
-  <div class="anime-floating-stars">
-    <span class="anime-star" style="top: 10%; left: 5%;">✦</span>
-    <span class="anime-star" style="top: 30%; left: 88%; animation-delay: 0.8s;">✦</span>
-    <span class="anime-star" style="top: 70%; left: 12%; animation-delay: 1.6s;">✦</span>
-    <span class="anime-star" style="top: 88%; left: 92%; animation-delay: 2.4s;">✦</span>
-  </div>
-
-  <div class="anime-sakura-container">
-    <span class="anime-sakura-petal" style="left: 5%; animation-duration: 12s; animation-delay: 0s;"></span>
-    <span class="anime-sakura-petal" style="left: 20%; animation-duration: 15s; animation-delay: 2s;"></span>
-    <span class="anime-sakura-petal" style="left: 40%; animation-duration: 10s; animation-delay: 4s;"></span>
-    <span class="anime-sakura-petal" style="left: 55%; animation-duration: 14s; animation-delay: 1s;"></span>
-    <span class="anime-sakura-petal" style="left: 70%; animation-duration: 11s; animation-delay: 3s;"></span>
-    <span class="anime-sakura-petal" style="left: 85%; animation-duration: 13s; animation-delay: 5s;"></span>
-  </div>
-
   <template v-if="isLoginPage">
     <RouterView v-slot="{ Component }">
       <transition name="anime-fade" mode="out-in">
@@ -24,8 +7,17 @@
     </RouterView>
   </template>
 
-  <div v-else class="anime-app">
-    <aside class="anime-nav">
+  <div v-else class="anime-app" @keydown.esc="closeMobileNav">
+    <a class="anime-skip-link" href="#main-content">跳转到主内容</a>
+    <button
+      v-if="mobileNavOpen"
+      class="anime-nav-backdrop"
+      type="button"
+      aria-label="关闭导航菜单"
+      @click="closeMobileNav"
+    ></button>
+
+    <aside id="primary-navigation" class="anime-nav" :class="{ 'is-open': mobileNavOpen }">
       <div class="anime-nav-brand">
         <div class="anime-logo">
           <img src="/logo.png" alt="logo" style="width:100%;height:100%;object-fit:cover" />
@@ -36,63 +28,69 @@
         </div>
       </div>
 
-      <nav class="anime-nav-list">
-        <RouterLink class="anime-nav-item" to="/console/dashboard" active-class="active">
-          <Home class="anime-nav-icon" :size="20" />
+      <nav class="anime-nav-list" @click="closeMobileNav">
+        <div class="anime-nav-group-label">工作台</div>
+        <RouterLink class="anime-nav-item" to="/console/dashboard" exact-active-class="active">
+          <Home class="anime-nav-icon" :size="18" />
           <span>首页</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/statistics" active-class="active">
-          <BarChart3 class="anime-nav-icon" :size="20" />
+        <RouterLink class="anime-nav-item" to="/console/statistics" exact-active-class="active">
+          <BarChart3 class="anime-nav-icon" :size="18" />
           <span>统计</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/im" active-class="active">
-          <Users class="anime-nav-icon" :size="20" />
+
+        <div class="anime-nav-group-label">消息接入</div>
+        <RouterLink class="anime-nav-item" to="/console/im" exact-active-class="active">
+          <Users class="anime-nav-icon" :size="18" />
           <span>群聊</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/im/single" active-class="active">
-          <MessageSquare class="anime-nav-icon" :size="20" />
+        <RouterLink class="anime-nav-item" to="/console/im/single" exact-active-class="active">
+          <MessageSquare class="anime-nav-icon" :size="18" />
           <span>私聊</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/knowledge" active-class="active">
-          <BookOpen class="anime-nav-icon" :size="20" />
-          <span>知识库</span>
-        </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/app" active-class="active">
-          <Bot class="anime-nav-icon" :size="20" />
-          <span>应用</span>
-        </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/bots" active-class="active">
-          <Cpu class="anime-nav-icon" :size="20" />
+        <RouterLink class="anime-nav-item" to="/console/bots" exact-active-class="active">
+          <Cpu class="anime-nav-icon" :size="18" />
           <span>机器人</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/console/faq" active-class="active">
-          <HelpCircle class="anime-nav-icon" :size="20" />
+
+        <div class="anime-nav-group-label">内容管理</div>
+        <RouterLink class="anime-nav-item" to="/console/knowledge" exact-active-class="active">
+          <BookOpen class="anime-nav-icon" :size="18" />
+          <span>知识库</span>
+        </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/app" exact-active-class="active">
+          <Bot class="anime-nav-icon" :size="18" />
+          <span>应用</span>
+        </RouterLink>
+        <RouterLink class="anime-nav-item" to="/console/faq" exact-active-class="active">
+          <HelpCircle class="anime-nav-icon" :size="18" />
           <span>FAQ</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/chat" active-class="active">
-          <MessageCircle class="anime-nav-icon" :size="20" />
+
+        <div class="anime-nav-group-label">服务</div>
+        <RouterLink class="anime-nav-item" to="/chat" exact-active-class="active">
+          <MessageCircle class="anime-nav-icon" :size="18" />
           <span>问答</span>
         </RouterLink>
-        <RouterLink class="anime-nav-item" to="/feedback" active-class="active">
-          <Mail class="anime-nav-icon" :size="20" />
+        <RouterLink class="anime-nav-item" to="/feedback" exact-active-class="active">
+          <Mail class="anime-nav-icon" :size="18" />
           <span>反馈</span>
         </RouterLink>
-        <div style="margin: 8px 0 4px; padding: 0 16px;">
-          <div style="height: 1px; background: var(--anime-border);"></div>
-        </div>
-        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/feedback-manage" active-class="active">
+
+        <div v-if="isAdmin" class="anime-nav-group-label">管理</div>
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/feedback-manage" exact-active-class="active">
           <ClipboardList class="anime-nav-icon" :size="20" />
           <span>反馈管理</span>
         </RouterLink>
-        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/apps" active-class="active">
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/apps" exact-active-class="active">
           <Bot class="anime-nav-icon" :size="20" />
           <span>应用管理</span>
         </RouterLink>
-        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/kbs" active-class="active">
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/kbs" exact-active-class="active">
           <BookOpen class="anime-nav-icon" :size="20" />
           <span>知识库管理</span>
         </RouterLink>
-        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/users" active-class="active">
+        <RouterLink v-if="isAdmin" class="anime-nav-item" to="/console/admin/users" exact-active-class="active">
           <Users class="anime-nav-icon" :size="20" />
           <span>用户管理</span>
         </RouterLink>
@@ -100,21 +98,37 @@
 
       <!-- User Footer -->
       <div v-if="currentUser" class="anime-nav-footer">
-        <div class="gus-avatar" @click="openUserProfile">
-          <img v-if="userProfile?.avatar" :src="getAvatarUrl(userProfile.avatar)" alt="" @error="onAvatarError" />
-          <span v-else>{{ (userProfile?.nickname || currentUser).charAt(0).toUpperCase() }}</span>
-        </div>
-        <div class="gus-info" @click="openUserProfile">
-          <div class="gus-name">{{ userProfile?.nickname || currentUser }}</div>
-          <div class="gus-role">{{ roleLabel }}</div>
-        </div>
+        <button type="button" class="anime-nav-profile" @click="openUserProfile">
+          <span class="gus-avatar">
+            <img v-if="userProfile?.avatar && !avatarFailed" :src="getAvatarUrl(userProfile.avatar)" alt="" @error="onAvatarError" />
+            <span v-else>{{ (userProfile?.nickname || currentUser).charAt(0).toUpperCase() }}</span>
+          </span>
+          <span class="gus-info">
+            <span class="gus-name">{{ userProfile?.nickname || currentUser }}</span>
+            <span class="gus-role">{{ roleLabel }}</span>
+          </span>
+        </button>
         <button class="anime-btn xs" @click="handleLogout">
           <LogOut :size="14" />
         </button>
       </div>
     </aside>
 
-    <main class="anime-main">
+    <main id="main-content" class="anime-main" tabindex="-1">
+      <div class="anime-mobile-topbar">
+        <button
+          class="anime-mobile-menu-toggle"
+          type="button"
+          :aria-expanded="mobileNavOpen"
+          aria-controls="primary-navigation"
+          :aria-label="mobileNavOpen ? '关闭导航菜单' : '打开导航菜单'"
+          @click="mobileNavOpen = !mobileNavOpen"
+        >
+          <X v-if="mobileNavOpen" :size="18" />
+          <Menu v-else :size="18" />
+        </button>
+        <span class="anime-mobile-topbar-title">ChatBase 工作台</span>
+      </div>
       <RouterView v-slot="{ Component }">
         <transition name="anime-fade" mode="out-in">
           <component :is="Component" />
@@ -130,9 +144,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
-import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, LogOut, Bot, ClipboardList, Cpu, MessageSquare } from 'lucide-vue-next'
+import { Home, BarChart3, Users, BookOpen, MessageCircle, Mail, HelpCircle, LogOut, Bot, ClipboardList, Cpu, MessageSquare, Menu, X } from 'lucide-vue-next'
 import UserProfile from './components/UserProfile.vue'
-import { getCurrentUser as fetchUserProfile } from './api/user'
+import { getCurrentUser as fetchUserProfile, logout } from './api/user'
 import type { UserVO } from './api/user'
 
 const router = useRouter()
@@ -142,6 +156,11 @@ const isLoginPage = computed(() => route.path === '/login')
 const currentUser = ref('')
 const isAdmin = ref(false)
 const role = ref('')
+const mobileNavOpen = ref(false)
+
+function closeMobileNav() {
+  mobileNavOpen.value = false
+}
 
 function syncAuthState() {
   currentUser.value = localStorage.getItem('chatbase_user') || ''
@@ -155,8 +174,12 @@ function getOriginalUsername(): string {
 
 const showUserProfile = ref(false)
 const userProfile = ref<UserVO | null>(null)
+const avatarFailed = ref(false)
+
+watch(userProfile, () => { avatarFailed.value = false })
 
 async function openUserProfile() {
+  closeMobileNav()
   showUserProfile.value = true
   await loadUserProfile()
 }
@@ -199,12 +222,16 @@ function getAvatarUrl(path: string): string {
   return `/api${path}`
 }
 
-function onAvatarError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.style.display = 'none'
+function onAvatarError() {
+  avatarFailed.value = true
 }
 
-function handleLogout() {
+async function handleLogout() {
+  try {
+    await logout()
+  } catch {
+    // 忽略注销接口失败，本地仍清理
+  }
   localStorage.removeItem('chatbase_token')
   localStorage.removeItem('chatbase_user')
   localStorage.removeItem('chatbase_original_username')
@@ -215,6 +242,7 @@ function handleLogout() {
 
 watch(() => route.path, () => {
   syncAuthState()
+  closeMobileNav()
   if (localStorage.getItem('chatbase_token')) loadUserProfile()
 })
 

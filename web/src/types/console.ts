@@ -54,6 +54,7 @@ export type ConversationSummary = {
   createdBy?: string | null
   appId?: number | null
   appName?: string | null
+  opencodeNodeId?: number | null
 }
 
 export type GroupMessageItem = {

@@ -9,6 +9,7 @@ import com.zxl.chatbase.kb.entity.KbApp;
 import com.zxl.chatbase.kb.entity.SysUser;
 import com.zxl.chatbase.kb.mapper.KbAppMapper;
 import com.zxl.chatbase.kb.mapper.SysUserMapper;
+import com.zxl.chatbase.opencode.node.OpencodeNodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class ImConversationServiceImpl implements ImConversationService {
     private final ImConversationMapper imConversationMapper;
     private final KbAppMapper kbAppMapper;
     private final SysUserMapper sysUserMapper;
+    private final OpencodeNodeService opencodeNodeService;
 
     private static String buildConversationId(String platform, String userId) {
         return "single:" + platform + ":" + userId;
@@ -100,6 +102,9 @@ public class ImConversationServiceImpl implements ImConversationService {
         if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
             throw new RuntimeException("无权绑定应用：非会话归属用户");
         }
+        if (OPENCODE_APP_ID.equals(conv.getAppId()) && !OPENCODE_APP_ID.equals(appId) && !isAdmin(userId)) {
+            throw new RuntimeException("无权修改本地 opencode 绑定：仅管理员可用");
+        }
 
         // 绑定本地 opencode：仅管理员可用
         if (OPENCODE_APP_ID.equals(appId)) {
@@ -109,6 +114,7 @@ public class ImConversationServiceImpl implements ImConversationService {
             conv.setCreatedBy(userId);
             conv.setAppId(OPENCODE_APP_ID);
             conv.setAppName(OPENCODE_APP_NAME);
+            conv.setOpencodeNodeId(null);
             conv.setUpdateTime(LocalDateTime.now());
             imConversationMapper.updateById(conv);
             log.info("会话绑定本地opencode: conversationId={}, userId={}", conv.getConversationId(), userId);
@@ -118,6 +124,7 @@ public class ImConversationServiceImpl implements ImConversationService {
         conv.setCreatedBy(userId);
         conv.setAppId(appId);
         conv.setAppName(appName);
+        conv.setOpencodeNodeId(null);
         conv.setUpdateTime(LocalDateTime.now());
         imConversationMapper.updateById(conv);
         log.info("会话绑定应用: conversationId={}, appId={}, appName={}, userId={}", conv.getConversationId(), appId, appName, userId);
@@ -132,9 +139,13 @@ public class ImConversationServiceImpl implements ImConversationService {
         if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
             throw new RuntimeException("无权解绑应用：非会话归属用户");
         }
+        if (OPENCODE_APP_ID.equals(conv.getAppId()) && !isAdmin(userId)) {
+            throw new RuntimeException("无权解除本地 opencode 绑定：仅管理员可用");
+        }
         conv.setCreatedBy(null);
         conv.setAppId(null);
         conv.setAppName(null);
+        conv.setOpencodeNodeId(null);
         conv.setUpdateTime(LocalDateTime.now());
         imConversationMapper.updateById(conv);
         log.info("会话解除应用绑定: conversationId={}, userId={}", conv.getConversationId(), userId);
@@ -170,6 +181,49 @@ public class ImConversationServiceImpl implements ImConversationService {
             log.error("获取会话应用失败: conversationId={}", conversationId, e);
             return null;
         }
+    }
+
+    @Override
+    public void bindOpencodeNode(Long id, Long nodeId, String userId) {
+        if (!isAdmin(userId)) throw new RuntimeException("仅管理员可绑定本机 opencode 节点");
+        ImConversation conv = imConversationMapper.selectById(id);
+        if (conv == null) throw new RuntimeException("会话不存在");
+        if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权绑定节点：非会话归属用户");
+        }
+        opencodeNodeService.requireBindableNode(nodeId);
+        conv.setCreatedBy(userId);
+        conv.setAppId(OPENCODE_APP_ID);
+        conv.setAppName(OPENCODE_APP_NAME);
+        conv.setOpencodeNodeId(nodeId);
+        conv.setUpdateTime(LocalDateTime.now());
+        imConversationMapper.updateById(conv);
+        log.info("私聊绑定 OpenCode 节点: conversationId={}, nodeId={}, userId={}", conv.getConversationId(), nodeId, userId);
+    }
+
+    @Override
+    public void unbindOpencodeNode(Long id, String userId) {
+        if (!isAdmin(userId)) throw new RuntimeException("仅管理员可解绑本机 opencode 节点");
+        ImConversation conv = imConversationMapper.selectById(id);
+        if (conv == null) throw new RuntimeException("会话不存在");
+        if (conv.getCreatedBy() != null && !conv.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("无权解绑节点：非会话归属用户");
+        }
+        conv.setOpencodeNodeId(null);
+        conv.setAppId(OPENCODE_APP_ID);
+        conv.setAppName(OPENCODE_APP_NAME);
+        conv.setUpdateTime(LocalDateTime.now());
+        imConversationMapper.updateById(conv);
+    }
+
+    @Override
+    public Long getOpencodeNodeId(String conversationId) {
+        if (!StringUtils.hasText(conversationId)) return null;
+        ImConversation conv = imConversationMapper.selectOne(
+                new LambdaQueryWrapper<ImConversation>()
+                        .eq(ImConversation::getConversationId, conversationId)
+                        .last("LIMIT 1"));
+        return conv != null && OPENCODE_APP_ID.equals(conv.getAppId()) ? conv.getOpencodeNodeId() : null;
     }
 
     private boolean isAdmin(String userId) {
