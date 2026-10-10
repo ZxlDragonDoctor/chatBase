@@ -33,8 +33,8 @@
 ## 目录 / Table of Contents
 
 - [项目简介 · What is it](#项目简介--what-is-it)
+- [界面预览 / Screenshots](#界面预览--screenshots)
 - [核心特性 · Features](#核心特性--features)
-- [界面与首页统计](#界面与首页统计)
 - [技术栈 · Tech Stack](#技术栈--tech-stack)
 - [系统架构 · Architecture](#系统架构--architecture)
 - [快速开始 · Quick Start](#快速开始--quick-start)
@@ -56,14 +56,36 @@
 
 <img src="./assets/chatbase-icon.png" alt="ChatBase" width="120" align="right">
 
-ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决方案。后端对接 Dify 大模型，前端提供管理看板，把分散在 QQ、企业微信、微信个人号里的用户消息统一汇聚、自动回复、沉淀为知识库，并支持数据统计与反馈闭环。
+ChatBase 是一套面向团队的**多渠道 AI 客服工作台**：把 QQ、企业微信和微信个人号的消息统一接入，使用 Dify 与知识库生成回复，再通过统计和用户反馈持续改进服务。需要本地执行时，管理员还可以将私聊绑定到完成配对并经管理员批准的 OpenCode 节点；现有直连和桥接方式继续保留。
 
 - **多渠道统一抽象**：QQ 走 NapCat（WebSocket + WebUI 扫码）、企业微信走回调、微信个人号走 iLink，差异被收敛到同一套 IM 消息模型。
 - **知识库优先**：FAQ 优先命中，未命中再走大模型，并附带引用来源。
 - **统一工作台界面**：登录、聊天、统计、IM、知识库、应用、机器人、FAQ 与管理页面采用一致的响应式浅色界面。
-- **OpenClaw 式本机节点**：电脑通过 WSS 主动连接并用一次性配对码登记，经管理员批准后绑定私聊；原有 direct HTTP 和 V1 桥接仍可使用。
+- **可选的本机 OpenCode 节点**：电脑通过 WSS 主动连接并用一次性配对码登记，经管理员批准后绑定私聊；原有 direct HTTP 和 V1 桥接仍可使用。
 
 **Keywords:** AI chatbot · customer service · RAG knowledge base · Dify · QQ Bot (NapCat) · WeCom · WeChat personal · remote coding agent · opencode · Vue 3 · Spring Boot
+
+---
+
+## 界面预览 / Screenshots
+
+ChatBase 将多渠道消息、机器人状态、知识库和使用数据放在同一个管理工作台中。下面展示登录页与控制台首页；截图中的统计数字和账号信息均为本地生成的示例数据。
+
+<div align="center">
+
+<img src="./assets/screenshots/dashboard.jpg" alt="ChatBase 管理工作台首页，展示今日问答、历史指标、机器人状态和快速入口" width="100%">
+
+<p><strong>管理工作台</strong> · 今日问答、Token 使用、机器人状态与常用功能入口</p>
+
+<img src="./assets/screenshots/login.jpg" alt="ChatBase 登录页面，展示团队知识工作台的登录表单" width="49%">
+
+<p><strong>登录页面</strong> · 管理员统一分配账号，登录后进入工作台</p>
+
+</div>
+
+控制台覆盖统计、群聊与私聊、知识库、应用、机器人、FAQ、聊天、反馈和管理员页面，并适配窄屏导航与表格布局。
+
+首页统计的实现审查发现平台 ID 和用户可见群组范围存在边界问题，详情及建议见[首页统计口径审查](./docs/dashboard-statistics-audit.md)。该审查记录描述当前服务端统计实现。
 
 ---
 
@@ -80,14 +102,6 @@ ChatBase 是一套**开箱即用的多渠道智能客服 + AI 知识库**解决�
 | <img src="./assets/icons/feedback.png" width="28" alt=""> **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
 | <img src="./assets/icons/commands.png" width="28" alt=""> **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
 | <img src="./assets/icons/security.png" width="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；默认关闭自助注册 |
-
----
-
-## 界面与首页统计
-
-管理控制台采用统一的浅色工作台布局，覆盖首页、统计、群聊与私聊、知识库、应用、机器人、FAQ、聊天、反馈和管理员页面。窄屏下导航、表格、工具栏和弹窗会调整布局；键盘用户可以使用页面导航和弹窗操作。
-
-首页统计的实现审查发现平台 ID 和用户可见群组范围存在边界问题，详情及建议见[首页统计口径审查](./docs/dashboard-statistics-audit.md)。该审查记录描述当前服务端统计实现。
 
 ---
 
