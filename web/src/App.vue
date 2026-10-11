@@ -20,7 +20,7 @@
     <aside id="primary-navigation" class="anime-nav" :class="{ 'is-open': mobileNavOpen }">
       <div class="anime-nav-brand">
         <div class="anime-logo">
-          <img src="/logo.png" alt="logo" style="width:100%;height:100%;object-fit:cover" />
+          <img src="/logo.png" alt="ChatBase" style="width:100%;height:100%;object-fit:cover" />
         </div>
         <div>
           <div class="anime-brand-title">ChatBase</div>
