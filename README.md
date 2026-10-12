@@ -93,15 +93,15 @@ ChatBase 将多渠道消息、机器人状态、知识库和使用数据放在�
 
 | 模块 Tier | 能力 What you get | 说明 |
 |-----------|------------------|------|
-| <img src="./assets/icons/dialogue.png" width="28" alt=""> **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
-| <img src="./assets/icons/knowledge.png" width="28" alt=""> **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
-| <img src="./assets/icons/channels.png" width="28" alt=""> **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
-| <img src="./assets/icons/remote.png" width="28" alt=""> **远程 opencode / Remote** | 私聊绑定已批准的本机节点（可选） | OpenClaw 式主动 WSS 配对；保留 direct HTTP 与 V1 桥接兼容，仅 admin 可管理 |
-| **工作台界面 / Console UI** | 全站统一、响应式的浅色工作台 | 包括窄屏导航、可访问的表单与弹窗、清晰的加载和错误状态 |
-| <img src="./assets/icons/analytics.png" width="28" alt=""> **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
-| <img src="./assets/icons/feedback.png" width="28" alt=""> **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
-| <img src="./assets/icons/commands.png" width="28" alt=""> **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
-| <img src="./assets/icons/security.png" width="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；默认关闭自助注册 |
+| <img src="./assets/icons/readme/dialogue.svg" width="28" height="28" alt=""> **AI 对话 / Dialogue** | Dify 多轮对话、FAQ 优先命中、引用溯源 | 基于会话上下文，命中 FAQ 优先返回，未命中走大模型；带 Retriever 引用来源 |
+| <img src="./assets/icons/readme/knowledge.svg" width="28" height="28" alt=""> **知识库 / Knowledge** | 批量传文档、自动同步 Dify、分类、搜索 | 支持 TXT/PDF/DOCX/MD，Dify Dataset 同步，树形分类，进度条（SSE） |
+| <img src="./assets/icons/readme/channels.svg" width="28" height="28" alt=""> **多渠道 IM / Channels** | QQ 群/私聊、企微回调、微信 iLink | 统一消息抽象，扫码/回调接入，群与私聊全覆盖 |
+| <img src="./assets/icons/readme/remote.svg" width="28" height="28" alt=""> **远程 opencode / Remote** | 私聊绑定已批准的本机节点（可选） | OpenClaw 式主动 WSS 配对；保留 direct HTTP 与 V1 桥接兼容，仅 admin 可管理 |
+| <img src="./assets/icons/readme/console.svg" width="28" height="28" alt=""> **工作台界面 / Console UI** | 全站统一、响应式的浅色工作台 | 包括窄屏导航、可访问的表单与弹窗、清晰的加载和错误状态 |
+| <img src="./assets/icons/readme/analytics.svg" width="28" height="28" alt=""> **数据洞察 / Analytics** | Token/费用趋势、关键词云、群活跃、命中率 | 按日/月统计，支持 admin 切换到全部/个人维度 |
+| <img src="./assets/icons/readme/feedback.svg" width="28" height="28" alt=""> **FAQ & 反馈 / Feedback** | 高频问答自动抽取、评分、后台处理 | 星级+类型+描述反馈，管理员回复，满意度分析 |
+| <img src="./assets/icons/readme/commands.svg" width="28" height="28" alt=""> **机器人命令 / Bot Commands** | 微信/企微交互式命令（/help /new /status 等） | 8 个内置命令，支持中英文别名，可扩展 |
+| <img src="./assets/icons/readme/security.svg" width="28" height="28" alt=""> **权限隔离 / Security** | admin/user 角色 + `created_by` 数据隔离 | 拦截器鉴权 + 查询级数据过滤；默认关闭自助注册 |
 
 ---
 
